@@ -8,14 +8,19 @@ input group "Test Strategy Settings";
 input double test_take_profit_points = 500; // [TEST] > Take Profit (points)
 input double test_stop_loss_points = 250; // [TEST] > Stop Loss (points)
 input ENUM_ORDER_TYPE test_order_side = ORDER_TYPE_BUY; // [TEST] > Order Side
+input int test_entry_hour = 10; // [TEST] > Entry Hour (0-23)
 
 class Test:
 public IStrategy {
+private:
+	int last_order_day;
+
 public:
 	Test(string strategy_symbol) {
 		symbol = strategy_symbol;
 		name = "Test";
 		prefix = "TST";
+		last_order_day = -1;
 	}
 
 private:
@@ -27,10 +32,15 @@ private:
 		return INIT_SUCCEEDED;
 	}
 
-	void onStartDay() {
-		IStrategy::onStartDay();
+	void onStartHour() {
+		IStrategy::onStartHour();
 
-		openDailyOrder();
+		MqlDateTime current_time = dtime.Now();
+
+		if (current_time.hour == test_entry_hour && current_time.day_of_year != last_order_day) {
+			openDailyOrder();
+			last_order_day = current_time.day_of_year;
+		}
 	}
 
 	void openDailyOrder() {
