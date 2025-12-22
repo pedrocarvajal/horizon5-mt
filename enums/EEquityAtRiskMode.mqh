@@ -1,0 +1,8 @@
+#ifndef __E_EQUITY_AT_RISK_MODE_MQH__
+#define __E_EQUITY_AT_RISK_MODE_MQH__
+
+enum ENUM_EQUITY_AT_RISK_MODE {
+	EQUITY_AT_RISK_LOT = 1
+};
+
+#endif

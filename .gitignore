@@ -1,0 +1,46 @@
+# MQL5 compiled files
+*.ex5
+*.ex4
+
+# MQL5 temporary/log files
+*.log
+*.hst
+*.csv
+*.dat
+*.chr
+*.tpl
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+.env
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing/Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Local config
+*.local
