@@ -61,11 +61,11 @@ private:
 		}
 
 		if (test_order_side == ORDER_TYPE_BUY) {
-			order.take_profit = current_price + (test_take_profit_points * point);
-			order.stop_loss = current_price - (test_stop_loss_points * point);
+			order.main_take_profit_at_price = current_price + (test_take_profit_points * point);
+			order.main_stop_loss_at_price = current_price - (test_stop_loss_points * point);
 		} else {
-			order.take_profit = current_price - (test_take_profit_points * point);
-			order.stop_loss = current_price + (test_stop_loss_points * point);
+			order.main_take_profit_at_price = current_price - (test_take_profit_points * point);
+			order.main_stop_loss_at_price = current_price + (test_stop_loss_points * point);
 		}
 
 		ArrayResize(orders, ArraySize(orders) + 1);
@@ -76,8 +76,8 @@ private:
 			(test_order_side == ORDER_TYPE_BUY) ? "BUY" : "SELL",
 			lot_size,
 			current_price,
-			order.take_profit,
-			order.stop_loss
+			order.main_take_profit_at_price,
+			order.main_stop_loss_at_price
 		));
 	}
 

@@ -327,7 +327,10 @@ public:
 	}
 
 	void RefreshId() {
-		id = source + "_" + IntegerToString(layer) + "_" + generateUUID();
+		string uuid = "";
+		for (int i = 0; i < 8; i++)
+			uuid += IntegerToString(MathRand() % 10);
+		id = source + "_" + IntegerToString(layer) + "_" + uuid;
 	}
 
 	double CalculateTakeProfit(double price) {
