@@ -44,3 +44,7 @@ htmlcov/
 
 # Local config
 *.local
+
+# Local scripts and build
+Makefile
+scripts/
