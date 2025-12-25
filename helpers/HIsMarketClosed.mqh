@@ -1,5 +1,9 @@
-#ifndef __IS_MARKET_CLOSED_MQH__
-#define __IS_MARKET_CLOSED_MQH__
+#ifndef __H_IS_MARKET_CLOSED_MQH__
+#define __H_IS_MARKET_CLOSED_MQH__
+
+#include "../services/SEDateTime/SEDateTime.mqh"
+
+extern SEDateTime dtime;
 
 bool isMarketClosed(string check_symbol, int safety_margin_minutes = 1) {
 	datetime current_time = dtime.GetCurrentTime();

@@ -1,5 +1,5 @@
-#ifndef __IS_LIVE_TRADING_MQH__
-#define __IS_LIVE_TRADING_MQH__
+#ifndef __H_IS_LIVE_TRADING_MQH__
+#define __H_IS_LIVE_TRADING_MQH__
 
 bool isLiveTrading() {
 	return MQLInfoInteger(MQL_TESTER) == false &&
