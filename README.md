@@ -383,3 +383,9 @@ reporter.ExportOrderHistoryToJsonFile();
 | Strategies  | `strategies/Test/Test.mqh`                                                           |
 | Enums       | `enums/EOrderStatuses.mqh`, `enums/EOptimizationResultFormula.mqh`                   |
 | Structs     | `structs/SQualityThresholds.mqh`, `structs/SOrderHistory.mqh`                        |
+
+---
+
+## License
+
+MIT License - See LICENSE file for details.
