@@ -8,11 +8,10 @@
 #include "../structs/SStatisticsSnapshot.mqh"
 #include "../structs/SQualityThresholds.mqh"
 
-#include "../services/Logger.mqh"
-#include "../services/DateTime.mqh"
-#include "../services/Order.mqh"
-#include "../services/Statistics.mqh"
-#include "../services/SymbolCost/SymbolCost.mqh"
+#include "../services/Logger/Logger.mqh"
+#include "../services/DateTime/DateTime.mqh"
+#include "../services/Order/Order.mqh"
+#include "../services/Statistics/Statistics.mqh"
 #include "../helpers/isMarketClosed.mqh"
 
 
@@ -31,8 +30,6 @@ public:
 private:
 	double balance;
 
-	SymbolCost *symbol_cost;
-
 public:
 	virtual int onInit() {
 		if (!SymbolSelect(symbol, true)) {
@@ -41,7 +38,6 @@ public:
 		}
 
 		statistics = new Statistics(symbol, name, prefix, balance);
-		symbol_cost = new SymbolCost(symbol);
 		logger.SetPrefix(name);
 
 		return INIT_SUCCEEDED;
@@ -49,7 +45,6 @@ public:
 
 	virtual void onDeinit() {
 		delete statistics;
-		delete symbol_cost;
 	};
 
 	virtual int onTesterInit() {
@@ -173,13 +168,24 @@ public:
 	}
 
 private:
+	double getPointValue(string target_symbol) {
+		double tick_value = SymbolInfoDouble(target_symbol, SYMBOL_TRADE_TICK_VALUE);
+		double tick_size = SymbolInfoDouble(target_symbol, SYMBOL_TRADE_TICK_SIZE);
+		double point_size = SymbolInfoDouble(target_symbol, SYMBOL_POINT);
+
+		if (tick_size <= 0)
+			return 0.0;
+
+		return tick_value * (point_size / tick_size);
+	}
+
 	double getLotMultiplier() {
 		string reference_symbol = "EURUSD";
 
 		logger.debug(StringFormat("[getLotMultiplier] Starting calculation for symbol: %s, reference: %s", symbol, reference_symbol));
 
-		double reference_point_value = (*symbol_cost).GetPointValue(reference_symbol);
-		double current_point_value = (*symbol_cost).GetPointValue(symbol);
+		double reference_point_value = getPointValue(reference_symbol);
+		double current_point_value = getPointValue(symbol);
 
 		logger.debug(StringFormat("[getLotMultiplier] Reference %s Point Value: $%.2f", reference_symbol, reference_point_value));
 		logger.debug(StringFormat("[getLotMultiplier] Current %s Point Value: $%.2f", symbol, current_point_value));

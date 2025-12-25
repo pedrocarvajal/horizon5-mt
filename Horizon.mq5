@@ -10,34 +10,27 @@
 #include <Indicators/Indicators.mqh>
 
 #include "libraries/json/index.mqh"
-#include "services/Logger.mqh"
+#include "services/Logger/Logger.mqh"
 
 #include "enums/EOrderStatuses.mqh"
 #include "enums/EPortfolioAllocationFormula.mqh"
 #include "enums/ETradingModes.mqh"
-#include "enums/ECircuitBreakerState.mqh"
 #include "enums/EEquityAtRiskMode.mqh"
 
-#include "structs/SCircuitBreakerState.mqh"
-#include "structs/SDynamicScaleMetrics.mqh"
 #include "structs/SOrderHistory.mqh"
 #include "structs/SStatisticsSnapshot.mqh"
-#include "structs/SReturnWithDate.mqh"
 #include "structs/SQualityThresholds.mqh"
-
 #include "structs/SQualityResult.mqh"
-#include "structs/SProfitTargets.mqh"
-#include "structs/SCandle.mqh"
 
 #include "helpers/isMarketClosed.mqh"
 #include "helpers/isLiveTrading.mqh"
 #include "helpers/deleteOldOrders.mqh"
 
-#include "services/DateTime.mqh"
-#include "services/Trade.mqh"
-#include "services/Order.mqh"
-#include "services/ReportOfOrderHistory.mqh"
-#include "services/OrderPersistence.mqh"
+#include "services/DateTime/DateTime.mqh"
+#include "services/Trade/Trade.mqh"
+#include "services/Order/Order.mqh"
+#include "services/ReportOfOrderHistory/ReportOfOrderHistory.mqh"
+#include "services/OrderPersistence/OrderPersistence.mqh"
 
 #include "interfaces/Asset.mqh"
 #include "interfaces/Strategy.mqh"

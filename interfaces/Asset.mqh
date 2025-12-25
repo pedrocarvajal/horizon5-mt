@@ -1,8 +1,8 @@
 #ifndef __ASSET_MQH__
 #define __ASSET_MQH__
 
-#include "../services/Logger.mqh"
-#include "../services/Order.mqh"
+#include "../services/Logger/Logger.mqh"
+#include "../services/Order/Order.mqh"
 #include "../interfaces/Strategy.mqh"
 
 
