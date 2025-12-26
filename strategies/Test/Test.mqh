@@ -1,120 +1,116 @@
 #ifndef __STRATEGY_TEST_MQH__
 #define __STRATEGY_TEST_MQH__
 
-#include "../../interfaces/Strategy.mqh"
+#include "../Strategy.mqh"
 #include "../../structs/SQualityThresholds.mqh"
 
 input group "Test Strategy Settings";
-input double test_take_profit_points = 500; // [TEST] > Take Profit (points)
-input double test_stop_loss_points = 250; // [TEST] > Stop Loss (points)
-input ENUM_ORDER_TYPE test_order_side = ORDER_TYPE_BUY; // [TEST] > Order Side
-input int test_entry_hour = 10; // [TEST] > Entry Hour (0-23)
+input double TestTakeProfitPoints = 500; // [TEST] > Take Profit (points)
+input double TestStopLossPoints = 250; // [TEST] > Stop Loss (points)
+input ENUM_ORDER_TYPE TestOrderSide = ORDER_TYPE_BUY; // [TEST] > Order Side
+input int TestEntryHour = 10; // [TEST] > Entry Hour (0-23)
 
 class Test:
-public IStrategy {
+public SEStrategy {
 private:
-	int last_order_day;
+	int lastOrderDay;
 
-public:
-	Test(string strategy_symbol) {
-		symbol = strategy_symbol;
-		name = "Test";
-		prefix = "TST";
-		last_order_day = -1;
-	}
+	int OnInit() {
+		SEStrategy::OnInit();
 
-private:
-	int onInit() {
-		IStrategy::onInit();
-
-		setupQualityThresholds();
+		SetupQualityThresholds();
 
 		return INIT_SUCCEEDED;
 	}
 
-	void onStartHour() {
-		IStrategy::onStartHour();
+	void OnStartHour() {
+		SEStrategy::OnStartHour();
 
-		MqlDateTime current_time = dtime.Now();
+		MqlDateTime currentTime = dtime.Now();
 
-		if (current_time.hour == test_entry_hour && current_time.day_of_year != last_order_day) {
-			openDailyOrder();
-			last_order_day = current_time.day_of_year;
+		if (currentTime.hour == TestEntryHour && currentTime.day_of_year != lastOrderDay) {
+			OpenDailyOrder();
+			lastOrderDay = currentTime.day_of_year;
 		}
 	}
 
-	void openDailyOrder() {
-		double lot_size = getLotSize();
+	void OpenDailyOrder() {
+		double lotSize = GetLotSize();
 
-		if (lot_size <= 0) {
+		if (lotSize <= 0) {
 			logger.warning("Invalid lot size, skipping order");
 			return;
 		}
 
-		double current_price = (test_order_side == ORDER_TYPE_BUY)
+		double currentPrice = (TestOrderSide == ORDER_TYPE_BUY)
 			? SymbolInfoDouble(symbol, SYMBOL_ASK)
 			: SymbolInfoDouble(symbol, SYMBOL_BID);
 
 		double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
 
-		Order *order = openNewOrder(
+		EOrder *order = OpenNewOrder(
 			1,
-			test_order_side,
-			current_price,
-			lot_size,
-			true
-		);
+			TestOrderSide,
+			currentPrice,
+			lotSize,
+			true);
 
 		if (order == NULL) {
 			logger.error("Failed to create order");
 			return;
 		}
 
-		if (test_order_side == ORDER_TYPE_BUY) {
-			order.main_take_profit_at_price = current_price + (test_take_profit_points * point);
-			order.main_stop_loss_at_price = current_price - (test_stop_loss_points * point);
+		if (TestOrderSide == ORDER_TYPE_BUY) {
+			order.mainTakeProfitAtPrice = currentPrice + (TestTakeProfitPoints * point);
+			order.mainStopLossAtPrice = currentPrice - (TestStopLossPoints * point);
 		} else {
-			order.main_take_profit_at_price = current_price - (test_take_profit_points * point);
-			order.main_stop_loss_at_price = current_price + (test_stop_loss_points * point);
+			order.mainTakeProfitAtPrice = currentPrice - (TestTakeProfitPoints * point);
+			order.mainStopLossAtPrice = currentPrice + (TestStopLossPoints * point);
 		}
 
 		ArrayResize(orders, ArraySize(orders) + 1);
 		orders[ArraySize(orders) - 1] = order;
 
 		logger.info(StringFormat(
-			"Daily order created: %s %.2f lots @ %.5f | TP: %.5f | SL: %.5f",
-			(test_order_side == ORDER_TYPE_BUY) ? "BUY" : "SELL",
-			lot_size,
-			current_price,
-			order.main_take_profit_at_price,
-			order.main_stop_loss_at_price
-		));
+				    "Daily order created: %s %.2f lots @ %.5f | TP: %.5f | SL: %.5f",
+				    (TestOrderSide == ORDER_TYPE_BUY) ? "BUY" : "SELL",
+				    lotSize,
+				    currentPrice,
+				    order.mainTakeProfitAtPrice,
+				    order.mainStopLossAtPrice));
 	}
 
-	void setupQualityThresholds() {
+	void SetupQualityThresholds() {
 		SQualityThresholds thresholds;
 
-		thresholds.optimization_formula = OPTIMIZATION_BY_PERFORMANCE;
+		thresholds.optimizationFormula = OPTIMIZATION_BY_PERFORMANCE;
 
-		thresholds.expected_total_return_pct_by_month = 0.01;
-		thresholds.expected_max_drawdown_pct = 0.01;
-		thresholds.expected_win_rate = 1;
-		thresholds.expected_recovery_factor = 3;
-		thresholds.expected_risk_reward_ratio = 1;
-		thresholds.expected_r_squared = 0.95;
-		thresholds.expected_trades = 28;
-		thresholds.expected_layer_distribution = 1;
+		thresholds.expectedTotalReturnPctByMonth = 0.01;
+		thresholds.expectedMaxDrawdownPct = 0.01;
+		thresholds.expectedWinRate = 1;
+		thresholds.expectedRecoveryFactor = 3;
+		thresholds.expectedRiskRewardRatio = 1;
+		thresholds.expectedRSquared = 0.95;
+		thresholds.expectedTrades = 28;
 
-		thresholds.min_total_return_pct = 0.0;
-		thresholds.max_max_drawdown_pct = 0.30;
-		thresholds.min_win_rate = 0;
-		thresholds.min_risk_reward_ratio = 0;
-		thresholds.min_recovery_factor = 1;
-		thresholds.min_r_squared = 0.0;
-		thresholds.min_trades = 5;
-		thresholds.min_layer_distribution = 0.30;
+		thresholds.minTotalReturnPct = 0.0;
+		thresholds.maxMaxDrawdownPct = 0.30;
+		thresholds.minWinRate = 0;
+		thresholds.minRiskRewardRatio = 0;
+		thresholds.minRecoveryFactor = 1;
+		thresholds.minRSquared = 0.0;
+		thresholds.minTrades = 5;
 
-		setQualityThresholds(thresholds);
+		SetQualityThresholds(thresholds);
+	}
+
+public:
+	Test() {
+		SetName("Test");
+		SetPrefix("TST");
+		SetMagicNumber(9999);
+
+		lastOrderDay = -1;
 	}
 };
 
