@@ -7,7 +7,6 @@
 class Test:
 public SEStrategy {
 private:
-	double testSyncVariable;
 	double takeProfitPoints;
 	double stopLossPoints;
 	ENUM_ORDER_TYPE orderSide;
