@@ -1,4 +1,4 @@
 *
 !.gitignore
+!Strategy.mqh
 !Test/
-!Test/**

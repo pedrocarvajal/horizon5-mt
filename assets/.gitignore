@@ -1,3 +1,5 @@
 *
 !.gitignore
-!GBPCAD.mqh
+!Asset.mqh
+!Example/
+!Example/**

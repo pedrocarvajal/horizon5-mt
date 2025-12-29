@@ -20,7 +20,7 @@ input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 #include "helpers/HDeleteOldOrders.mqh"
 
 #include "structs/SQueuedOrder.mqh"
-#include "assets/Asset.mqh"
+#include "configs/Assets.mqh"
 
 SEDateTime dtime;
 SELogger hlogger;
@@ -35,14 +35,6 @@ int lastCheckedMonth = -1;
 int lastCheckedWeek = -1;
 int lastStartWeekYday = -1;
 int lastEndWeekYday = -1;
-
-#include "assets/Commodities/Gold.mqh"
-
-SEAsset *gold = new GoldAsset();
-
-SEAsset *assets[] = {
-	gold
-};
 
 int OnInit() {
 	EventSetTimer(1);
