@@ -7,6 +7,7 @@
 class Test:
 public SEStrategy {
 private:
+	double testSyncVariable;
 	double takeProfitPoints;
 	double stopLossPoints;
 	ENUM_ORDER_TYPE orderSide;
@@ -88,3 +89,4 @@ public:
 };
 
 #endif
+// Test modification $(date) git add -A
