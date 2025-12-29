@@ -12,6 +12,7 @@
 #include "helpers/HCalculateRSquared.mqh"
 #include "helpers/HCalculateSharpeRatio.mqh"
 #include "helpers/HCalculateMetricQuality.mqh"
+#include "helpers/HCalculateCAGR.mqh"
 
 extern SEDateTime dtime;
 extern EOrder orders[];
@@ -20,6 +21,8 @@ extern EOrder orders[];
 
 class SEStatistics {
 private:
+	SELogger logger;
+
 	string id;
 	string strategyName;
 	string strategyPrefix;
@@ -95,16 +98,16 @@ private:
 
 		for (int i = 0; i < ArraySize(lastClosedOrders); i++) {
 			EOrder order = lastClosedOrders[i];
-			nextPerformance += order.profitInDollars;
-			nextNav += order.profitInDollars;
+			nextPerformance += order.GetProfitInDollars();
+			nextNav += order.GetProfitInDollars();
 
-			if (order.profitInDollars > 0) {
+			if (order.GetProfitInDollars() > 0) {
 				winningOrders++;
-				winningOrdersPerformance += order.profitInDollars;
+				winningOrdersPerformance += order.GetProfitInDollars();
 			} else {
 				losingOrders++;
-				losingOrdersPerformance += order.profitInDollars;
-				double currentLoss = MathAbs(order.profitInDollars);
+				losingOrdersPerformance += order.GetProfitInDollars();
+				double currentLoss = MathAbs(order.GetProfitInDollars());
 
 				if (currentLoss > maxLoss)
 					maxLoss = currentLoss;
@@ -180,6 +183,7 @@ private:
 		snapshotData.riskRewardRatio = riskRewardRatio;
 		snapshotData.winRate = winRate;
 		snapshotData.recoveryFactor = GetRecoveryFactor();
+		snapshotData.cagr = GetCAGR();
 
 		snapshotData.quality = quality.quality;
 		snapshotData.qualityReason = quality.reason;
@@ -205,6 +209,7 @@ private:
 		logger.debug(StringFormat("Sharpe ratio: %.4f", snapshotData.sharpeRatio));
 		logger.debug(StringFormat("Win rate: %.2f%%", winRate * 100));
 		logger.debug(StringFormat("Recovery factor: %.2f", snapshotData.recoveryFactor));
+		logger.debug(StringFormat("CAGR: %.2f%%", snapshotData.cagr * 100));
 		logger.debug(StringFormat("Quality: %.4f", snapshotData.quality));
 		logger.debug(StringFormat("Quality reason: %s", snapshotData.qualityReason));
 		logger.debug(StringFormat("Max exposure in lots: %.4f", snapshotData.maxExposureInLots));
@@ -218,15 +223,15 @@ private:
 		double currentExposureLots = 0.0;
 
 		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].source != strategyPrefix)
+			if (orders[i].GetSource() != strategyPrefix)
 				continue;
 
-			if (orders[i].status == ORDER_STATUS_OPEN || orders[i].status == ORDER_STATUS_PENDING) {
-				if (orders[i].side == ORDER_TYPE_BUY)
-					currentExposureLots += orders[i].volume;
+			if (orders[i].GetStatus() == ORDER_STATUS_OPEN || orders[i].GetStatus() == ORDER_STATUS_PENDING) {
+				if (orders[i].GetSide() == ORDER_TYPE_BUY)
+					currentExposureLots += orders[i].GetVolume();
 
-				else if (orders[i].side == ORDER_TYPE_SELL)
-					currentExposureLots -= orders[i].volume;
+				else if (orders[i].GetSide() == ORDER_TYPE_SELL)
+					currentExposureLots -= orders[i].GetVolume();
 			}
 		}
 
@@ -244,9 +249,6 @@ private:
 			maxExposureInPercentage = currentExposurePercentage;
 	}
 
-protected:
-	SELogger logger;
-
 public:
 	SEStatistics(string newSymbol, string name, string prefix, double allocatedBalance) {
 		logger.SetPrefix("Statistics[" + name + "]");
@@ -254,9 +256,12 @@ public:
 		symbol = newSymbol;
 		strategyName = name;
 		strategyPrefix = prefix;
+		initialBalance = allocatedBalance;
 
 		id = TimeToString(StructToTime(dtime.Now()), TIME_DATE | TIME_SECONDS);
 		startTime = StructToTime(dtime.Now());
+		stopOutDetected = false;
+		finalEquity = allocatedBalance;
 
 		ArrayResize(nav, 1);
 		nav[0] = allocatedBalance;
@@ -269,16 +274,12 @@ public:
 
 		ArrayResize(returns, 0);
 
-		maxExposureInLots = 0.0;
-		maxExposureInPercentage = 0.0;
-
-		stopOutDetected = false;
-		initialBalance = allocatedBalance;
-		finalEquity = allocatedBalance;
-
 		drawdownMaxInDollars = 0.0;
 		drawdownMaxInPercentage = 0.0;
 		maxLoss = 0.0;
+
+		maxExposureInLots = 0.0;
+		maxExposureInPercentage = 0.0;
 	}
 
 	void OnStartHour() {
@@ -315,7 +316,7 @@ public:
 	}
 
 	void OnOpenOrder(EOrder &order) {
-		if (order.status == ORDER_STATUS_CANCELLED)
+		if (order.GetStatus() == ORDER_STATUS_CANCELLED)
 			return;
 
 		updateExposure();
@@ -326,7 +327,7 @@ public:
 		lastClosedOrders[ArraySize(lastClosedOrders) - 1] = order;
 
 		ArrayResize(ordersHistory, ArraySize(ordersHistory) + 1);
-		ordersHistory[ArraySize(ordersHistory) - 1] = order.snapshot;
+		ordersHistory[ArraySize(ordersHistory) - 1] = order.GetSnapshot();
 
 		updateExposure();
 	}
@@ -342,6 +343,10 @@ public:
 			return 0.0;
 
 		return nav[ArraySize(nav) - 1];
+	}
+
+	double GetInitialBalance() {
+		return initialBalance;
 	}
 
 	SSQualityResult GetQuality() {
@@ -519,6 +524,12 @@ public:
 
 	double GetSharpeRatio(double &perf[]) {
 		return calculateSharpeRatio(perf);
+	}
+
+	double GetCAGR() {
+		double currentNav = (ArraySize(nav) > 0) ? nav[ArraySize(nav) - 1] : initialBalance;
+
+		return calculateCAGR(initialBalance, currentNav, monthsInBacktest);
 	}
 
 	void SetQualityThresholds(SQualityThresholds &thresholds) {

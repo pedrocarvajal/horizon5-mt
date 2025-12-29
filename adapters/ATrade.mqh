@@ -4,22 +4,28 @@
 #include <Trade/Trade.mqh>
 #include "../services/SELogger/SELogger.mqh"
 
-class ATrade
-{
+class ATrade {
 private:
 	SELogger logger;
-
-	ENUM_ORDER_TYPE_FILLING fillingMode;
-
-public:
 	ulong dealId;
 	ulong orderId;
 	ulong positionId;
 
+	ENUM_ORDER_TYPE_FILLING GetFillingMode(string symbol) {
+		long fillingModes = SymbolInfoInteger(symbol, SYMBOL_FILLING_MODE);
+
+		if ((fillingModes & SYMBOL_FILLING_FOK) == SYMBOL_FILLING_FOK)
+			return ORDER_FILLING_FOK;
+
+		if ((fillingModes & SYMBOL_FILLING_IOC) == SYMBOL_FILLING_IOC)
+			return ORDER_FILLING_IOC;
+
+		return ORDER_FILLING_RETURN;
+	}
+
+public:
 	ATrade() {
 		logger.SetPrefix("Trade");
-
-		fillingMode = ORDER_FILLING_FOK;
 
 		dealId = 0;
 		orderId = 0;
@@ -52,27 +58,21 @@ public:
 	}
 
 	bool IsPendingOrder(ulong ticket) {
-		if (OrderSelect(ticket))
-			return true;
-
-		return false;
+		return OrderSelect(ticket);
 	}
 
 	bool IsOpenPosition(ulong ticket) {
-		if (PositionSelectByTicket(ticket))
-			return true;
-
-		return false;
+		return PositionSelectByTicket(ticket);
 	}
 
 	bool Modify(double price = 0, double stopLoss = 0, double takeProfit = 0, ulong magicNumber = 0) {
-		logger.info(StringFormat("Modifying order, position_id=%d, order_id=%d", positionId, orderId));
+		logger.info(StringFormat("Modifying order, position_id=%d, order_id=%d", GetPositionId(), GetOrderId()));
 
 		if (stopLoss == 0 && takeProfit == 0)
 			return false;
 
-		if (!PositionSelectByTicket(positionId)) {
-			logger.error("Error selecting position: " + IntegerToString(positionId));
+		if (!PositionSelectByTicket(GetPositionId())) {
+			logger.error("Error selecting position: " + IntegerToString(GetPositionId()));
 			return false;
 		}
 
@@ -80,8 +80,6 @@ public:
 		double currentSl = PositionGetDouble(POSITION_SL);
 		double currentTp = PositionGetDouble(POSITION_TP);
 		double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
-		double minDistance = (double)SymbolInfoInteger(positionSymbol, SYMBOL_TRADE_STOPS_LEVEL) * SymbolInfoDouble(positionSymbol, SYMBOL_POINT);
-		double currentPrice = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? SymbolInfoDouble(positionSymbol, SYMBOL_BID) : SymbolInfoDouble(positionSymbol, SYMBOL_ASK);
 
 		MqlTradeRequest request;
 		MqlTradeResult result;
@@ -89,7 +87,7 @@ public:
 		ZeroMemory(result);
 
 		request.action = TRADE_ACTION_SLTP;
-		request.position = positionId;
+		request.position = GetPositionId();
 		request.symbol = positionSymbol;
 		request.magic = magicNumber;
 		request.price = (price > 0) ? price : openPrice;
@@ -161,7 +159,7 @@ public:
 		request.volume = Volume(symbol, lot);
 		request.deviation = 5;
 		request.magic = magicNumber;
-		request.type_filling = fillingMode;
+		request.type_filling = GetFillingMode(symbol);
 		request.price = (isMarketOrder) ? currentPrice : openAtPrice;
 
 		if (stopLoss > 0)
@@ -187,16 +185,16 @@ public:
 			return result;
 		}
 
-		dealId = result.deal;
-		orderId = result.order;
+		SetDealId(result.deal);
+		SetOrderId(result.order);
 
-		if (dealId > 0) {
-			HistoryDealSelect(dealId);
-			positionId = HistoryDealGetInteger(dealId, DEAL_POSITION_ID);
-			logger.info("Position ID found: " + IntegerToString(positionId));
+		if (GetDealId() > 0) {
+			HistoryDealSelect(GetDealId());
+			SetPositionId(HistoryDealGetInteger(GetDealId(), DEAL_POSITION_ID));
+			logger.info("Position ID found: " + IntegerToString(GetPositionId()));
 		}
 
-		logger.info(StringFormat("Order opened, deal_id=%d, order_id=%d, position_id=%d", dealId, orderId, positionId));
+		logger.info(StringFormat("Order opened, deal_id=%d, order_id=%d, position_id=%d", GetDealId(), GetOrderId(), GetPositionId()));
 		return result;
 	}
 
@@ -219,15 +217,27 @@ public:
 		return NormalizeDouble(lot, 2);
 	}
 
-	ulong GetDealId() {
+	void SetDealId(ulong newDealId) {
+		dealId = newDealId;
+	}
+
+	void SetOrderId(ulong newOrderId) {
+		orderId = newOrderId;
+	}
+
+	void SetPositionId(ulong newPositionId) {
+		positionId = newPositionId;
+	}
+
+	ulong GetDealId() const {
 		return dealId;
 	}
 
-	ulong GetOrderId() {
+	ulong GetOrderId() const {
 		return orderId;
 	}
 
-	ulong GetPositionId() {
+	ulong GetPositionId() const {
 		return positionId;
 	}
 };

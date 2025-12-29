@@ -3,34 +3,29 @@
 #property description "Horizon is an advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization. Built for professional traders seeking systematic, data-driven market execution with robust risk management."
 #property description "Horizon is developed with MQL5."
 
-#include "enums/EPortfolioAllocationFormula.mqh"
-#include "enums/EEquityAtRiskMode.mqh"
-
 input group "General Settings";
 input ENUM_ORDER_TYPE_FILLING FillingMode = ORDER_FILLING_IOC; // [1] > Order filling mode
 
 input group "Risk management";
-input ENUM_EQUITY_AT_RISK_MODE EquityAtRiskMode = EQUITY_AT_RISK_LOT; // [1] > Equity at risk mode
 input bool EquityAtRiskCompounded = true; // [1] > Equity at risk compounded
-input double EquityAtRiskBasedOn = 100000.0; // [1] > Equity at risk based on Balance
-input double EquityAtRisk = 1; // [1] > Equity at risk value
-input bool EquityAtRiskMultiplyByStrategy = false; // [1] > Equity at risk value multiply by strategy
-input ENUM_PORTFOLIO_ALLOCATION_FORMULA PortfolioAllocationFormula = ALLOCATION_EQUAL_WEIGHT; // [1] > Portfolio allocation formula
+input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
+#include <Trade/Trade.mqh>
 #include "services/SEDateTime/SEDateTime.mqh"
 #include "services/SEReportOfOrderHistory/SEReportOfOrderHistory.mqh"
 #include "services/SEOrderPersistence/SEOrderPersistence.mqh"
 
 #include "helpers/HIsLiveTrading.mqh"
+#include "helpers/HIsMarketClosed.mqh"
 #include "helpers/HDeleteOldOrders.mqh"
 
+#include "structs/SQueuedOrder.mqh"
 #include "assets/Asset.mqh"
 
 SEDateTime dtime;
 SELogger hlogger;
 EOrder orders[];
-EOrder ordersQueue[];
-EOrder closedOrders[];
+SQueuedOrder queuedOrders[];
 SEReportOfOrderHistory *orderHistoryReporter;
 SEOrderPersistence *orderPersistence;
 
@@ -41,15 +36,12 @@ int lastCheckedWeek = -1;
 int lastStartWeekYday = -1;
 int lastEndWeekYday = -1;
 
-// ------------------------------
-// Assets
-// ------------------------------
-#include "assets/XAUUSD.mqh"
+#include "assets/Commodities/Gold.mqh"
 
-SEAsset *xauusd = new XAUUSD();
+SEAsset *gold = new GoldAsset();
 
 SEAsset *assets[] = {
-	xauusd
+	gold
 };
 
 int OnInit() {
@@ -71,6 +63,14 @@ int OnInit() {
 	orderHistoryReporter = new SEReportOfOrderHistory(timestampedReportsDir, true);
 	orderPersistence = new SEOrderPersistence();
 
+	//
+	// int total = SymbolsTotal(false);
+
+	// for(int i = 0; i < total; i++) {
+	// 	string symbol = SymbolName(i, false);
+	// 	hlogger.info("Symbol: " + symbol);
+	// }
+
 	// Initialize assets
 	int assetCount = ArraySize(assets);
 
@@ -79,14 +79,45 @@ int OnInit() {
 		return INIT_FAILED;
 	}
 
-	double balancePerAsset = AccountInfoDouble(ACCOUNT_BALANCE) / assetCount;
+	double weightPerAsset = 1.0 / assetCount;
 
 	for (int i = 0; i < assetCount; i++) {
-		assets[i].SetBalance(balancePerAsset);
+		assets[i].SetWeight(weightPerAsset);
+		assets[i].SetBalance(AccountInfoDouble(ACCOUNT_BALANCE) * weightPerAsset);
+
 		int result = assets[i].OnInit();
 
 		if (result != INIT_SUCCEEDED)
 			return INIT_FAILED;
+	}
+
+	ulong magicNumbers[];
+	string magicSources[];
+
+	for (int i = 0; i < assetCount; i++) {
+		for (int j = 0; j < ArraySize(assets[i].strategies); j++) {
+			ulong currentMagic = assets[i].strategies[j].GetMagicNumber();
+			string currentSource = assets[i].GetSymbol() + "/" + assets[i].strategies[j].GetPrefix();
+
+			for (int k = 0; k < ArraySize(magicNumbers); k++) {
+				if (magicNumbers[k] == currentMagic) {
+					hlogger.error("Duplicate magic number detected: " + IntegerToString(currentMagic));
+					hlogger.error("Conflict between: " + magicSources[k] + " and " + currentSource);
+					return INIT_FAILED;
+				}
+			}
+
+			int size = ArraySize(magicNumbers);
+			ArrayResize(magicNumbers, size + 1);
+			ArrayResize(magicSources, size + 1);
+			magicNumbers[size] = currentMagic;
+			magicSources[size] = currentSource;
+		}
+	}
+
+	if (ArraySize(magicNumbers) == 0) {
+		hlogger.error("No strategies enabled. Enable at least one strategy to start.");
+		return INIT_FAILED;
 	}
 
 	// Restore orders from JSON files
@@ -95,8 +126,8 @@ int OnInit() {
 		bool restorationFailed = false;
 
 		for (int i = 0; i < ArraySize(assets); i++) {
-			for (int s = 0; s < ArraySize(assets[i].assetStrategies); s++) {
-				string strategyName = assets[i].assetStrategies[s].GetPrefix();
+			for (int s = 0; s < ArraySize(assets[i].strategies); s++) {
+				string strategyName = assets[i].strategies[s].GetPrefix();
 				hlogger.info("Processing strategy: " + strategyName);
 
 				EOrder restoredOrders[];
@@ -111,10 +142,10 @@ int OnInit() {
 
 				for (int j = 0; j < restoredCount; j++) {
 					bool isDuplicate = false;
-					string restoredId = restoredOrders[j].Id();
+					string restoredId = restoredOrders[j].GetId();
 
 					for (int k = 0; k < ArraySize(orders); k++) {
-						if (orders[k].Id() == restoredId) {
+						if (orders[k].GetId() == restoredId) {
 							isDuplicate = true;
 							hlogger.debug("Skipping duplicate order: " + restoredId);
 							break;
@@ -166,18 +197,16 @@ void OnDeinit(const int reason) {
 	for (int i = 0; i < ArraySize(orders); i++)
 		orders[i].OnDeinit();
 
-	for (int i = 0; i < ArraySize(ordersQueue); i++)
-		ordersQueue[i].OnDeinit();
-
-	for (int i = 0; i < ArraySize(closedOrders); i++)
-		closedOrders[i].OnDeinit();
+	for (int i = 0; i < ArraySize(queuedOrders); i++)
+		if (queuedOrders[i].action == QUEUE_ACTION_OPEN && CheckPointer(queuedOrders[i].order) != POINTER_INVALID) {
+			queuedOrders[i].order.OnDeinit();
+			delete queuedOrders[i].order;
+		}
 
 	ArrayResize(orders, 0);
 	ArrayFree(orders);
-	ArrayResize(ordersQueue, 0);
-	ArrayFree(ordersQueue);
-	ArrayResize(closedOrders, 0);
-	ArrayFree(closedOrders);
+	ArrayResize(queuedOrders, 0);
+	ArrayFree(queuedOrders);
 
 	if (CheckPointer(orderHistoryReporter) != POINTER_INVALID)
 		delete orderHistoryReporter;
@@ -242,6 +271,8 @@ void OnTimer() {
 
 		for (int i = 0; i < ArraySize(assets); i++)
 			assets[i].OnStartMinute();
+
+		ProcessQueuedOrders();
 	}
 
 	// Per-tick processing
@@ -249,27 +280,61 @@ void OnTimer() {
 		assets[i].OnTick();
 
 	for (int i = 0; i < ArraySize(orders); i++) {
-		if (!orders[i].isInitialized)
+		if (!orders[i].IsInitialized())
 			orders[i].OnInit();
 
-		ENUM_ORDER_STATUSES previousStatus = orders[i].status;
+		ENUM_ORDER_STATUSES previousStatus = orders[i].GetStatus();
 
-		if (orders[i].status == ORDER_STATUS_PENDING)
+		if (orders[i].GetStatus() == ORDER_STATUS_QUEUED && !isMarketClosed(orders[i].GetSymbol())) {
+			orders[i].SetStatus(ORDER_STATUS_PENDING);
+			hlogger.info("Queued order activated: " + orders[i].GetId() + " (market opened)");
+		}
+
+		if (orders[i].GetStatus() == ORDER_STATUS_PENDING)
 			orders[i].CheckToOpen();
 
-		if (previousStatus == ORDER_STATUS_PENDING && orders[i].status == ORDER_STATUS_CANCELLED)
+		if (previousStatus == ORDER_STATUS_PENDING && orders[i].GetStatus() == ORDER_STATUS_CANCELLED)
 			for (int j = 0; j < ArraySize(assets); j++)
 				assets[j].OnOpenOrder(orders[i]);
 	}
+}
 
-	for (int i = 0; i < ArraySize(ordersQueue); i++) {
-		ArrayResize(orders, ArraySize(orders) + 1);
-		orders[ArraySize(orders) - 1] = ordersQueue[i];
-		hlogger.debug("Recovery order transferred from queue to main orders: " + ordersQueue[i].Id());
+void ProcessQueuedOrders() {
+	for (int i = ArraySize(queuedOrders) - 1; i >= 0; i--) {
+		SQueuedOrder queued = queuedOrders[i];
+		string symbol = (queued.action == QUEUE_ACTION_OPEN) ? queued.order.GetSymbol() : "";
+		int orderIndex = -1;
+
+		if (queued.action == QUEUE_ACTION_CLOSE) {
+			for (int j = 0; j < ArraySize(orders); j++) {
+				if (orders[j].GetPositionId() == queued.positionId) {
+					orderIndex = j;
+					break;
+				}
+			}
+
+			if (orderIndex == -1 || orders[orderIndex].GetStatus() == ORDER_STATUS_CLOSED || orders[orderIndex].GetStatus() == ORDER_STATUS_CANCELLED) {
+				hlogger.debug("Queued close: Order already closed or not found: " + IntegerToString(queued.positionId));
+				ArrayRemove(queuedOrders, i, 1);
+				continue;
+			}
+
+			symbol = orders[orderIndex].GetSymbol();
+		}
+
+		if (isMarketClosed(symbol))
+			continue;
+
+		if (queued.action == QUEUE_ACTION_OPEN) {
+			ArrayResize(orders, ArraySize(orders) + 1);
+			orders[ArraySize(orders) - 1] = *queued.order;
+			hlogger.info("Queued open transferred to orders: " + queued.order.GetId());
+		} else if (queued.action == QUEUE_ACTION_CLOSE) {
+			orders[orderIndex].Close();
+		}
+
+		ArrayRemove(queuedOrders, i, 1);
 	}
-
-	if (ArraySize(ordersQueue) > 0)
-		ArrayResize(ordersQueue, 0);
 }
 
 void OnTradeTransaction(
@@ -285,7 +350,7 @@ void OnTradeTransaction(
 				ulong orderId = transaction.order;
 
 				for (int i = 0; i < ArraySize(orders); i++) {
-					if (orders[i].orderId == orderId && (orders[i].status == ORDER_STATUS_CLOSING || orders[i].status == ORDER_STATUS_PENDING)) {
+					if (orders[i].GetOrderId() == orderId && (orders[i].GetStatus() == ORDER_STATUS_CLOSING || orders[i].GetStatus() == ORDER_STATUS_PENDING)) {
 						MqlDateTime cancelTime = dtime.Now();
 						orders[i].OnClose(cancelTime, 0.0, 0.0, DEAL_REASON_EXPERT);
 
@@ -306,8 +371,8 @@ void OnTradeTransaction(
 
 		bool validMagic = false;
 		for (int i = 0; i < ArraySize(assets); i++) {
-			for (int j = 0; j < ArraySize(assets[i].assetStrategies); j++) {
-				if (magic == assets[i].assetStrategies[j].GetMagicNumber()) {
+			for (int j = 0; j < ArraySize(assets[i].strategies); j++) {
+				if (magic == assets[i].strategies[j].GetMagicNumber()) {
 					validMagic = true;
 					break;
 				}
@@ -345,7 +410,7 @@ void OnTradeTransaction(
 				hlogger.debug("OnTradeTransaction: Closing order with dealId=" + IntegerToString(dealId) + ", positionId=" + IntegerToString(positionId));
 
 				for (int i = 0; i < size; i++) {
-					if (orders[i].positionId == positionId) {
+					if (orders[i].GetPositionId() == positionId) {
 						idx = i;
 						break;
 					}
@@ -372,7 +437,7 @@ void OnTradeTransaction(
 				int idx = -1;
 
 				for (int i = 0; i < size; i++) {
-					if (orders[i].orderId == orderId) {
+					if (orders[i].GetOrderId() == orderId) {
 						idx = i;
 						break;
 					}
@@ -383,7 +448,15 @@ void OnTradeTransaction(
 					return;
 				}
 
-				orders[idx].OnOpen(result);
+				if (orders[idx].GetStatus() != ORDER_STATUS_OPEN) {
+					MqlTradeResult openResult;
+					ZeroMemory(openResult);
+					openResult.deal = dealId;
+					openResult.order = orderId;
+					openResult.price = HistoryDealGetDouble(dealId, DEAL_PRICE);
+					openResult.retcode = 10009;
+					orders[idx].OnOpen(openResult);
+				}
 
 				for (int j = 0; j < ArraySize(assets); j++)
 					assets[j].OnOpenOrder(orders[idx]);

@@ -1,0 +1,9 @@
+#ifndef __E_QUEUE_ACTIONS_MQH__
+#define __E_QUEUE_ACTIONS_MQH__
+
+enum ENUM_QUEUE_ACTIONS {
+	QUEUE_ACTION_OPEN,
+	QUEUE_ACTION_CLOSE
+};
+
+#endif

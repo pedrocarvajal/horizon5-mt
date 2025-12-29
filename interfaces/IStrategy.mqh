@@ -21,7 +21,7 @@ interface IStrategy {
 	void OnDeinit();
 
 	void SetAsset(SEAsset *assetReference);
-	void SetBalance(double allocatedBalance);
+	void SetWeight(double allocatedWeight);
 	void SetMagicNumber(ulong magic);
 
 	string GetPrefix();

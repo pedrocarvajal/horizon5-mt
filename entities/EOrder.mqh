@@ -3,8 +3,10 @@
 
 #include "../enums/EOrderStatuses.mqh"
 #include "../structs/SSOrderHistory.mqh"
+#include "../structs/SQueuedOrder.mqh"
 #include "../adapters/ATrade.mqh"
 #include "../services/SEDateTime/SEDateTime.mqh"
+#include "../helpers/HIsMarketClosed.mqh"
 
 class SEOrderPersistence;
 class SEReportOfOrderHistory;
@@ -12,17 +14,18 @@ class SEReportOfOrderHistory;
 extern SEDateTime dtime;
 extern SEOrderPersistence *orderPersistence;
 extern SEReportOfOrderHistory *orderHistoryReporter;
+extern SQueuedOrder queuedOrders[];
 
 class EOrder:
 public ATrade {
-public:
+private:
 	bool isInitialized;
 	bool isProcessed;
 	bool isMarketOrder;
+	bool allowQueueing;
 
 	string id;
 	string source;
-	string sourceCustomId;
 	string symbol;
 	ulong magicNumber;
 
@@ -30,7 +33,6 @@ public:
 	int side;
 	ENUM_DEAL_REASON orderCloseReason;
 
-	int layer;
 	double volume;
 
 	double signalPrice;
@@ -43,10 +45,6 @@ public:
 	MqlDateTime closeAt;
 
 	double profitInDollars;
-	double profitAccumulativeInDollars;
-
-	double mainTakeProfitInPoints;
-	double mainStopLossInPoints;
 
 	double mainTakeProfitAtPrice;
 	double mainStopLossAtPrice;
@@ -56,73 +54,72 @@ public:
 
 public:
 	EOrder(ulong strategyMagicNumber = 0, string strategySymbol = "") {
+		logger.SetPrefix("Order");
+
+		symbol = strategySymbol;
+		magicNumber = strategyMagicNumber;
+
 		isInitialized = false;
 		isProcessed = false;
 		isMarketOrder = false;
-		logger.SetPrefix("Order");
-
+		allowQueueing = false;
 		id = "";
-		sourceCustomId = "";
-		symbol = strategySymbol;
-		magicNumber = strategyMagicNumber;
-		dealId = 0;
-		orderId = 0;
-		positionId = 0;
+		SetDealId(0);
+		SetOrderId(0);
+		SetPositionId(0);
 	}
 
 	EOrder(const EOrder& other) {
+		logger.SetPrefix("Order");
+
 		isInitialized = other.isInitialized;
 		isProcessed = other.isProcessed;
 		isMarketOrder = other.isMarketOrder;
-		logger.SetPrefix("Order");
+		allowQueueing = other.allowQueueing;
+
 		id = other.id;
 		source = other.source;
-		sourceCustomId = other.sourceCustomId;
 		symbol = other.symbol;
 		magicNumber = other.magicNumber;
+
 		status = other.status;
 		side = other.side;
 		orderCloseReason = other.orderCloseReason;
-		layer = other.layer;
+
 		volume = other.volume;
 
 		signalPrice = other.signalPrice;
 		openAtPrice = other.openAtPrice;
 		openPrice = other.openPrice;
 		closePrice = other.closePrice;
+
 		signalAt = other.signalAt;
 		openAt = other.openAt;
 		closeAt = other.closeAt;
-		profitInDollars = other.profitInDollars;
-		profitAccumulativeInDollars = other.profitAccumulativeInDollars;
 
-		mainTakeProfitInPoints = other.mainTakeProfitInPoints;
-		mainStopLossInPoints = other.mainStopLossInPoints;
+		profitInDollars = other.profitInDollars;
+
 		mainTakeProfitAtPrice = other.mainTakeProfitAtPrice;
 		mainStopLossAtPrice = other.mainStopLossAtPrice;
 
 		snapshot = other.snapshot;
 
-		dealId = other.dealId;
-		orderId = other.orderId;
-		positionId = other.positionId;
+		SetDealId(other.GetDealId());
+		SetOrderId(other.GetOrderId());
+		SetPositionId(other.GetPositionId());
 	}
 
 	void Snapshot() {
 		snapshot.openTime = StructToTime(signalAt);
 		snapshot.openPrice = signalPrice;
 		snapshot.openLot = volume;
-		snapshot.orderId = Id();
+		snapshot.orderId = GetId();
 		snapshot.side = side;
-		snapshot.sourceCustomId = sourceCustomId;
 		snapshot.magicNumber = magicNumber;
 		snapshot.strategyName = source;
 		snapshot.strategyPrefix = source;
-		snapshot.layer = layer;
 		snapshot.status = status;
 		snapshot.orderCloseReason = orderCloseReason;
-		snapshot.mainTakeProfitInPoints = mainTakeProfitInPoints;
-		snapshot.mainStopLossInPoints = mainStopLossInPoints;
 		snapshot.mainTakeProfitAtPrice = mainTakeProfitAtPrice;
 		snapshot.mainStopLossAtPrice = mainStopLossAtPrice;
 		snapshot.signalAt = StructToTime(signalAt);
@@ -133,7 +130,7 @@ public:
 
 	void OnInit() {
 		if (isInitialized) {
-			logger.info("[" + Id() + "] Order already initialized");
+			logger.info("[" + GetId() + "] Order already initialized");
 			return;
 		}
 
@@ -144,7 +141,7 @@ public:
 		if (isProcessed)
 			return;
 
-		logger.info("[" + Id() + "] Opening order, id: " + Id());
+		logger.info("[" + GetId() + "] Opening order, id: " + GetId());
 		Open();
 	}
 
@@ -154,76 +151,100 @@ public:
 
 	void Close() {
 		if (status == ORDER_STATUS_OPEN) {
-			logger.info("[" + Id() + "] Closing open position, position_id: " + IntegerToString(positionId));
+			if (isMarketClosed(symbol)) {
+				int size = ArraySize(queuedOrders);
+				ArrayResize(queuedOrders, size + 1);
 
-			if (!ATrade::Close(positionId)) {
-				logger.info("[" + Id() + "] Failed to close open position, ticket: " + IntegerToString(positionId));
+				queuedOrders[size].action = QUEUE_ACTION_CLOSE;
+				queuedOrders[size].positionId = GetPositionId();
+
+				logger.info("[" + GetId() + "] Close queued: Market is closed, will execute when market opens");
 				return;
 			}
 
-			logger.info("[" + Id() + "] Close order sent to broker, waiting for confirmation...");
+			logger.info("[" + GetId() + "] Closing open position, position_id: " + IntegerToString(GetPositionId()));
+
+			if (!ATrade::Close(GetPositionId())) {
+				logger.error("[" + GetId() + "] Failed to close open position, ticket: " + IntegerToString(GetPositionId()));
+				return;
+			}
+
+			logger.info("[" + GetId() + "] Close order sent to broker, waiting for confirmation...");
 			status = ORDER_STATUS_CLOSING;
 			return;
 		}
 
 		if (status == ORDER_STATUS_PENDING) {
-			if (orderId == 0) {
-				logger.info("[" + Id() + "] Cannot cancel order: invalid orderId");
+			if (GetOrderId() == 0) {
+				logger.info("[" + GetId() + "] Cannot cancel order: invalid orderId");
 				status = ORDER_STATUS_CANCELLED;
 
 				if (CheckPointer(orderPersistence) != POINTER_INVALID)
-					orderPersistence.DeleteOrderJson(source, Id());
+					orderPersistence.DeleteOrderJson(source, GetId());
 
 				return;
 			}
 
-			if (!OrderSelect(orderId)) {
-				logger.info("[" + Id() + "] Order no longer exists (orderId: " + IntegerToString(orderId) + "), updating status to cancelled");
+			if (!OrderSelect(GetOrderId())) {
+				logger.info("[" + GetId() + "] Order no longer exists (orderId: " + IntegerToString(GetOrderId()) + "), updating status to cancelled");
 				status = ORDER_STATUS_CANCELLED;
 
 				if (CheckPointer(orderPersistence) != POINTER_INVALID)
-					orderPersistence.DeleteOrderJson(source, Id());
+					orderPersistence.DeleteOrderJson(source, GetId());
 
 				return;
 			}
 
-			if (!ATrade::Cancel(orderId)) {
-				logger.info("[" + Id() + "] Failed to cancel pending order, orderId: " + IntegerToString(orderId));
+			if (!ATrade::Cancel(GetOrderId())) {
+				logger.error("[" + GetId() + "] Failed to cancel pending order, orderId: " + IntegerToString(GetOrderId()));
 				return;
 			}
 
-			logger.info("[" + Id() + "] Cancel order sent to broker, waiting for confirmation...");
+			logger.info("[" + GetId() + "] Cancel order sent to broker, waiting for confirmation...");
 			status = ORDER_STATUS_CLOSING;
 			return;
 		}
 	}
 
 	void Open() {
+		if (isMarketClosed(symbol)) {
+			if (allowQueueing)
+				return;
+
+			status = ORDER_STATUS_CANCELLED;
+			isProcessed = true;
+
+			logger.warning("[" + GetId() + "] Open blocked: Market is closed");
+
+			if (CheckPointer(orderPersistence) != POINTER_INVALID)
+				orderPersistence.DeleteOrderJson(source, GetId());
+
+			return;
+		}
+
 		if (!ValidateMinimumVolume()) {
 			status = ORDER_STATUS_CANCELLED;
 			isProcessed = true;
 
-			logger.info("[" + Id() + "] Order cancelled - Volume does not meet minimum requirements");
+			logger.info("[" + GetId() + "] Order cancelled - Volume does not meet minimum requirements");
 
 			if (CheckPointer(orderPersistence) != POINTER_INVALID)
-				orderPersistence.DeleteOrderJson(source, Id());
+				orderPersistence.DeleteOrderJson(source, GetId());
 
 			return;
 		}
 
 		bool isBuy = (side == ORDER_TYPE_BUY);
-		double takeProfit = CalculateTakeProfit(openAtPrice);
-		double stopLoss = CalculateStopLoss(openAtPrice);
 
 		MqlTradeResult result = ATrade::Open(
 			symbol,
-			Id(),
+			GetId(),
 			isBuy,
 			isMarketOrder,
 			openAtPrice,
 			volume,
-			takeProfit,
-			stopLoss,
+			mainTakeProfitAtPrice,
+			mainStopLossAtPrice,
 			magicNumber
 			);
 
@@ -239,12 +260,11 @@ public:
 		closeAt = time;
 		closePrice = price;
 		profitInDollars = profits;
-		profitAccumulativeInDollars += profits;
 		status = ORDER_STATUS_CLOSED;
 
 		if (profits == 0.0 && price == 0.0) {
 			status = ORDER_STATUS_CANCELLED;
-			logger.info("[" + Id() + "] Order cancelled");
+			logger.info("[" + GetId() + "] Order cancelled");
 		}
 
 		orderCloseReason = reason;
@@ -252,30 +272,30 @@ public:
 
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(snapshot);
-			logger.info("[" + Id() + "] Order snapshot added to report");
+			logger.info("[" + GetId() + "] Order snapshot added to report");
 		}
 
 		if (reason == DEAL_REASON_TP)
-			logger.info("[" + Id() + "] Order closed by Take Profit");
+			logger.info("[" + GetId() + "] Order closed by Take Profit");
 
 		if (reason == DEAL_REASON_EXPERT)
-			logger.info("[" + Id() + "] Order closed by Expert");
+			logger.info("[" + GetId() + "] Order closed by Expert");
 
 		if (reason == DEAL_REASON_CLIENT)
-			logger.info("[" + Id() + "] Order closed by Client");
+			logger.info("[" + GetId() + "] Order closed by Client");
 
 		if (reason == DEAL_REASON_MOBILE)
-			logger.info("[" + Id() + "] Order closed by Mobile");
+			logger.info("[" + GetId() + "] Order closed by Mobile");
 
 		if (reason == DEAL_REASON_WEB)
-			logger.info("[" + Id() + "] Order closed by Web");
+			logger.info("[" + GetId() + "] Order closed by Web");
 
 		if (reason == DEAL_REASON_SL)
-			logger.info("[" + Id() + "] Order closed by Stop Loss");
+			logger.info("[" + GetId() + "] Order closed by Stop Loss");
 
 		if (status == ORDER_STATUS_CLOSED)
 			if (CheckPointer(orderPersistence) != POINTER_INVALID)
-				orderPersistence.DeleteOrderJson(source, Id());
+				orderPersistence.DeleteOrderJson(source, GetId());
 	}
 
 	void OnOpen(const MqlTradeResult &result) {
@@ -286,7 +306,7 @@ public:
 			isProcessed = true;
 
 			if (CheckPointer(orderPersistence) != POINTER_INVALID)
-				orderPersistence.DeleteOrderJson(source, Id());
+				orderPersistence.DeleteOrderJson(source, GetId());
 
 			return;
 		}
@@ -295,22 +315,22 @@ public:
 		isProcessed = true;
 		openAt = dtime.Now();
 		openPrice = result.price;
-		dealId = result.deal;
-		orderId = result.order;
+		SetDealId(result.deal);
+		SetOrderId(result.order);
 
-		if (dealId > 0) {
-			HistoryDealSelect(dealId);
-			positionId = HistoryDealGetInteger(dealId, DEAL_POSITION_ID);
+		if (GetDealId() > 0) {
+			HistoryDealSelect(GetDealId());
+			SetPositionId(HistoryDealGetInteger(GetDealId(), DEAL_POSITION_ID));
 		}
 
-		if (dealId == 0) {
+		if (GetDealId() == 0) {
 			status = ORDER_STATUS_PENDING;
-			logger.info("[" + Id() + "] Order opened as pending, orderId: " + IntegerToString(orderId));
+			logger.info("[" + GetId() + "] Order opened as pending, orderId: " + IntegerToString(GetOrderId()));
 		} else {
 			if (wasPending)
-				logger.info("[" + Id() + "] Pending order has opened, dealId: " + IntegerToString(dealId) + ", positionId: " + IntegerToString(positionId));
+				logger.info("[" + GetId() + "] Pending order has opened, dealId: " + IntegerToString(GetDealId()) + ", positionId: " + IntegerToString(GetPositionId()));
 			else
-				logger.info("[" + Id() + "] Order opened immediately, dealId: " + IntegerToString(dealId) + ", positionId: " + IntegerToString(positionId));
+				logger.info("[" + GetId() + "] Order opened immediately, dealId: " + IntegerToString(GetDealId()) + ", positionId: " + IntegerToString(GetPositionId()));
 
 			status = ORDER_STATUS_OPEN;
 		}
@@ -325,42 +345,194 @@ public:
 		id = newId;
 	}
 
-	string Id() {
+	bool SetTakeProfit(double takeProfitAtPrice = 0) {
+		if (takeProfitAtPrice <= 0)
+			return false;
+
+		mainTakeProfitAtPrice = takeProfitAtPrice;
+
+		if (status == ORDER_STATUS_OPEN) {
+			if (!ATrade::ModifyTakeProfit(takeProfitAtPrice, magicNumber)) {
+				logger.error("[" + GetId() + "] Failed to modify take profit on open position");
+				return false;
+			}
+
+			logger.info("[" + GetId() + "] Take profit modified to: " + DoubleToString(takeProfitAtPrice, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS)));
+		}
+
+		return true;
+	}
+
+	bool SetStopLoss(double stopLossAtPrice = 0) {
+		if (stopLossAtPrice <= 0)
+			return false;
+
+		mainStopLossAtPrice = stopLossAtPrice;
+
+		if (status == ORDER_STATUS_OPEN) {
+			if (!ATrade::ModifyStopLoss(stopLossAtPrice, magicNumber)) {
+				logger.error("[" + GetId() + "] Failed to modify stop loss on open position");
+				return false;
+			}
+
+			logger.info("[" + GetId() + "] Stop loss modified to: " + DoubleToString(stopLossAtPrice, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS)));
+		}
+
+		return true;
+	}
+
+	void SetSource(string newSource) {
+		source = newSource;
+	}
+
+	void SetSymbol(string newSymbol) {
+		symbol = newSymbol;
+	}
+
+	void SetMagicNumber(ulong newMagicNumber) {
+		magicNumber = newMagicNumber;
+	}
+
+	void SetStatus(ENUM_ORDER_STATUSES newStatus) {
+		status = newStatus;
+	}
+
+	void SetSide(int newSide) {
+		side = newSide;
+	}
+
+	void SetVolume(double newVolume) {
+		volume = newVolume;
+	}
+
+	void SetSignalPrice(double newSignalPrice) {
+		signalPrice = newSignalPrice;
+	}
+
+	void SetOpenAtPrice(double newOpenAtPrice) {
+		openAtPrice = newOpenAtPrice;
+	}
+
+	void SetOpenPrice(double newOpenPrice) {
+		openPrice = newOpenPrice;
+	}
+
+	void SetSignalAt(MqlDateTime &newSignalAt) {
+		signalAt = newSignalAt;
+	}
+
+	void SetOpenAt(MqlDateTime &newOpenAt) {
+		openAt = newOpenAt;
+	}
+
+	void SetIsMarketOrder(bool value) {
+		isMarketOrder = value;
+	}
+
+	void SetAllowQueueing(bool value) {
+		allowQueueing = value;
+	}
+
+	void SetIsProcessed(bool value) {
+		isProcessed = value;
+	}
+
+	void SetIsInitialized(bool value) {
+		isInitialized = value;
+	}
+
+	string GetId() {
 		if (id == "")
 			RefreshId();
 
 		return id;
 	}
 
+	string GetSource() {
+		return source;
+	}
+
+	string GetSymbol() {
+		return symbol;
+	}
+
+	ulong GetMagicNumber() {
+		return magicNumber;
+	}
+
+	ENUM_ORDER_STATUSES GetStatus() {
+		return status;
+	}
+
+	int GetSide() {
+		return side;
+	}
+
+	ENUM_DEAL_REASON GetOrderCloseReason() {
+		return orderCloseReason;
+	}
+
+	double GetVolume() {
+		return volume;
+	}
+
+	double GetSignalPrice() {
+		return signalPrice;
+	}
+
+	double GetOpenAtPrice() {
+		return openAtPrice;
+	}
+
+	double GetOpenPrice() {
+		return openPrice;
+	}
+
+	double GetClosePrice() {
+		return closePrice;
+	}
+
+	double GetProfitInDollars() {
+		return profitInDollars;
+	}
+
+	MqlDateTime GetSignalAt() {
+		return signalAt;
+	}
+
+	MqlDateTime GetOpenAt() {
+		return openAt;
+	}
+
+	MqlDateTime GetCloseAt() {
+		return closeAt;
+	}
+
+	SSOrderHistory GetSnapshot() {
+		return snapshot;
+	}
+
+	bool IsMarketOrder() {
+		return isMarketOrder;
+	}
+
+	bool IsProcessed() {
+		return isProcessed;
+	}
+
+	bool IsInitialized() {
+		return isInitialized;
+	}
+
+	bool AllowsQueueing() {
+		return allowQueueing;
+	}
+
 	void RefreshId() {
 		string uuid = "";
 		for (int i = 0; i < 8; i++)
 			uuid += IntegerToString(MathRand() % 10);
-		id = source + "_" + IntegerToString(layer) + "_" + uuid;
-	}
-
-	double CalculateTakeProfit(double price) {
-		if (mainTakeProfitAtPrice > 0)
-			return mainTakeProfitAtPrice;
-
-		if (mainTakeProfitInPoints == 0)
-			return 0;
-
-		return (side == ORDER_TYPE_BUY)
-			? price + (mainTakeProfitInPoints * SymbolInfoDouble(symbol, SYMBOL_POINT))
-			: price - (mainTakeProfitInPoints * SymbolInfoDouble(symbol, SYMBOL_POINT));
-	}
-
-	double CalculateStopLoss(double price) {
-		if (mainStopLossAtPrice > 0)
-			return mainStopLossAtPrice;
-
-		if (mainStopLossInPoints == 0)
-			return 0;
-
-		return (side == ORDER_TYPE_BUY)
-			? price - (mainStopLossInPoints * SymbolInfoDouble(symbol, SYMBOL_POINT))
-			: price + (mainStopLossInPoints * SymbolInfoDouble(symbol, SYMBOL_POINT));
+		id = source + "_" + uuid;
 	}
 
 	bool ValidateMinimumVolume() {
@@ -369,23 +541,23 @@ public:
 		double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
 
 		if (volume <= 0) {
-			logger.info("[" + Id() + "] Validation failed - Volume is zero or negative: " + DoubleToString(volume, 5));
+			logger.info("[" + GetId() + "] Validation failed - Volume is zero or negative: " + DoubleToString(volume, 5));
 			return false;
 		}
 
 		if (volume < minLot) {
-			logger.info("[" + Id() + "] Validation failed - Volume " + DoubleToString(volume, 5) + " is below minimum lot size: " + DoubleToString(minLot, 5));
+			logger.info("[" + GetId() + "] Validation failed - Volume " + DoubleToString(volume, 5) + " is below minimum lot size: " + DoubleToString(minLot, 5));
 			return false;
 		}
 
 		if (volume > maxLot) {
-			logger.info("[" + Id() + "] Validation failed - Volume " + DoubleToString(volume, 5) + " exceeds maximum lot size: " + DoubleToString(maxLot, 5));
+			logger.info("[" + GetId() + "] Validation failed - Volume " + DoubleToString(volume, 5) + " exceeds maximum lot size: " + DoubleToString(maxLot, 5));
 			return false;
 		}
 
 		double normalizedVolume = MathFloor(volume / lotStep) * lotStep;
 		if (normalizedVolume < minLot) {
-			logger.info("[" + Id() + "] Validation failed - Normalized volume " + DoubleToString(normalizedVolume, 5) + " is below minimum after lot step adjustment");
+			logger.info("[" + GetId() + "] Validation failed - Normalized volume " + DoubleToString(normalizedVolume, 5) + " is below minimum after lot step adjustment");
 			return false;
 		}
 
@@ -395,7 +567,6 @@ public:
 	void OnDeinit() {
 		id = "";
 		source = "";
-		sourceCustomId = "";
 		status = ORDER_STATUS_CLOSED;
 		isInitialized = false;
 		isProcessed = false;

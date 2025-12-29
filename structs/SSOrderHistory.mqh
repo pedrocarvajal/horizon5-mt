@@ -7,16 +7,12 @@ struct SSOrderHistory {
 	string orderId;
 	string strategyName;
 	string strategyPrefix;
-	string sourceCustomId;
 	ulong magicNumber;
-	int layer;
 
 	ENUM_ORDER_STATUSES status;
 	int side;
 	ENUM_DEAL_REASON orderCloseReason;
 
-	double mainTakeProfitInPoints;
-	double mainStopLossInPoints;
 	double mainTakeProfitAtPrice;
 	double mainStopLossAtPrice;
 
