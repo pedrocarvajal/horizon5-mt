@@ -21,7 +21,6 @@ interface IAsset {
 
 	void SetSymbol(string assetSymbol);
 	void SetName(string assetName);
-	void SetMagicNumber(ulong magic);
 	void SetBalance(double assetBalance);
 
 	int GetStrategyCount();

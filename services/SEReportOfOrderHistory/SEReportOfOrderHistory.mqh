@@ -21,14 +21,10 @@ private:
 		obj.setProperty("order_id", history.orderId);
 		obj.setProperty("strategy_name", history.strategyName);
 		obj.setProperty("strategy_prefix", history.strategyPrefix);
-		obj.setProperty("source_custom_id", history.sourceCustomId);
 		obj.setProperty("magic_number", (long)history.magicNumber);
-		obj.setProperty("layer", history.layer);
 		obj.setProperty("status", (int)history.status);
 		obj.setProperty("side", history.side);
 		obj.setProperty("order_close_reason", (int)history.orderCloseReason);
-		obj.setProperty("main_take_profit_in_points", history.mainTakeProfitInPoints);
-		obj.setProperty("main_stop_loss_in_points", history.mainStopLossInPoints);
 		obj.setProperty("main_take_profit_at_price", history.mainTakeProfitAtPrice);
 		obj.setProperty("main_stop_loss_at_price", history.mainStopLossAtPrice);
 		obj.setProperty("signal_at", (long)history.signalAt);

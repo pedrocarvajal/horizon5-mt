@@ -42,27 +42,28 @@ private:
 			return false;
 		}
 
-		order.isInitialized = json.getBoolean("is_initialized");
-		order.isProcessed = json.getBoolean("is_processed");
-		order.isMarketOrder = json.getBoolean("is_market_order");
-		order.status = (ENUM_ORDER_STATUSES)json.getNumber("status");
+		order.SetIsInitialized(json.getBoolean("is_initialized"));
+		order.SetIsProcessed(json.getBoolean("is_processed"));
+		order.SetIsMarketOrder(json.getBoolean("is_market_order"));
+		order.SetStatus((ENUM_ORDER_STATUSES)json.getNumber("status"));
 
-		order.id = json.getString("id");
-		order.source = json.getString("source");
-		order.sourceCustomId = json.getString("source_custom_id");
-		order.side = (int)json.getNumber("side");
-		order.layer = (int)json.getNumber("layer");
-		order.orderId = (ulong)json.getNumber("order_id");
-		order.dealId = (ulong)json.getNumber("deal_id");
-		order.positionId = (ulong)json.getNumber("position_id");
+		order.SetId(json.getString("id"));
+		order.SetSource(json.getString("source"));
+		order.SetSide((int)json.getNumber("side"));
+		order.SetOrderId((ulong)json.getNumber("order_id"));
+		order.SetDealId((ulong)json.getNumber("deal_id"));
+		order.SetPositionId((ulong)json.getNumber("position_id"));
 
-		order.volume = json.getNumber("volume");
-		order.signalPrice = json.getNumber("signal_price");
-		order.openAtPrice = json.getNumber("open_at_price");
-		order.openPrice = json.getNumber("open_price");
+		order.SetVolume(json.getNumber("volume"));
+		order.SetSignalPrice(json.getNumber("signal_price"));
+		order.SetOpenAtPrice(json.getNumber("open_at_price"));
+		order.SetOpenPrice(json.getNumber("open_price"));
 
-		TimeToStruct((datetime)json.getNumber("signal_at"), order.signalAt);
-		TimeToStruct((datetime)json.getNumber("open_at"), order.openAt);
+		MqlDateTime signalAt, openAt;
+		TimeToStruct((datetime)json.getNumber("signal_at"), signalAt);
+		TimeToStruct((datetime)json.getNumber("open_at"), openAt);
+		order.SetSignalAt(signalAt);
+		order.SetOpenAt(openAt);
 
 		return true;
 	}
@@ -93,27 +94,25 @@ private:
 	string SerializeOrder(EOrder &order) {
 		JSON::Object json;
 
-		json.setProperty("is_initialized", order.isInitialized);
-		json.setProperty("is_processed", order.isProcessed);
-		json.setProperty("is_market_order", order.isMarketOrder);
-		json.setProperty("status", (int)order.status);
+		json.setProperty("is_initialized", order.IsInitialized());
+		json.setProperty("is_processed", order.IsProcessed());
+		json.setProperty("is_market_order", order.IsMarketOrder());
+		json.setProperty("status", (int)order.GetStatus());
 
-		json.setProperty("id", order.id);
-		json.setProperty("source", order.source);
-		json.setProperty("source_custom_id", order.sourceCustomId);
-		json.setProperty("side", order.side);
-		json.setProperty("layer", order.layer);
-		json.setProperty("order_id", (long)order.orderId);
-		json.setProperty("deal_id", (long)order.dealId);
-		json.setProperty("position_id", (long)order.positionId);
+		json.setProperty("id", order.GetId());
+		json.setProperty("source", order.GetSource());
+		json.setProperty("side", order.GetSide());
+		json.setProperty("order_id", (long)order.GetOrderId());
+		json.setProperty("deal_id", (long)order.GetDealId());
+		json.setProperty("position_id", (long)order.GetPositionId());
 
-		json.setProperty("volume", order.volume);
-		json.setProperty("signal_price", order.signalPrice);
-		json.setProperty("open_at_price", order.openAtPrice);
-		json.setProperty("open_price", order.openPrice);
+		json.setProperty("volume", order.GetVolume());
+		json.setProperty("signal_price", order.GetSignalPrice());
+		json.setProperty("open_at_price", order.GetOpenAtPrice());
+		json.setProperty("open_price", order.GetOpenPrice());
 
-		json.setProperty("signal_at", (long)StructToTime(order.signalAt));
-		json.setProperty("open_at", (long)StructToTime(order.openAt));
+		json.setProperty("signal_at", (long)StructToTime(order.GetSignalAt()));
+		json.setProperty("open_at", (long)StructToTime(order.GetOpenAt()));
 
 		json.setProperty("saved_at", (long)dtime.GetCurrentTime());
 
@@ -193,10 +192,10 @@ public:
 						ArrayResize(restoredOrders, ArraySize(restoredOrders) + 1);
 						restoredOrders[ArraySize(restoredOrders) - 1] = order;
 						loadedCount++;
-						logger.info("Order loaded successfully: " + order.Id() + " (Status: " + EnumToString((ENUM_ORDER_STATUSES)order.status) + ")");
+						logger.info("Order loaded successfully: " + order.GetId() + " (Status: " + EnumToString(order.GetStatus()) + ")");
 					} else {
-						logger.warning(" Order no longer exists in MetaTrader, cleaning up: " + order.Id());
-						DeleteOrderJson(strategyName, order.Id());
+						logger.warning(" Order no longer exists in MetaTrader, cleaning up: " + order.GetId());
+						DeleteOrderJson(strategyName, order.GetId());
 					}
 				} else {
 					logger.error("CRITICAL ERROR: Failed to deserialize order from: " + fileName);
@@ -224,12 +223,12 @@ public:
 		if (!isLiveTrading())
 			return true;
 
-		if (!CreateDirectoryStructure(order.source)) {
-			logger.error("Cannot create directory structure for strategy: " + order.source);
+		if (!CreateDirectoryStructure(order.GetSource())) {
+			logger.error("Cannot create directory structure for strategy: " + order.GetSource());
 			return false;
 		}
 
-		string filePath = GetOrderFilePath(order.source, order.Id());
+		string filePath = GetOrderFilePath(order.GetSource(), order.GetId());
 		string jsonData = SerializeOrder(order);
 
 		int handle = FileOpen(filePath, FILE_WRITE | FILE_TXT | FILE_COMMON | FILE_ANSI);
@@ -250,11 +249,11 @@ public:
 		if (!isLiveTrading())
 			return true;
 
-		if (order.status == ORDER_STATUS_PENDING && order.orderId > 0)
-			return OrderSelect(order.orderId);
+		if (order.GetStatus() == ORDER_STATUS_PENDING && order.GetOrderId() > 0)
+			return OrderSelect(order.GetOrderId());
 
-		if (order.status == ORDER_STATUS_OPEN && order.positionId > 0)
-			return PositionSelectByTicket(order.positionId);
+		if (order.GetStatus() == ORDER_STATUS_OPEN && order.GetPositionId() > 0)
+			return PositionSelectByTicket(order.GetPositionId());
 
 		return false;
 	}
