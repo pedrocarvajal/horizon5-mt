@@ -30,9 +30,9 @@ private:
 	}
 
 	void OpenDailyOrder() {
-		double lotSize = GetLotSizeByCapital();
+		double orderLotSize = GetLotSizeByCapital();
 
-		if (lotSize <= 0) {
+		if (orderLotSize <= 0) {
 			logger.warning("Invalid lot size, skipping order");
 			return;
 		}
@@ -43,35 +43,38 @@ private:
 
 		double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
 
+		double takeProfitPrice = 0;
+		double stopLossPrice = 0;
+
+		if (orderSide == ORDER_TYPE_BUY) {
+			takeProfitPrice = currentPrice + (takeProfitPoints * point);
+			stopLossPrice = currentPrice - (stopLossPoints * point);
+		} else {
+			takeProfitPrice = currentPrice - (takeProfitPoints * point);
+			stopLossPrice = currentPrice + (stopLossPoints * point);
+		}
+
 		EOrder *order = OpenNewOrder(
 			orderSide,
 			currentPrice,
-			lotSize,
-			true);
+			orderLotSize,
+			true,
+			false,
+			takeProfitPrice,
+			stopLossPrice);
 
 		if (order == NULL) {
 			logger.error("Failed to create order");
 			return;
 		}
 
-		if (orderSide == ORDER_TYPE_BUY) {
-			order.mainTakeProfitAtPrice = currentPrice + (takeProfitPoints * point);
-			order.mainStopLossAtPrice = currentPrice - (stopLossPoints * point);
-		} else {
-			order.mainTakeProfitAtPrice = currentPrice - (takeProfitPoints * point);
-			order.mainStopLossAtPrice = currentPrice + (stopLossPoints * point);
-		}
-
-		ArrayResize(orders, ArraySize(orders) + 1);
-		orders[ArraySize(orders) - 1] = order;
-
 		logger.info(StringFormat(
 				    "Daily order created: %s %.2f lots @ %.5f | TP: %.5f | SL: %.5f",
 				    (orderSide == ORDER_TYPE_BUY) ? "BUY" : "SELL",
-				    lotSize,
+				    orderLotSize,
 				    currentPrice,
-				    order.mainTakeProfitAtPrice,
-				    order.mainStopLossAtPrice));
+				    takeProfitPrice,
+				    stopLossPrice));
 	}
 
 public:
