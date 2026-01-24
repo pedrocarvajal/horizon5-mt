@@ -6,9 +6,12 @@
 input group "General Settings";
 input ENUM_ORDER_TYPE_FILLING FillingMode = ORDER_FILLING_IOC; // [1] > Order filling mode
 
+input group "Reporting";
+input bool EnableOrderHistoryReport = false; // [1] > Enable order history report on tester
+
 input group "Risk management";
 input bool EquityAtRiskCompounded = true; // [1] > Equity at risk compounded
-input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
+input double EquityAtRisk = 10; // [1] > Equity at risk value (in percentage)
 
 #include <Trade/Trade.mqh>
 #include "services/SEDateTime/SEDateTime.mqh"
@@ -18,14 +21,16 @@ input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 #include "helpers/HIsLiveTrading.mqh"
 #include "helpers/HIsMarketClosed.mqh"
 #include "helpers/HDeleteOldOrders.mqh"
+#include "helpers/HGetPipSize.mqh"
+#include "helpers/HGetPipValue.mqh"
 
-#include "structs/SQueuedOrder.mqh"
+#include "constants/time.mqh"
+
 #include "configs/Assets.mqh"
 
 SEDateTime dtime;
 SELogger hlogger;
 EOrder orders[];
-SQueuedOrder queuedOrders[];
 SEReportOfOrderHistory *orderHistoryReporter;
 SEOrderPersistence *orderPersistence;
 
@@ -52,16 +57,10 @@ int OnInit() {
 	string timestamp = StringFormat("%04d%02d%02d_%02d%02d%02d", dt.year, dt.mon, dt.day, dt.hour, dt.min, dt.sec);
 	string timestampedReportsDir = "/Reports/" + _Symbol + "/" + timestamp;
 
-	orderHistoryReporter = new SEReportOfOrderHistory(timestampedReportsDir, true);
+	if (EnableOrderHistoryReport)
+		orderHistoryReporter = new SEReportOfOrderHistory(timestampedReportsDir, true);
+
 	orderPersistence = new SEOrderPersistence();
-
-	//
-	// int total = SymbolsTotal(false);
-
-	// for(int i = 0; i < total; i++) {
-	// 	string symbol = SymbolName(i, false);
-	// 	hlogger.info("Symbol: " + symbol);
-	// }
 
 	// Initialize assets
 	int assetCount = ArraySize(assets);
@@ -189,16 +188,8 @@ void OnDeinit(const int reason) {
 	for (int i = 0; i < ArraySize(orders); i++)
 		orders[i].OnDeinit();
 
-	for (int i = 0; i < ArraySize(queuedOrders); i++)
-		if (queuedOrders[i].action == QUEUE_ACTION_OPEN && CheckPointer(queuedOrders[i].order) != POINTER_INVALID) {
-			queuedOrders[i].order.OnDeinit();
-			delete queuedOrders[i].order;
-		}
-
 	ArrayResize(orders, 0);
 	ArrayFree(orders);
-	ArrayResize(queuedOrders, 0);
-	ArrayFree(queuedOrders);
 
 	if (CheckPointer(orderHistoryReporter) != POINTER_INVALID)
 		delete orderHistoryReporter;
@@ -212,9 +203,6 @@ void OnDeinit(const int reason) {
 }
 
 void OnTimer() {
-	if (dtime.Now().hour < 1)
-		return;
-
 	// Start of week (Monday) - executed FIRST
 	if (dtime.Now().day_of_week == 1 && lastStartWeekYday != dtime.Now().day_of_year) {
 		for (int i = 0; i < ArraySize(assets); i++)
@@ -263,8 +251,6 @@ void OnTimer() {
 
 		for (int i = 0; i < ArraySize(assets); i++)
 			assets[i].OnStartMinute();
-
-		ProcessQueuedOrders();
 	}
 
 	// Per-tick processing
@@ -277,55 +263,15 @@ void OnTimer() {
 
 		ENUM_ORDER_STATUSES previousStatus = orders[i].GetStatus();
 
-		if (orders[i].GetStatus() == ORDER_STATUS_QUEUED && !isMarketClosed(orders[i].GetSymbol())) {
-			orders[i].SetStatus(ORDER_STATUS_PENDING);
-			hlogger.info("Queued order activated: " + orders[i].GetId() + " (market opened)");
-		}
-
 		if (orders[i].GetStatus() == ORDER_STATUS_PENDING)
 			orders[i].CheckToOpen();
+
+		if (orders[i].GetStatus() == ORDER_STATUS_OPEN)
+			orders[i].CheckToClose();
 
 		if (previousStatus == ORDER_STATUS_PENDING && orders[i].GetStatus() == ORDER_STATUS_CANCELLED)
 			for (int j = 0; j < ArraySize(assets); j++)
 				assets[j].OnOpenOrder(orders[i]);
-	}
-}
-
-void ProcessQueuedOrders() {
-	for (int i = ArraySize(queuedOrders) - 1; i >= 0; i--) {
-		SQueuedOrder queued = queuedOrders[i];
-		string symbol = (queued.action == QUEUE_ACTION_OPEN) ? queued.order.GetSymbol() : "";
-		int orderIndex = -1;
-
-		if (queued.action == QUEUE_ACTION_CLOSE) {
-			for (int j = 0; j < ArraySize(orders); j++) {
-				if (orders[j].GetPositionId() == queued.positionId) {
-					orderIndex = j;
-					break;
-				}
-			}
-
-			if (orderIndex == -1 || orders[orderIndex].GetStatus() == ORDER_STATUS_CLOSED || orders[orderIndex].GetStatus() == ORDER_STATUS_CANCELLED) {
-				hlogger.debug("Queued close: Order already closed or not found: " + IntegerToString(queued.positionId));
-				ArrayRemove(queuedOrders, i, 1);
-				continue;
-			}
-
-			symbol = orders[orderIndex].GetSymbol();
-		}
-
-		if (isMarketClosed(symbol))
-			continue;
-
-		if (queued.action == QUEUE_ACTION_OPEN) {
-			ArrayResize(orders, ArraySize(orders) + 1);
-			orders[ArraySize(orders) - 1] = *queued.order;
-			hlogger.info("Queued open transferred to orders: " + queued.order.GetId());
-		} else if (queued.action == QUEUE_ACTION_CLOSE) {
-			orders[orderIndex].Close();
-		}
-
-		ArrayRemove(queuedOrders, i, 1);
 	}
 }
 

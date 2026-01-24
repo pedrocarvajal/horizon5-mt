@@ -16,17 +16,16 @@ class SEAsset;
 #include "../services/SEStatistics/SEStatistics.mqh"
 #include "../services/SELotSize/SELotSize.mqh"
 #include "../helpers/HIsMarketClosed.mqh"
-#include "../structs/SQueuedOrder.mqh"
 
 extern SEDateTime dtime;
 extern EOrder orders[];
-extern SQueuedOrder queuedOrders[];
 
 class SEStrategy:
 public IStrategy {
 private:
 	double weight;
 	double balance;
+	int numOfOrdersOpenedToday;
 	EOrder openOrders[];
 
 	SEAsset *asset;
@@ -68,24 +67,6 @@ private:
 			if (isSideMatch && isStatusMatch) {
 				ArrayResize(resultOrders, ArraySize(resultOrders) + 1);
 				resultOrders[ArraySize(resultOrders) - 1] = sourceOrders[i];
-			}
-		}
-
-		for (int i = 0; i < ArraySize(queuedOrders); i++) {
-			if (queuedOrders[i].action != QUEUE_ACTION_OPEN)
-				continue;
-
-			if (queuedOrders[i].order.GetSource() != prefix)
-				continue;
-
-			if (queuedOrders[i].order.GetSymbol() != symbol)
-				continue;
-
-			bool isSideMatch = (side == -1) || (queuedOrders[i].order.GetSide() == side);
-
-			if (isSideMatch) {
-				ArrayResize(resultOrders, ArraySize(resultOrders) + 1);
-				resultOrders[ArraySize(resultOrders) - 1] = *queuedOrders[i].order;
 			}
 		}
 	}
@@ -157,6 +138,7 @@ public:
 			return INIT_FAILED;
 		}
 
+		numOfOrdersOpenedToday = 0;
 		logger.SetPrefix(name);
 		SQualityThresholds thresholds;
 		statistics = new SEStatistics(symbol, name, prefix, balance);
@@ -199,6 +181,7 @@ public:
 
 	virtual void OnStartDay() {
 		statistics.OnStartDay();
+		numOfOrdersOpenedToday = 0;
 	}
 
 	virtual void OnStartWeek() {
@@ -237,18 +220,10 @@ public:
 		ENUM_ORDER_TYPE side,
 		double openAtPrice,
 		double volume,
-		bool isMarketOrder = false,
-		bool allowQueueing = false,
+		bool isMarketOrder = true,
 		double takeProfit = 0,
 		double stopLoss = 0
 		) {
-		bool isMarketCurrentlyClosed = isMarketClosed(symbol);
-
-		if (isMarketCurrentlyClosed && !allowQueueing) {
-			logger.warning("Order blocked: Market is closed");
-			return NULL;
-		}
-
 		if (!ValidateTradingMode(side))
 			return NULL;
 
@@ -263,9 +238,7 @@ public:
 		order.SetSignalPrice(currentPrice);
 		order.SetOpenAtPrice(openAtPrice);
 		order.SetSignalAt(dtime.Now());
-
 		order.SetIsMarketOrder(isMarketOrder);
-		order.SetAllowQueueing(allowQueueing);
 
 		if (stopLoss > 0)
 			order.SetStopLoss(stopLoss);
@@ -275,18 +248,10 @@ public:
 
 		order.GetId();
 
-		if (isMarketCurrentlyClosed) {
-			int size = ArraySize(queuedOrders);
-			ArrayResize(queuedOrders, size + 1);
+		ArrayResize(orders, ArraySize(orders) + 1);
+		orders[ArraySize(orders) - 1] = *order;
 
-			queuedOrders[size].action = QUEUE_ACTION_OPEN;
-			queuedOrders[size].order = order;
-
-			logger.info("Order queued: Market is closed, will execute when market opens");
-		} else {
-			ArrayResize(orders, ArraySize(orders) + 1);
-			orders[ArraySize(orders) - 1] = *order;
-		}
+		numOfOrdersOpenedToday++;
 
 		return order;
 	}
@@ -295,10 +260,13 @@ public:
 		FilterOrders(orders, resultOrders, side, status, ORDER_STATUS_OPEN, ORDER_STATUS_PENDING);
 	}
 
+	int GetNumOfOrdersOpenedToday() {
+		return numOfOrdersOpenedToday;
+	}
+
 	double GetLotSizeByCapital() {
-		return lotSize.CalculateByCapital(
-			EquityAtRiskCompounded ? statistics.GetNav() : statistics.GetInitialBalance()
-			);
+		double nav = EquityAtRiskCompounded ? statistics.GetNav() : statistics.GetInitialBalance();
+		return lotSize.CalculateByCapital(nav * EquityAtRisk / 100.0);
 	}
 
 	double GetLotSizeByVolatility(double atrValue, double equityAtRisk) {

@@ -1,3 +1,12 @@
 {
-  "cSpell.words": ["hlogger"]
+  "cSpell.words": ["hlogger"],
+  "files.autoSave": "onFocusChange",
+  "achilleshr.runonsave": {
+    "commands": [
+      {
+        "match": "\\.(mqh|mq5)$",
+        "cmd": "cd ${workspaceFolder} && make deploy"
+      }
+    ]
+  }
 }

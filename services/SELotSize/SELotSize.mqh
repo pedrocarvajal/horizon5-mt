@@ -2,6 +2,7 @@
 #define __SE_LOT_SIZE_MQH__
 
 #include "../SELogger/SELogger.mqh"
+#include "../../helpers/HGetMarginPerLot.mqh"
 
 class SELotSize {
 private:
@@ -18,17 +19,15 @@ public:
 	}
 
 	double CalculateByCapital(double nav) {
-		double price = SymbolInfoDouble(symbol, SYMBOL_ASK);
-		double contractSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
+		double marginPerLot = GetMarginPerLot(symbol);
 
-		if (price <= 0 || contractSize <= 0) {
-			logger.warning("CalculateByCapital: Invalid price or contract size");
+		if (marginPerLot <= 0) {
+			logger.warning("CalculateByCapital: Unable to calculate margin per lot");
 			return 0.0;
 		}
 
-		double result = nav / (price * contractSize);
-
-		logger.info(StringFormat("CalculateByCapital: nav=%.2f, price=%.2f, contractSize=%.2f, lotSize=%.4f", nav, price, contractSize, result));
+		double result = nav / marginPerLot;
+		logger.info(StringFormat("CalculateByCapital: nav=%.2f, marginPerLot=%.2f, lotSize=%.4f", nav, marginPerLot, result));
 
 		return result;
 	}

@@ -45,6 +45,10 @@ private:
 		order.SetIsInitialized(json.getBoolean("is_initialized"));
 		order.SetIsProcessed(json.getBoolean("is_processed"));
 		order.SetIsMarketOrder(json.getBoolean("is_market_order"));
+		order.SetPendingToOpen(json.getBoolean("pending_to_open"));
+		order.SetPendingToClose(json.getBoolean("pending_to_close"));
+		order.SetRetryCount((int)json.getNumber("retry_count"));
+		order.SetRetryAfter((datetime)json.getNumber("retry_after"));
 		order.SetStatus((ENUM_ORDER_STATUSES)json.getNumber("status"));
 
 		order.SetId(json.getString("id"));
@@ -97,6 +101,10 @@ private:
 		json.setProperty("is_initialized", order.IsInitialized());
 		json.setProperty("is_processed", order.IsProcessed());
 		json.setProperty("is_market_order", order.IsMarketOrder());
+		json.setProperty("pending_to_open", order.IsPendingToOpen());
+		json.setProperty("pending_to_close", order.IsPendingToClose());
+		json.setProperty("retry_count", order.GetRetryCount());
+		json.setProperty("retry_after", (long)order.GetRetryAfter());
 		json.setProperty("status", (int)order.GetStatus());
 
 		json.setProperty("id", order.GetId());

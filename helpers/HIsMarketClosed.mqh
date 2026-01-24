@@ -2,41 +2,75 @@
 #define __H_IS_MARKET_CLOSED_MQH__
 
 #include "../services/SEDateTime/SEDateTime.mqh"
+#include "../structs/SMarketStatus.mqh"
 
 extern SEDateTime dtime;
 
-bool isMarketClosed(string check_symbol, int safety_margin_minutes = 1) {
-	datetime current_time = dtime.GetCurrentTime();
+SMarketStatus getMarketStatus(string checkSymbol, int safetyMarginMinutes = 1) {
+	SMarketStatus status;
+	status.isClosed = true;
+	status.opensInSeconds = 0;
+
+	datetime currentTime = dtime.GetCurrentTime();
 	MqlDateTime dt;
-	TimeToStruct(current_time, dt);
+	TimeToStruct(currentTime, dt);
 
-	ENUM_DAY_OF_WEEK current_day = (ENUM_DAY_OF_WEEK)dt.day_of_week;
-	datetime session_start, session_end;
-	uint session_index = 0;
+	int currentMinutes = dt.hour * 60 + dt.min;
+	int currentSeconds = currentMinutes * 60 + dt.sec;
 
-	while (SymbolInfoSessionTrade(check_symbol, current_day, session_index, session_start, session_end)) {
-		MqlDateTime start_dt, end_dt;
-		TimeToStruct(session_start, start_dt);
-		TimeToStruct(session_end, end_dt);
+	for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
+		ENUM_DAY_OF_WEEK checkDay = (ENUM_DAY_OF_WEEK)((dt.day_of_week + dayOffset) % 7);
+		datetime sessionStart, sessionEnd;
+		uint sessionIndex = 0;
 
-		int current_minutes = dt.hour * 60 + dt.min;
-		int start_minutes = start_dt.hour * 60 + start_dt.min + safety_margin_minutes;
-		int end_minutes = end_dt.hour * 60 + end_dt.min - safety_margin_minutes;
+		while (SymbolInfoSessionTrade(checkSymbol, checkDay, sessionIndex, sessionStart, sessionEnd)) {
+			MqlDateTime startDt, endDt;
+			TimeToStruct(sessionStart, startDt);
+			TimeToStruct(sessionEnd, endDt);
 
-		bool is_overnight_session = (end_minutes <= start_minutes);
+			int startMinutes = startDt.hour * 60 + startDt.min + safetyMarginMinutes;
+			int endMinutes = endDt.hour * 60 + endDt.min - safetyMarginMinutes;
+			int startSeconds = startMinutes * 60;
+			int endSeconds = endMinutes * 60;
 
-		if (is_overnight_session) {
-			if (current_minutes >= start_minutes || current_minutes <= end_minutes)
-				return false;
-		} else {
-			if (current_minutes >= start_minutes && current_minutes <= end_minutes)
-				return false;
+			if (dayOffset == 0) {
+				bool isOvernightSession = (endMinutes <= startMinutes);
+
+				if (isOvernightSession) {
+					if (currentMinutes >= startMinutes || currentMinutes <= endMinutes) {
+						status.isClosed = false;
+						status.opensInSeconds = 0;
+						return status;
+					}
+				} else {
+					if (currentMinutes >= startMinutes && currentMinutes <= endMinutes) {
+						status.isClosed = false;
+						status.opensInSeconds = 0;
+						return status;
+					}
+				}
+
+				if (currentSeconds < startSeconds) {
+					status.opensInSeconds = startSeconds - currentSeconds;
+					return status;
+				}
+			} else {
+				int secondsUntilMidnight = 86400 - currentSeconds;
+				int secondsFromPreviousDays = (dayOffset - 1) * 86400;
+				status.opensInSeconds = secondsUntilMidnight + secondsFromPreviousDays + startSeconds;
+				return status;
+			}
+
+			sessionIndex++;
 		}
-
-		session_index++;
 	}
 
-	return true;
+	status.opensInSeconds = 86400;
+	return status;
+}
+
+bool isMarketClosed(string checkSymbol, int safetyMarginMinutes = 1) {
+	return getMarketStatus(checkSymbol, safetyMarginMinutes).isClosed;
 }
 
 #endif

@@ -1,4 +1,3 @@
 # SEStatistics
 
 > Documentation pending development.
-

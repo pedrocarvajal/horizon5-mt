@@ -20,4 +20,3 @@ Before implementing, modifying, or creating any code, you MUST gather complete c
 - **Follow established patterns**: New code must align with the architectural conventions already present in the codebase.
 
 This prevents redundant implementations and ensures consistency across the project.
-

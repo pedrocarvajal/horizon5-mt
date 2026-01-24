@@ -1,4 +1,3 @@
 # Explanation
 
 > Documentation pending development.
-

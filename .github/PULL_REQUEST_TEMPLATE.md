@@ -40,9 +40,9 @@ Select all that apply:
 
 Summarize the key changes in bullet points:
 
-- 
-- 
-- 
+-
+-
+-
 
 ## Testing
 
@@ -62,9 +62,9 @@ Describe the steps to test these changes:
 # Example code to test the changes
 ```
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ## Performance Impact
 
@@ -137,12 +137,11 @@ Add any other context about the PR here:
 
 Specific areas you'd like reviewers to focus on:
 
-- 
-- 
-- 
+-
+-
+-
 
 ---
 
 **License Acknowledgment:**
 By submitting this PR, I confirm that my contributions are licensed under the PolyForm Noncommercial License 1.0.0 and comply with the project's license requirements.
-

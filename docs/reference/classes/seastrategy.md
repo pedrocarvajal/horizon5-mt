@@ -1,4 +1,3 @@
 # SEStrategy
 
 > Documentation pending development.
-
