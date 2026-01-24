@@ -1,4 +1,3 @@
 # EOrder
 
 > Documentation pending development.
-

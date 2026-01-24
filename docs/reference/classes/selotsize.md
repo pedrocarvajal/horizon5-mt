@@ -1,4 +1,3 @@
 # SELotSize
 
 > Documentation pending development.
-

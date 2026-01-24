@@ -1,4 +1,3 @@
 # Installation
 
 > Documentation pending development.
-
