@@ -17,8 +17,10 @@ class SEAsset;
 #include "../services/SELotSize/SELotSize.mqh"
 #include "../helpers/HIsMarketClosed.mqh"
 
+#define ORDER_TYPE_ANY    -1
+#define ORDER_STATUS_ANY  -1
+
 extern SEDateTime dtime;
-extern EOrder orders[];
 
 class SEStrategy:
 public IStrategy {
@@ -26,64 +28,40 @@ private:
 	double weight;
 	double balance;
 	int numOfOrdersOpenedToday;
-	EOrder openOrders[];
+	EOrder orders[];
 
 	SEAsset *asset;
 	SEStatistics *statistics;
 	SELotSize *lotSize;
 
-	void AddToOpenOrders(EOrder &order) {
-		ArrayResize(openOrders, ArraySize(openOrders) + 1);
-		openOrders[ArraySize(openOrders) - 1] = order;
-	}
-
-	void FilterOrders(
-		EOrder& sourceOrders[],
+	void filterOrders(
 		EOrder& resultOrders[],
 		ENUM_ORDER_TYPE side,
 		ENUM_ORDER_STATUSES status,
 		ENUM_ORDER_STATUSES defaultStatus1,
-		ENUM_ORDER_STATUSES defaultStatus2 = -1) {
+		ENUM_ORDER_STATUSES defaultStatus2 = ORDER_STATUS_ANY) {
 		ArrayResize(resultOrders, 0);
 
-		for (int i = 0; i < ArraySize(sourceOrders); i++) {
-			if (sourceOrders[i].GetSource() != prefix)
-				continue;
-
-			if (sourceOrders[i].GetSymbol() != symbol)
-				continue;
-
-			bool isSideMatch = (side == -1) || (sourceOrders[i].GetSide() == side);
+		for (int i = 0; i < ArraySize(orders); i++) {
+			bool isSideMatch = (side == ORDER_TYPE_ANY) || (orders[i].GetSide() == side);
 			bool isStatusMatch = false;
 
-			if (status == -1) {
-				isStatusMatch = (sourceOrders[i].GetStatus() == defaultStatus1);
-				if (defaultStatus2 != -1)
-					isStatusMatch = isStatusMatch || (sourceOrders[i].GetStatus() == defaultStatus2);
+			if (status == ORDER_STATUS_ANY) {
+				isStatusMatch = (orders[i].GetStatus() == defaultStatus1);
+				if (defaultStatus2 != ORDER_STATUS_ANY)
+					isStatusMatch = isStatusMatch || (orders[i].GetStatus() == defaultStatus2);
 			} else {
-				isStatusMatch = (sourceOrders[i].GetStatus() == status);
+				isStatusMatch = (orders[i].GetStatus() == status);
 			}
 
 			if (isSideMatch && isStatusMatch) {
 				ArrayResize(resultOrders, ArraySize(resultOrders) + 1);
-				resultOrders[ArraySize(resultOrders) - 1] = sourceOrders[i];
+				resultOrders[ArraySize(resultOrders) - 1] = orders[i];
 			}
 		}
 	}
 
-	void RemoveFromOpenOrders(EOrder &closedOrder) {
-		for (int i = 0; i < ArraySize(openOrders); i++) {
-			if (openOrders[i].GetId() == closedOrder.GetId()) {
-				for (int j = i; j < ArraySize(openOrders) - 1; j++)
-					openOrders[j] = openOrders[j + 1];
-
-				ArrayResize(openOrders, ArraySize(openOrders) - 1);
-				break;
-			}
-		}
-	}
-
-	bool ValidateTradingMode(ENUM_ORDER_TYPE side) {
+	bool validateTradingMode(ENUM_ORDER_TYPE side) {
 		if (tradingMode == TRADING_MODE_BUY_ONLY && side == ORDER_TYPE_SELL) {
 			logger.warning("Order blocked: Trading mode is BUY_ONLY, cannot open SELL order");
 			return false;
@@ -95,6 +73,28 @@ private:
 		}
 
 		return true;
+	}
+
+	void initializeDefaultThresholds() {
+		SQualityThresholds thresholds;
+
+		thresholds.optimizationFormula = OPTIMIZATION_BY_PERFORMANCE;
+		thresholds.expectedTotalReturnPctByMonth = 0.05;
+		thresholds.expectedMaxDrawdownPct = 0.25;
+		thresholds.expectedWinRate = 0.50;
+		thresholds.expectedRecoveryFactor = 2;
+		thresholds.expectedRiskRewardRatio = 2;
+		thresholds.expectedRSquared = 0.85;
+		thresholds.expectedTrades = 10;
+		thresholds.minTotalReturnPct = 0.0;
+		thresholds.maxMaxDrawdownPct = 0.30;
+		thresholds.minWinRate = 0.40;
+		thresholds.minRiskRewardRatio = 1;
+		thresholds.minRecoveryFactor = 1;
+		thresholds.minRSquared = 0.0;
+		thresholds.minTrades = 5;
+
+		SetQualityThresholds(thresholds);
 	}
 
 protected:
@@ -140,27 +140,10 @@ public:
 
 		numOfOrdersOpenedToday = 0;
 		logger.SetPrefix(name);
-		SQualityThresholds thresholds;
 		statistics = new SEStatistics(symbol, name, prefix, balance);
 		lotSize = new SELotSize(symbol);
 
-		thresholds.optimizationFormula = OPTIMIZATION_BY_PERFORMANCE;
-		thresholds.expectedTotalReturnPctByMonth = 0.05;
-		thresholds.expectedMaxDrawdownPct = 0.25;
-		thresholds.expectedWinRate = 0.50;
-		thresholds.expectedRecoveryFactor = 2;
-		thresholds.expectedRiskRewardRatio = 2;
-		thresholds.expectedRSquared = 0.85;
-		thresholds.expectedTrades = 10;
-		thresholds.minTotalReturnPct = 0.0;
-		thresholds.maxMaxDrawdownPct = 0.30;
-		thresholds.minWinRate = 0.40;
-		thresholds.minRiskRewardRatio = 1;
-		thresholds.minRecoveryFactor = 1;
-		thresholds.minRSquared = 0.0;
-		thresholds.minTrades = 5;
-
-		SetQualityThresholds(thresholds);
+		initializeDefaultThresholds();
 
 		return INIT_SUCCEEDED;
 	}
@@ -180,7 +163,7 @@ public:
 	}
 
 	virtual void OnStartDay() {
-		statistics.OnStartDay();
+		statistics.OnStartDay(orders);
 		numOfOrdersOpenedToday = 0;
 	}
 
@@ -193,19 +176,21 @@ public:
 	}
 
 	virtual void OnOpenOrder(EOrder& order) {
-		AddToOpenOrders(order);
-		statistics.OnOpenOrder(order);
+		statistics.OnOpenOrder(order, orders);
 	}
 
 	virtual void OnCloseOrder(EOrder& order, ENUM_DEAL_REASON reason) {
-		RemoveFromOpenOrders(order);
-		statistics.OnCloseOrder(order, reason);
+		statistics.OnCloseOrder(order, reason, orders);
 	}
 
 	virtual void OnEndWeek() {
 	}
 
 	virtual void OnDeinit() {
+		for (int i = 0; i < ArraySize(orders); i++)
+			orders[i].OnDeinit();
+
+		ArrayResize(orders, 0);
 	}
 
 	virtual ~SEStrategy() {
@@ -224,7 +209,7 @@ public:
 		double takeProfit = 0,
 		double stopLoss = 0
 		) {
-		if (!ValidateTradingMode(side))
+		if (!validateTradingMode(side))
 			return NULL;
 
 		EOrder *order = new EOrder(strategyMagicNumber, symbol);
@@ -256,8 +241,81 @@ public:
 		return order;
 	}
 
-	void GetOpenOrders(EOrder& resultOrders[], ENUM_ORDER_TYPE side = -1, ENUM_ORDER_STATUSES status = -1) {
-		FilterOrders(orders, resultOrders, side, status, ORDER_STATUS_OPEN, ORDER_STATUS_PENDING);
+	void GetOpenOrders(EOrder& resultOrders[], ENUM_ORDER_TYPE side = ORDER_TYPE_ANY, ENUM_ORDER_STATUSES status = ORDER_STATUS_ANY) {
+		filterOrders(resultOrders, side, status, ORDER_STATUS_OPEN, ORDER_STATUS_PENDING);
+	}
+
+	int GetOrdersCount() {
+		return ArraySize(orders);
+	}
+
+	EOrder * GetOrderAtIndex(int index) {
+		if (index < 0 || index >= ArraySize(orders))
+			return NULL;
+
+		return GetPointer(orders[index]);
+	}
+
+	int FindOrderIndexByOrderId(ulong orderId) {
+		for (int i = 0; i < ArraySize(orders); i++)
+			if (orders[i].GetOrderId() == orderId)
+				return i;
+
+		return -1;
+	}
+
+	int FindOrderIndexByPositionId(ulong positionId) {
+		for (int i = 0; i < ArraySize(orders); i++)
+			if (orders[i].GetPositionId() == positionId)
+				return i;
+
+		return -1;
+	}
+
+	int FindOrderIndexById(string id) {
+		for (int i = 0; i < ArraySize(orders); i++)
+			if (orders[i].GetId() == id)
+				return i;
+
+		return -1;
+	}
+
+	void ProcessOrders() {
+		for (int i = 0; i < ArraySize(orders); i++) {
+			if (!orders[i].IsInitialized())
+				orders[i].OnInit();
+
+			if (orders[i].GetStatus() == ORDER_STATUS_PENDING)
+				orders[i].CheckToOpen();
+
+			if (orders[i].GetStatus() == ORDER_STATUS_OPEN)
+				orders[i].CheckToClose();
+		}
+	}
+
+	void CleanupClosedOrders() {
+		EOrder activeOrders[];
+		int activeCount = 0;
+
+		for (int i = 0; i < ArraySize(orders); i++) {
+			if (orders[i].GetStatus() != ORDER_STATUS_CLOSED && orders[i].GetStatus() != ORDER_STATUS_CANCELLED) {
+				ArrayResize(activeOrders, activeCount + 1);
+				activeOrders[activeCount] = orders[i];
+				activeCount++;
+			} else {
+				orders[i].OnDeinit();
+			}
+		}
+
+		ArrayResize(orders, activeCount);
+
+		for (int i = 0; i < activeCount; i++)
+			orders[i] = activeOrders[i];
+	}
+
+	void AddOrder(EOrder &order) {
+		ArrayResize(orders, ArraySize(orders) + 1);
+		orders[ArraySize(orders) - 1] = order;
 	}
 
 	int GetNumOfOrdersOpenedToday() {

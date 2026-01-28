@@ -18,6 +18,8 @@ private:
 	bool enabled;
 	double balance;
 
+	static const double GEOMETRIC_MEAN_EXPONENT;
+
 protected:
 	string symbol;
 
@@ -31,9 +33,11 @@ public:
 	}
 
 	~SEAsset() {
-		for (int i = 0; i < ArraySize(strategies); i++)
-			if (CheckPointer(strategies[i]) == POINTER_DYNAMIC)
-				delete strategies[i];
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			if (CheckPointer(strategies[i]) != POINTER_DYNAMIC)
+				continue;
+			delete strategies[i];
+		}
 	}
 
 	virtual int OnInit() {
@@ -135,7 +139,7 @@ public:
 			strategies[i].OnDeinit();
 	}
 
-	void SetNewStrategy(SEStrategy *strategy) {
+	void AddStrategy(SEStrategy *strategy) {
 		strategy.SetAsset(GetPointer(this));
 		strategy.SetSymbol(symbol);
 		strategy.SetMagicNumber(StringToNumber(symbol + "_" + name + "_" + strategy.GetName()));
@@ -148,7 +152,7 @@ public:
 		return ArraySize(strategies);
 	}
 
-	double GetQualityProduct() {
+	double CalculateQualityProduct() {
 		double quality = 1.0;
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
@@ -158,10 +162,70 @@ public:
 			if (strategyQuality == 0)
 				return 0;
 
-			quality = MathPow(quality * strategyQuality, 1.0 / 2.0);
+			quality = MathPow(quality * strategyQuality, GEOMETRIC_MEAN_EXPONENT);
 		}
 
 		return quality;
+	}
+
+	bool FindOrderByOrderId(ulong orderId, int &strategyIndex, int &orderIndex) {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			int idx = strategies[i].FindOrderIndexByOrderId(orderId);
+
+			if (idx != -1) {
+				strategyIndex = i;
+				orderIndex = idx;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool FindOrderByPositionId(ulong positionId, int &strategyIndex, int &orderIndex) {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			int idx = strategies[i].FindOrderIndexByPositionId(positionId);
+
+			if (idx != -1) {
+				strategyIndex = i;
+				orderIndex = idx;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool FindOrderById(string id, int &strategyIndex, int &orderIndex) {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			int idx = strategies[i].FindOrderIndexById(id);
+
+			if (idx != -1) {
+				strategyIndex = i;
+				orderIndex = idx;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	SEStrategy * GetStrategyByPrefix(string strategyPrefix) {
+		for (int i = 0; i < ArraySize(strategies); i++)
+			if (strategies[i].GetPrefix() == strategyPrefix)
+				return strategies[i];
+
+		return NULL;
+	}
+
+	void ProcessOrders() {
+		for (int i = 0; i < ArraySize(strategies); i++)
+			strategies[i].ProcessOrders();
+	}
+
+	void CleanupClosedOrders() {
+		for (int i = 0; i < ArraySize(strategies); i++)
+			strategies[i].CleanupClosedOrders();
 	}
 
 	void SetName(string newName) {
@@ -188,5 +252,7 @@ public:
 		return symbol;
 	}
 };
+
+const double SEAsset::GEOMETRIC_MEAN_EXPONENT = 0.5;
 
 #endif

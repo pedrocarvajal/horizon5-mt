@@ -24,7 +24,7 @@ interface IAsset {
 	void SetBalance(double assetBalance);
 
 	int GetStrategyCount();
-	double GetQualityProduct();
+	double CalculateQualityProduct();
 };
 
 #endif
