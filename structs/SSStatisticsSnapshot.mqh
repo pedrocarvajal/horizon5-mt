@@ -22,6 +22,8 @@ struct SSStatisticsSnapshot {
 	double winRate;
 	double recoveryFactor;
 	double cagr;
+	double stability;
+	double stabilitySQ3;
 
 	double quality;
 	string qualityReason;
