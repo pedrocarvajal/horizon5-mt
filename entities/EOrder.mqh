@@ -500,6 +500,19 @@ public:
 		return profitInDollars;
 	}
 
+	double GetFloatingPnL() {
+		if (status != ORDER_STATUS_OPEN)
+			return 0.0;
+
+		if (GetPositionId() == 0)
+			return 0.0;
+
+		if (!PositionSelectByTicket(GetPositionId()))
+			return 0.0;
+
+		return PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+	}
+
 	MqlDateTime GetSignalAt() {
 		return signalAt;
 	}
