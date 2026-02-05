@@ -1,5 +1,20 @@
 {
   "cSpell.words": ["hlogger"],
+  "highlight.regexes": {
+    "(input\\s+)(group)": {
+      "regexFlags": "g",
+      "filterLanguageRegex": "cpp",
+      "decorations": [{}, { "color": "#569CD6" }]
+    },
+    "(SStrategySettings)(\\s*&?\\s*)(\\w+)": {
+      "regexFlags": "g",
+      "decorations": [
+        { "color": "#4EC9B0" },
+        {},
+        { "color": "#9CDCFE" }
+      ]
+    }
+  },
   "files.autoSave": "onFocusChange",
   "achilleshr.runonsave": {
     "commands": [
