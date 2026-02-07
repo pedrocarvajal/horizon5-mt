@@ -46,13 +46,13 @@ int OnInit() {
 	dtime = SEDateTime();
 	hlogger.SetPrefix("Horizon");
 
-	lastCheckedDay = dtime.Today().day_of_year;
+	lastCheckedDay = dtime.Today().dayOfYear;
 	lastCheckedHour = dtime.Today().hour;
-	lastCheckedMonth = dtime.Today().mon;
-	lastCheckedWeek = dtime.Now().day_of_week;
+	lastCheckedMonth = dtime.Today().month;
+	lastCheckedWeek = dtime.Now().dayOfWeek;
 
-	MqlDateTime dt = dtime.Now();
-	string timestamp = StringFormat("%04d%02d%02d_%02d%02d%02d", dt.year, dt.mon, dt.day, dt.hour, dt.min, dt.sec);
+	SDateTime dt = dtime.Now();
+	string timestamp = StringFormat("%04d%02d%02d_%02d%02d%02d", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
 	string timestampedReportsDir = "/Reports/" + _Symbol + "/" + timestamp;
 
 	if (EnableOrderHistoryReport)
@@ -191,25 +191,27 @@ void OnDeinit(const int reason) {
 }
 
 void OnTimer() {
+	SDateTime now = dtime.Now();
+
 	// Start of week (Monday) - executed FIRST
-	if (dtime.Now().day_of_week == 1 && lastStartWeekYday != dtime.Now().day_of_year) {
+	if (now.dayOfWeek == 1 && lastStartWeekYday != now.dayOfYear) {
 		for (int i = 0; i < ArraySize(assets); i++)
 			assets[i].OnStartWeek();
 
-		lastStartWeekYday = dtime.Now().day_of_year;
+		lastStartWeekYday = now.dayOfYear;
 	}
 
 	// End of week (Friday 23:00 or later) - executed BEFORE daily/hourly triggers
-	if (dtime.Now().day_of_week == 5 && dtime.Now().hour >= 23 && lastEndWeekYday != dtime.Now().day_of_year) {
+	if (now.dayOfWeek == 5 && now.hour >= 23 && lastEndWeekYday != now.dayOfYear) {
 		for (int i = 0; i < ArraySize(assets); i++)
 			assets[i].OnEndWeek();
 
-		lastEndWeekYday = dtime.Now().day_of_year;
+		lastEndWeekYday = now.dayOfYear;
 	}
 
 	// Start of new day
-	if (dtime.Now().day_of_year != lastCheckedDay) {
-		lastCheckedDay = dtime.Now().day_of_year;
+	if (now.dayOfYear != lastCheckedDay) {
+		lastCheckedDay = now.dayOfYear;
 
 		for (int i = 0; i < ArraySize(assets); i++)
 			assets[i].CleanupClosedOrders();
@@ -219,16 +221,16 @@ void OnTimer() {
 	}
 
 	// Start of new hour
-	if (dtime.Now().hour != lastCheckedHour) {
-		lastCheckedHour = dtime.Now().hour;
+	if (now.hour != lastCheckedHour) {
+		lastCheckedHour = now.hour;
 
 		for (int i = 0; i < ArraySize(assets); i++)
 			assets[i].OnStartHour();
 	}
 
 	// Start of new month
-	if (dtime.Now().mon != lastCheckedMonth) {
-		lastCheckedMonth = dtime.Now().mon;
+	if (now.month != lastCheckedMonth) {
+		lastCheckedMonth = now.month;
 
 		for (int i = 0; i < ArraySize(assets); i++)
 			assets[i].OnStartMonth();
@@ -236,8 +238,8 @@ void OnTimer() {
 
 	// Start of new minute
 	static int lastCheckedMinute = -1;
-	if (dtime.Now().min != lastCheckedMinute) {
-		lastCheckedMinute = dtime.Now().min;
+	if (now.minute != lastCheckedMinute) {
+		lastCheckedMinute = now.minute;
 
 		for (int i = 0; i < ArraySize(assets); i++)
 			assets[i].OnStartMinute();
@@ -270,7 +272,7 @@ void OnTradeTransaction(
 						EOrder *order = assets[i].strategies[strategyIndex].GetOrderAtIndex(orderIndex);
 
 						if (order != NULL && (order.GetStatus() == ORDER_STATUS_CLOSING || order.GetStatus() == ORDER_STATUS_PENDING)) {
-							MqlDateTime cancelTime = dtime.Now();
+							SDateTime cancelTime = dtime.Now();
 							order.OnClose(cancelTime, 0.0, 0.0, DEAL_REASON_EXPERT);
 							assets[i].strategies[strategyIndex].OnCloseOrder(order, DEAL_REASON_EXPERT);
 							hlogger.debug("OnTradeTransaction: Order cancelled with orderId=" + IntegerToString(orderId));
@@ -316,7 +318,7 @@ void OnTradeTransaction(
 			hlogger.debug("OnTradeTransaction: entry=" + IntegerToString(entry) + ", reason=" + IntegerToString(reason));
 
 			if (entry == DEAL_ENTRY_OUT) {
-				MqlDateTime dealTime = dtime.Now();
+				SDateTime dealTime = dtime.Now();
 				double dealPrice = HistoryDealGetDouble(dealId, DEAL_PRICE);
 				double dealProfit = HistoryDealGetDouble(dealId, DEAL_PROFIT);
 				double dealCommission = HistoryDealGetDouble(dealId, DEAL_COMMISSION);

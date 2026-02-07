@@ -4,7 +4,10 @@
 #include "../../libraries/json/index.mqh"
 #include "../../helpers/HIsLiveTrading.mqh"
 #include "../SELogger/SELogger.mqh"
+#include "../SEDateTime/SEDateTime.mqh"
 #include "../../entities/EOrder.mqh"
+
+extern SEDateTime dtime;
 
 class SEOrderPersistence {
 private:
@@ -63,9 +66,8 @@ private:
 		order.SetOpenAtPrice(json.getNumber("open_at_price"));
 		order.SetOpenPrice(json.getNumber("open_price"));
 
-		MqlDateTime signalAt, openAt;
-		TimeToStruct((datetime)json.getNumber("signal_at"), signalAt);
-		TimeToStruct((datetime)json.getNumber("open_at"), openAt);
+		SDateTime signalAt = dtime.FromTimestamp((datetime)json.getNumber("signal_at"));
+		SDateTime openAt = dtime.FromTimestamp((datetime)json.getNumber("open_at"));
 		order.SetSignalAt(signalAt);
 		order.SetOpenAt(openAt);
 
@@ -119,10 +121,10 @@ private:
 		json.setProperty("open_at_price", order.GetOpenAtPrice());
 		json.setProperty("open_price", order.GetOpenPrice());
 
-		json.setProperty("signal_at", (long)StructToTime(order.GetSignalAt()));
-		json.setProperty("open_at", (long)StructToTime(order.GetOpenAt()));
+		json.setProperty("signal_at", (long)order.GetSignalAt().timestamp);
+		json.setProperty("open_at", (long)order.GetOpenAt().timestamp);
 
-		json.setProperty("saved_at", (long)dtime.GetCurrentTime());
+		json.setProperty("saved_at", (long)dtime.Timestamp());
 
 		return json.toString();
 	}
