@@ -5,6 +5,7 @@
 #include "../../structs/SSOrderHistory.mqh"
 #include "../SELogger/SELogger.mqh"
 #include "../SEDateTime/SEDateTime.mqh"
+#include "../SEDateTime/structs/SDateTime.mqh"
 
 extern SEDateTime dtime;
 
@@ -49,8 +50,8 @@ public:
 	SEReportOfOrderHistory() {
 		logger.SetPrefix("OrderHistoryReporter");
 
-		MqlDateTime dt = dtime.Now();
-		string timestamp = StringFormat("%04d%02d%02d_%02d%02d%02d", dt.year, dt.mon, dt.day, dt.hour, dt.min, dt.sec);
+		SDateTime dt = dtime.Now();
+		string timestamp = StringFormat("%04d%02d%02d_%02d%02d%02d", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
 		reportsDir = "/Reports/" + _Symbol + "/" + timestamp;
 		useCommonFiles = false;
 		ArrayResize(orderHistory, 0);
