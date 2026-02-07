@@ -5,6 +5,7 @@
 #include "../structs/SSOrderHistory.mqh"
 #include "../adapters/ATrade.mqh"
 #include "../services/SEDateTime/SEDateTime.mqh"
+#include "../services/SEDateTime/structs/SDateTime.mqh"
 #include "../helpers/HIsMarketClosed.mqh"
 
 #define MAX_RETRY_COUNT 3
@@ -50,9 +51,9 @@ public:
 	double mainStopLossAtPrice;
 
 	// === TIMESTAMPS ===
-	MqlDateTime signalAt;
-	MqlDateTime openAt;
-	MqlDateTime closeAt;
+	SDateTime signalAt;
+	SDateTime openAt;
+	SDateTime closeAt;
 
 	// === COMPOSITION ===
 	SSOrderHistory snapshot;
@@ -133,7 +134,7 @@ public:
 		if (!pendingToOpen || isProcessed)
 			return;
 
-		datetime currentTime = dtime.GetCurrentTime();
+		datetime currentTime = dtime.Timestamp();
 		SMarketStatus marketStatus = getMarketStatus(symbol);
 
 		if (retryAfter > 0 && currentTime < retryAfter)
@@ -165,7 +166,7 @@ public:
 		if (!pendingToClose)
 			return;
 
-		datetime currentTime = dtime.GetCurrentTime();
+		datetime currentTime = dtime.Timestamp();
 		SMarketStatus marketStatus = getMarketStatus(symbol);
 
 		if (retryAfter > 0 && currentTime < retryAfter)
@@ -191,7 +192,7 @@ public:
 		SMarketStatus marketStatus = getMarketStatus(symbol);
 
 		if (marketStatus.isClosed) {
-			retryAfter = dtime.GetCurrentTime() + marketStatus.opensInSeconds;
+			retryAfter = dtime.Timestamp() + marketStatus.opensInSeconds;
 			return;
 		}
 
@@ -231,7 +232,7 @@ public:
 
 			if (marketStatus.isClosed) {
 				pendingToClose = true;
-				retryAfter = dtime.GetCurrentTime() + marketStatus.opensInSeconds;
+				retryAfter = dtime.Timestamp() + marketStatus.opensInSeconds;
 				logger.info("[" + GetId() + "] Close pending: Market closed, will retry in " + IntegerToString(marketStatus.opensInSeconds) + " seconds");
 				return;
 			}
@@ -336,7 +337,7 @@ public:
 	}
 
 	void OnClose(
-		const MqlDateTime &time,
+		const SDateTime &time,
 		double price,
 		double profits,
 		ENUM_DEAL_REASON reason
@@ -391,7 +392,7 @@ public:
 	}
 
 	void Snapshot() {
-		snapshot.openTime = StructToTime(signalAt);
+		snapshot.openTime = signalAt.timestamp;
 		snapshot.openPrice = signalPrice;
 		snapshot.openLot = volume;
 		snapshot.orderId = GetId();
@@ -403,8 +404,8 @@ public:
 		snapshot.orderCloseReason = orderCloseReason;
 		snapshot.mainTakeProfitAtPrice = mainTakeProfitAtPrice;
 		snapshot.mainStopLossAtPrice = mainStopLossAtPrice;
-		snapshot.signalAt = StructToTime(signalAt);
-		snapshot.closeTime = StructToTime(closeAt);
+		snapshot.signalAt = signalAt.timestamp;
+		snapshot.closeTime = closeAt.timestamp;
 		snapshot.closePrice = closePrice;
 		snapshot.profitInDollars = profitInDollars;
 	}
@@ -513,15 +514,15 @@ public:
 		return PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
 	}
 
-	MqlDateTime GetSignalAt() {
+	SDateTime GetSignalAt() {
 		return signalAt;
 	}
 
-	MqlDateTime GetOpenAt() {
+	SDateTime GetOpenAt() {
 		return openAt;
 	}
 
-	MqlDateTime GetCloseAt() {
+	SDateTime GetCloseAt() {
 		return closeAt;
 	}
 
@@ -633,11 +634,11 @@ public:
 		openPrice = newOpenPrice;
 	}
 
-	void SetSignalAt(MqlDateTime &newSignalAt) {
+	void SetSignalAt(SDateTime &newSignalAt) {
 		signalAt = newSignalAt;
 	}
 
-	void SetOpenAt(MqlDateTime &newOpenAt) {
+	void SetOpenAt(SDateTime &newOpenAt) {
 		openAt = newOpenAt;
 	}
 

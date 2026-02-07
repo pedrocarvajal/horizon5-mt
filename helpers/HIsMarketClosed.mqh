@@ -11,7 +11,7 @@ SMarketStatus getMarketStatus(string checkSymbol, int safetyMarginMinutes = 1) {
 	status.isClosed = true;
 	status.opensInSeconds = 0;
 
-	datetime currentTime = dtime.GetCurrentTime();
+	datetime currentTime = dtime.Timestamp();
 	MqlDateTime dt;
 	TimeToStruct(currentTime, dt);
 
