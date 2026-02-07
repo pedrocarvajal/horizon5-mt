@@ -135,7 +135,7 @@ private:
 
 	SSStatisticsSnapshot buildSnapshotData(SSQualityResult &quality) {
 		SSStatisticsSnapshot snapshotData;
-		snapshotData.timestamp = StructToTime(dtime.Now());
+		snapshotData.timestamp = dtime.Now().timestamp;
 		snapshotData.id = id;
 
 		ArrayResize(snapshotData.orders, ArraySize(ordersHistory));
@@ -296,8 +296,8 @@ public:
 		strategyPrefix = prefix;
 		initialBalance = allocatedBalance;
 
-		id = TimeToString(StructToTime(dtime.Now()), TIME_DATE | TIME_SECONDS);
-		startTime = StructToTime(dtime.Now());
+		id = TimeToString(dtime.Now().timestamp, TIME_DATE | TIME_SECONDS);
+		startTime = dtime.Now().timestamp;
 		stopOutDetected = false;
 		finalEquity = allocatedBalance;
 

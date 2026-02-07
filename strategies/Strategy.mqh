@@ -12,6 +12,7 @@ class SEAsset;
 #include "../interfaces/IStrategy.mqh"
 #include "../services/SELogger/SELogger.mqh"
 #include "../services/SEDateTime/SEDateTime.mqh"
+#include "../services/SEDateTime/structs/SDateTime.mqh"
 #include "../entities/EOrder.mqh"
 #include "../services/SEStatistics/SEStatistics.mqh"
 #include "../services/SELotSize/SELotSize.mqh"
@@ -27,7 +28,9 @@ public IStrategy {
 private:
 	double weight;
 	double balance;
-	int numOfOrdersOpenedToday;
+	int countOrdersOfToday;
+	int countOpenOrders;
+	int countClosedOrders;
 	EOrder orders[];
 
 	SEAsset *asset;
@@ -138,7 +141,9 @@ public:
 			return INIT_FAILED;
 		}
 
-		numOfOrdersOpenedToday = 0;
+		countOrdersOfToday = 0;
+		countOpenOrders = 0;
+		countClosedOrders = 0;
 		logger.SetPrefix(name);
 		statistics = new SEStatistics(symbol, name, prefix, balance);
 		lotSize = new SELotSize(symbol);
@@ -164,7 +169,7 @@ public:
 
 	virtual void OnStartDay() {
 		statistics.OnStartDay(orders);
-		numOfOrdersOpenedToday = 0;
+		countOrdersOfToday = 0;
 	}
 
 	virtual void OnStartWeek() {
@@ -181,6 +186,8 @@ public:
 
 	virtual void OnCloseOrder(EOrder& order, ENUM_DEAL_REASON reason) {
 		statistics.OnCloseOrder(order, reason, orders);
+		countOpenOrders--;
+		countClosedOrders++;
 	}
 
 	virtual void OnEndWeek() {
@@ -222,7 +229,8 @@ public:
 		order.SetVolume(volume);
 		order.SetSignalPrice(currentPrice);
 		order.SetOpenAtPrice(openAtPrice);
-		order.SetSignalAt(dtime.Now());
+		SDateTime signalTime = dtime.Now();
+		order.SetSignalAt(signalTime);
 		order.SetIsMarketOrder(isMarketOrder);
 
 		if (stopLoss > 0)
@@ -236,7 +244,8 @@ public:
 		ArrayResize(orders, ArraySize(orders) + 1);
 		orders[ArraySize(orders) - 1] = *order;
 
-		numOfOrdersOpenedToday++;
+		countOrdersOfToday++;
+		countOpenOrders++;
 
 		return order;
 	}
@@ -318,8 +327,16 @@ public:
 		orders[ArraySize(orders) - 1] = order;
 	}
 
-	int GetNumOfOrdersOpenedToday() {
-		return numOfOrdersOpenedToday;
+	int GetCountOrdersOfToday() {
+		return countOrdersOfToday;
+	}
+
+	int GetCountOpenOrders() {
+		return countOpenOrders;
+	}
+
+	int GetCountClosedOrders() {
+		return countClosedOrders;
 	}
 
 	double GetLotSizeByCapital() {
