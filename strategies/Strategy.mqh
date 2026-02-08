@@ -274,6 +274,30 @@ public:
 			ORDER_STATUS_PENDING);
 	}
 
+	bool HasActiveOrders() {
+		for (int i = 0; i < ArraySize(orders); i++)
+			if (orders[i].GetStatus() == ORDER_STATUS_OPEN ||
+			    orders[i].GetStatus() == ORDER_STATUS_PENDING)
+				return true;
+
+		return false;
+	}
+
+	void CloseAllActiveOrders() {
+		for (int i = 0; i < ArraySize(orders); i++) {
+			if (orders[i].GetStatus() == ORDER_STATUS_OPEN) {
+				orders[i].Close();
+			} else if (orders[i].GetStatus() == ORDER_STATUS_PENDING) {
+				orders[i].SetStatus(ORDER_STATUS_CANCELLED);
+				orders[i].SetPendingToOpen(false);
+				orders[i].SetIsProcessed(true);
+
+				if (CheckPointer(orderPersistence) != POINTER_INVALID)
+					orderPersistence.DeleteOrderJson(orders[i].GetSource(), orders[i].GetId());
+			}
+		}
+	}
+
 	int GetOrdersCount() {
 		return ArraySize(orders);
 	}
