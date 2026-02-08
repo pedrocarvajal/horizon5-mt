@@ -5,9 +5,12 @@
 
 struct SSOrderHistory {
 	string orderId;
+	string symbol;
 	string strategyName;
 	string strategyPrefix;
 	ulong magicNumber;
+	ulong dealId;
+	ulong positionId;
 
 	ENUM_ORDER_STATUSES status;
 	int side;
@@ -17,6 +20,8 @@ struct SSOrderHistory {
 	double stopLossPrice;
 
 	datetime signalAt;
+	double signalPrice;
+
 	datetime openTime;
 	double openPrice;
 	double openLot;

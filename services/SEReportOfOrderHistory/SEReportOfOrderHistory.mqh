@@ -21,15 +21,19 @@ private:
 	JSON::Object *OrderHistoryToJson(const SSOrderHistory &history) {
 		JSON::Object *obj = new JSON::Object();
 		obj.setProperty("order_id", history.orderId);
+		obj.setProperty("symbol", history.symbol);
 		obj.setProperty("strategy_name", history.strategyName);
 		obj.setProperty("strategy_prefix", history.strategyPrefix);
 		obj.setProperty("magic_number", (long)history.magicNumber);
+		obj.setProperty("deal_id", (long)history.dealId);
+		obj.setProperty("position_id", (long)history.positionId);
 		obj.setProperty("status", (int)history.status);
 		obj.setProperty("side", history.side);
 		obj.setProperty("order_close_reason", (int)history.orderCloseReason);
 		obj.setProperty("main_take_profit_at_price", history.takeProfitPrice);
 		obj.setProperty("main_stop_loss_at_price", history.stopLossPrice);
 		obj.setProperty("signal_at", (long)history.signalAt);
+		obj.setProperty("signal_price", history.signalPrice);
 		obj.setProperty("open_time", (long)history.openTime);
 		obj.setProperty("open_price", history.openPrice);
 		obj.setProperty("open_lot", history.openLot);
@@ -56,7 +60,7 @@ public:
 	SEReportOfOrderHistory() {
 		logger.SetPrefix("OrderHistoryReporter");
 
-		reportsDir = StringFormat("/Reports/%s/%s", _Symbol, dtime.Timestamp());
+		reportsDir = StringFormat("/Reports/%s/%s", _Symbol, TimeToString(dtime.Timestamp(), TIME_DATE));
 		useCommonFiles = false;
 		ArrayResize(orderHistory, 0);
 	}
