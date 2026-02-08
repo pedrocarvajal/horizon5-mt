@@ -263,6 +263,11 @@ public:
 			strategies[i].CleanupClosedOrders();
 	}
 
+	void ExportOrderHistory() {
+		for (int i = 0; i < ArraySize(strategies); i++)
+			strategies[i].ExportOrderHistory();
+	}
+
 	void SetName(string newName) {
 		name = newName;
 	}
