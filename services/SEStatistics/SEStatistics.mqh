@@ -73,16 +73,16 @@ private:
 		if (equityPercentage < STOP_OUT_THRESHOLD) {
 			stopOutDetected = true;
 			logger.debug(StringFormat(
-					     "Stop out detected: Equity %.2f (%.2f%% of initial balance)",
-					     finalEquity, equityPercentage * 100));
+				"Stop out detected: Equity %.2f (%.2f%% of initial balance)",
+				finalEquity, equityPercentage * 100));
 			return true;
 		}
 
 		if (equityPercentage < SEVERE_LOSS_THRESHOLD) {
 			stopOutDetected = true;
 			logger.debug(StringFormat(
-					     "Severe equity loss detected: %.2f%% remaining",
-					     equityPercentage * 100));
+				"Severe equity loss detected: %.2f%% remaining",
+				equityPercentage * 100));
 			return true;
 		}
 
@@ -186,47 +186,47 @@ private:
 
 	void logSnapshotDetails(SSStatisticsSnapshot &snapshotData) {
 		logger.separator(StringFormat("Snapshot: %s",
-					      TimeToString(snapshotData.timestamp)));
+			TimeToString(snapshotData.timestamp)));
 		logger.debug(StringFormat("Strategy name: %s", strategyName));
 		logger.debug(StringFormat("Strategy prefix: %s", strategyPrefix));
 		logger.debug(StringFormat("Start time: %s", TimeToString(startTime)));
 		logger.debug(StringFormat("Orders: %d",
-					  ArraySize(snapshotData.orders)));
+			ArraySize(snapshotData.orders)));
 		logger.debug(StringFormat("Nav: %.2f",
-					  (ArraySize(nav) >
-					   0) ? nav[ArraySize(nav) - 1] : 0.0));
+			(ArraySize(nav) >
+			 0) ? nav[ArraySize(nav) - 1] : 0.0));
 		logger.debug(StringFormat("Performance: %.2f",
-					  (ArraySize(performance) >
-					   0) ? performance[ArraySize(performance) -
-							    1] : 0.0));
+			(ArraySize(performance) >
+			 0) ? performance[ArraySize(performance) -
+					  1] : 0.0));
 		logger.debug(StringFormat("Winning orders: %d", winningOrders));
 		logger.debug(StringFormat("Losing orders: %d", losingOrders));
 		logger.debug(StringFormat("Winning orders performance: %.2f",
-					  winningOrdersPerformance));
+			winningOrdersPerformance));
 		logger.debug(StringFormat("Losing orders performance: %.2f",
-					  losingOrdersPerformance));
+			losingOrdersPerformance));
 		logger.debug(StringFormat("Max loss: %.2f", maxLoss));
 		logger.debug(StringFormat("Drawdown max in dollars: %.2f",
-					  drawdownMaxInDollars));
+			drawdownMaxInDollars));
 		logger.debug(StringFormat("Drawdown max in percentage: %.2f%%",
-					  drawdownMaxInPercentage * 100));
+			drawdownMaxInPercentage * 100));
 		logger.debug(StringFormat("Risk/Reward ratio: %.2f", riskRewardRatio));
 		logger.debug(StringFormat("Sharpe ratio: %.4f",
-					  snapshotData.sharpeRatio));
+			snapshotData.sharpeRatio));
 		logger.debug(StringFormat("Win rate: %.2f%%", winRate * 100));
 		logger.debug(StringFormat("Recovery factor: %.2f",
-					  snapshotData.recoveryFactor));
+			snapshotData.recoveryFactor));
 		logger.debug(StringFormat("CAGR: %.2f%%", snapshotData.cagr * 100));
 		logger.debug(StringFormat("Stability: %.4f", snapshotData.stability));
 		logger.debug(StringFormat("Stability SQ3: %.4f",
-					  snapshotData.stabilitySQ3));
+			snapshotData.stabilitySQ3));
 		logger.debug(StringFormat("Quality: %.4f", snapshotData.quality));
 		logger.debug(StringFormat("Quality reason: %s",
-					  snapshotData.qualityReason));
+			snapshotData.qualityReason));
 		logger.debug(StringFormat("Max exposure in lots: %.4f",
-					  snapshotData.maxExposureInLots));
+			snapshotData.maxExposureInLots));
 		logger.debug(StringFormat("Max exposure in percentage: %.4f",
-					  snapshotData.maxExposureInPercentage));
+			snapshotData.maxExposureInPercentage));
 	}
 
 	void snapshot() {
@@ -325,8 +325,8 @@ private:
 
 public:
 	SEStatistics(string newSymbol, string name, string prefix,
-		     double allocatedBalance) {
-		logger.SetPrefix("Statistics[" + name + "]");
+		double allocatedBalance) {
+		logger.SetPrefix(StringFormat("Statistics[%s]", name));
 
 		symbol = newSymbol;
 		strategyName = name;
@@ -448,51 +448,51 @@ public:
 			true);
 
 		if (evaluateOptimizationFormula(
-			    OPTIMIZATION_BY_PERFORMANCE,
-			    qPerformance,
-			    result, "Performance below minimum threshold")
+			OPTIMIZATION_BY_PERFORMANCE,
+			qPerformance,
+			result, "Performance below minimum threshold")
 		)
 			return result;
 
 		if (evaluateOptimizationFormula(
-			    OPTIMIZATION_BY_DRAWDOWN,
-			    qDrawdown,
-			    result, "Drawdown below minimum threshold")
+			OPTIMIZATION_BY_DRAWDOWN,
+			qDrawdown,
+			result, "Drawdown below minimum threshold")
 		)
 			return result;
 
 		if (evaluateOptimizationFormula(
-			    OPTIMIZATION_BY_RISK_REWARD,
-			    qRiskReward,
-			    result, "Risk-reward ratio below minimum threshold")
+			OPTIMIZATION_BY_RISK_REWARD,
+			qRiskReward,
+			result, "Risk-reward ratio below minimum threshold")
 		)
 			return result;
 
 		if (evaluateOptimizationFormula(
-			    OPTIMIZATION_BY_WIN_RATE,
-			    qWinRate,
-			    result, "Win rate below minimum threshold")
+			OPTIMIZATION_BY_WIN_RATE,
+			qWinRate,
+			result, "Win rate below minimum threshold")
 		)
 			return result;
 
 		if (evaluateOptimizationFormula(
-			    OPTIMIZATION_BY_R_SQUARED,
-			    qRSquared,
-			    result, "R-squared below minimum threshold")
+			OPTIMIZATION_BY_R_SQUARED,
+			qRSquared,
+			result, "R-squared below minimum threshold")
 		)
 			return result;
 
 		if (evaluateOptimizationFormula(
-			    OPTIMIZATION_BY_TRADES,
-			    qTrades,
-			    result, "Number of trades below minimum threshold")
+			OPTIMIZATION_BY_TRADES,
+			qTrades,
+			result, "Number of trades below minimum threshold")
 		)
 			return result;
 
 		if (evaluateOptimizationFormula(
-			    OPTIMIZATION_BY_RECOVERY_FACTOR,
-			    qRecoveryFactor,
-			    result, "Recovery factor below minimum threshold")
+			OPTIMIZATION_BY_RECOVERY_FACTOR,
+			qRecoveryFactor,
+			result, "Recovery factor below minimum threshold")
 		)
 			return result;
 
