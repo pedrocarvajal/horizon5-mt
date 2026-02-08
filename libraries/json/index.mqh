@@ -2,7 +2,8 @@ class JSON {
 	class Object;
 	class Array;
 	class JsonValueItem;
-	enum JSONValueItemTypes { JSONStringType, JSONNumberType, JSONBoolType, JSONObjetType, JSONArrayType, JSONUndefinedType };
+	enum JSONValueItemTypes { JSONStringType, JSONNumberType, JSONBoolType,
+				  JSONObjetType, JSONArrayType, JSONUndefinedType };
 public:
 	class Object {
 public:
@@ -13,7 +14,8 @@ public:
 			ArrayResize(this._jsonValueItemsArray, 0, 10);
 			int parceJsonCharCounter = 0;
 			bool isSuccess = true;
-			JSON::_parseJSONObject(json, parceJsonCharCounter, isSuccess, &this);
+			JSON::_parseJSONObject(json, parceJsonCharCounter, isSuccess,
+					       &this);
 			if (!isSuccess) this._clearResources();
 		};
 
@@ -85,7 +87,8 @@ public:
 		}
 		void getKeysToArray(string &array[]) const {
 			ArrayResize(array, ArraySize(this._jsonValueItemsArray));
-			for (int i = 0; i < ArraySize(this._jsonValueItemsArray); array[i] = this._jsonValueItemsArray[i].key, i++);
+			for (int i = 0; i < ArraySize(this._jsonValueItemsArray);
+			     array[i] = this._jsonValueItemsArray[i].key, i++) ;
 		}
 
 		string toString() const {
@@ -94,7 +97,11 @@ public:
 
 			for (int i = 0; i < arraySize; i++) {
 				const JsonValueItem *item = this._jsonValueItemsArray[i];
-				result += "\"" + item.key + "\": " + item.toString() + (i < arraySize - 1 ? "," : "");
+				result += "\"" + item.key + "\": " + item.toString() + (i <
+											arraySize
+											- 1 ?
+											"," :
+											"");
 			}
 
 			return "{" + result + "}";
@@ -134,7 +141,8 @@ private:
 			return JSONUndefinedType;
 		}
 		void _clearResources() {
-			for (int i = 0; i < ArraySize(this._jsonValueItemsArray); i++) delete this._jsonValueItemsArray[i];
+			for (int i = 0; i < ArraySize(this._jsonValueItemsArray);
+			     i++) delete this._jsonValueItemsArray[i];
 			ArrayResize(this._jsonValueItemsArray, 0);
 		}
 	};
@@ -244,11 +252,13 @@ private:
 			return &this;
 		}
 		JSONValueItemTypes _getPropertyType(int index) const {
-			if (index >= ArraySize(this._jsonValueItemsArray)) return JSONUndefinedType;
+			if (index >=
+			    ArraySize(this._jsonValueItemsArray)) return JSONUndefinedType;
 			return this._jsonValueItemsArray[index].valueType;
 		}
 		void _clearResources() {
-			for (int i = 0; i < ArraySize(this._jsonValueItemsArray); i++) delete this._jsonValueItemsArray[i];
+			for (int i = 0; i < ArraySize(this._jsonValueItemsArray);
+			     i++) delete this._jsonValueItemsArray[i];
 			ArrayResize(this._jsonValueItemsArray, 0);
 		}
 	};
@@ -257,9 +267,10 @@ private:
 	JSON() {
 	}
 
-	static void _parseJSONObject(const string &json, int &i, bool &isSuccess, JSON::Object *object) {
+	static void _parseJSONObject(const string &json, int &i, bool &isSuccess,
+				     JSON::Object *object) {
 		JSON::_skipWhitespace(json, i);
-		while (i < StringLen(json) && json[i++] != '{');  // skip '{'
+		while (i < StringLen(json) && json[i++] != '{') ; // skip '{'
 		JSON::_skipWhitespace(json, i);
 
 		while (i < StringLen(json)) {
@@ -278,7 +289,8 @@ private:
 			else if (json[i] == 'n' || json[i] == 'N')
 				object.setProperty(key, JSON::_parseNull(json, i, isSuccess));
 			else if (json[i] == 't' || json[i] == 'f')
-				object.setProperty(key, JSON::_parseBoolean(json, i, isSuccess));
+				object.setProperty(key,
+						   JSON::_parseBoolean(json, i, isSuccess));
 			else if (json[i] == '"')
 				object.setProperty(key, JSON::_parseString(json, i, isSuccess));
 			else if (json[i] == '{')
@@ -299,9 +311,10 @@ private:
 			}
 		}
 	}
-	static void _parseJSONArray(const string &json, int &i, bool &isSuccess, JSON::Array *arrayObject) {
+	static void _parseJSONArray(const string &json, int &i, bool &isSuccess,
+				    JSON::Array *arrayObject) {
 		JSON::_skipWhitespace(json, i);
-		while (i < StringLen(json) && json[i++] != '[');  // skip '['
+		while (i < StringLen(json) && json[i++] != '[') ; // skip '['
 		JSON::_skipWhitespace(json, i);
 
 		while (i < StringLen(json)) {
@@ -338,16 +351,19 @@ private:
 		return ch >= '0' && ch <= '9';
 	}
 	static void _skipWhitespace(const string &json, int &i) {
-		while (i < StringLen(json) && (json[i] == ' ' || json[i] == '\n' || json[i] == '\r' || json[i] == '\t')) i++;
+		while (i < StringLen(json) &&
+		       (json[i] == ' ' || json[i] == '\n' || json[i] == '\r' ||
+			json[i] == '\t')) i++;
 	}
 	static string _parseKey(const string &json, int &i, bool &isSuccess) {
 		if (i < StringLen(json) && json[i] == '"') {
 			i++; // skip '"'
 			string key = "";
 
-			while (i < StringLen(json) && json[i] != '"') key += ShortToString(json[i++]);
-			if (i < StringLen(json) && json[i] == '"') {    // check end '"'
-				i++;                                    // skip '"'
+			while (i < StringLen(json) &&
+			       json[i] != '"') key += ShortToString(json[i++]);
+			if (i < StringLen(json) && json[i] == '"') { // check end '"'
+				i++;                    // skip '"'
 				return key;
 			}
 		}
@@ -386,11 +402,11 @@ private:
 		i++; // skip '"'
 
 		while (i < StringLen(json)) {
-			if (json[i] == '"') {           // if end of string
-				i++;                    // skip '"'
+			if (json[i] == '"') { // if end of string
+				i++;    // skip '"'
 				return result;
-			} else if (json[i] == '\\') {   // check escape
-				i++;                    // // skip '\'
+			} else if (json[i] == '\\') { // check escape
+				i++;    // // skip '\'
 				if (i < StringLen(json)) {
 					switch (json[i]) {
 					case 'n': result += "\n"; break;
@@ -447,12 +463,14 @@ private:
 		isSuccess = false;
 		return "";
 	}
-	static JSON::Object *_parseObject(const string &json, int &i, bool &isSuccess) {
+	static JSON::Object *_parseObject(const string &json, int &i,
+					  bool &isSuccess) {
 		JSON::Object *childObject = new JSON::Object();
 		JSON::_parseJSONObject(json, i, isSuccess, childObject);
 		return childObject;
 	}
-	static JSON::Array *_parseArray(const string &json, int &i, bool &isSuccess) {
+	static JSON::Array *_parseArray(const string &json, int &i,
+					bool &isSuccess) {
 		JSON::Array *childObject = new JSON::Array();
 		JSON::_parseJSONArray(json, i, isSuccess, childObject);
 		return childObject;
@@ -469,30 +487,42 @@ public:
 		JSON::Object *objectValue;
 		JSON::Array *arrayValue;
 
-		JsonValueItem(string k, string value) : key(k), valueType(JSONStringType), stringValue(value) {
+		JsonValueItem(string k, string value) : key(k),
+			valueType(JSONStringType), stringValue(value) {
 		};
-		JsonValueItem(string k, int value) : key(k), valueType(JSONNumberType), doubleValue(double(value)) {
+		JsonValueItem(string k, int value) : key(k), valueType(JSONNumberType),
+			doubleValue(double(value)) {
 		};
-		JsonValueItem(string k, long value) : key(k), valueType(JSONNumberType), doubleValue(double(value)) {
+		JsonValueItem(string k, long value) : key(k), valueType(JSONNumberType),
+			doubleValue(double(value)) {
 		};
-		JsonValueItem(string k, double value) : key(k), valueType(JSONNumberType), doubleValue(value) {
+		JsonValueItem(string k, double value) : key(k),
+			valueType(JSONNumberType), doubleValue(value) {
 		};
-		JsonValueItem(string k, bool value) : key(k), valueType(JSONBoolType), booleanValue(value) {
+		JsonValueItem(string k, bool value) : key(k), valueType(JSONBoolType),
+			booleanValue(value) {
 		};
-		JsonValueItem(string k, JSON::Object * value) : key(k), valueType(JSONObjetType), objectValue(value) {
+		JsonValueItem(string k, JSON::Object * value) : key(k),
+			valueType(JSONObjetType), objectValue(value) {
 		};
-		JsonValueItem(string k, JSON::Array * value) : key(k), valueType(JSONArrayType), arrayValue(value) {
+		JsonValueItem(string k, JSON::Array * value) : key(k),
+			valueType(JSONArrayType), arrayValue(value) {
 		};
 
 		string toString() const {
-			if (this.valueType == JSONBoolType) return string(this.booleanValue);
+			if (this.valueType ==
+			    JSONBoolType) return string(this.booleanValue);
 			if (this.valueType == JSONNumberType) {
-				if (MathMod(this.doubleValue, 1.0) == 0.0 && MathAbs(this.doubleValue) < 9007199254740992.0)
+				if (MathMod(this.doubleValue,
+					    1.0) == 0.0 &&
+				    MathAbs(this.doubleValue) < 9007199254740992.0)
 					return IntegerToString((long)this.doubleValue);
 				return DoubleToString(this.doubleValue, 8);
 			}
-			if (this.valueType == JSONObjetType) return this.objectValue.toString();
-			if (this.valueType == JSONArrayType) return this.arrayValue.toString();
+			if (this.valueType ==
+			    JSONObjetType) return this.objectValue.toString();
+			if (this.valueType ==
+			    JSONArrayType) return this.arrayValue.toString();
 			if (this.valueType == JSONStringType) {
 				string copy = this.stringValue;
 				StringReplace(copy, "\"", "\\\"");

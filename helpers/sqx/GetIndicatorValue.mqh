@@ -11,7 +11,8 @@ double GetIndicatorValue(int handle, int buffer, int shift) {
 	return 0.0;
 }
 
-bool GetIndicatorValues(int handle, int buffer, int shift, int count, double &values[]) {
+bool GetIndicatorValues(int handle, int buffer, int shift, int count,
+			double &values[]) {
 	ArraySetAsSeries(values, true);
 
 	return CopyBuffer(handle, buffer, shift, count, values) == count;

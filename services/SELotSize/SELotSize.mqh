@@ -22,17 +22,21 @@ public:
 		double marginPerLot = GetMarginPerLot(symbol);
 
 		if (marginPerLot <= 0) {
-			logger.warning("CalculateByCapital: Unable to calculate margin per lot");
+			logger.warning(
+				"CalculateByCapital: Unable to calculate margin per lot");
 			return 0.0;
 		}
 
 		double result = nav / marginPerLot;
-		logger.info(StringFormat("CalculateByCapital: nav=%.2f, marginPerLot=%.2f, lotSize=%.4f", nav, marginPerLot, result));
+		logger.info(StringFormat(
+				    "CalculateByCapital: nav=%.2f, marginPerLot=%.2f, lotSize=%.4f",
+				    nav, marginPerLot, result));
 
 		return result;
 	}
 
-	double CalculateByVolatility(double nav, double atrValue, double equityAtRisk) {
+	double CalculateByVolatility(double nav, double atrValue,
+				     double equityAtRisk) {
 		double tickValue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
 		double tickSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
 
@@ -42,7 +46,8 @@ public:
 		}
 
 		if (tickValue <= 0 || tickSize <= 0) {
-			logger.warning("CalculateByVolatility: Invalid tick value or tick size");
+			logger.warning(
+				"CalculateByVolatility: Invalid tick value or tick size");
 			return 0.0;
 		}
 
@@ -57,7 +62,10 @@ public:
 
 		double result = riskAmount / dollarVolatility;
 
-		logger.info(StringFormat("CalculateByVolatility: nav=%.2f, ATR=%.5f, equityAtRisk=%.2f, dollarVol=%.2f, riskAmt=%.2f, lotSize=%.4f", nav, atrValue, equityAtRisk, dollarVolatility, riskAmount, result));
+		logger.info(StringFormat(
+				    "CalculateByVolatility: nav=%.2f, ATR=%.5f, equityAtRisk=%.2f, dollarVol=%.2f, riskAmt=%.2f, lotSize=%.4f",
+				    nav, atrValue, equityAtRisk, dollarVolatility,
+				    riskAmount, result));
 
 		return result;
 	}

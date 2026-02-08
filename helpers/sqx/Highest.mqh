@@ -1,7 +1,8 @@
 #ifndef __SQX_HIGHEST_MQH__
 #define __SQX_HIGHEST_MQH__
 
-double Highest(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType, int period, int shift) {
+double Highest(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType,
+	       int period, int shift) {
 	double values[];
 
 	int copied = 0;
@@ -27,7 +28,8 @@ double Highest(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType, int 
 	return maxValue;
 }
 
-double Lowest(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType, int period, int shift) {
+double Lowest(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType,
+	      int period, int shift) {
 	double values[];
 
 	int copied = 0;

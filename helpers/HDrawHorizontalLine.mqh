@@ -8,7 +8,7 @@ bool drawHorizontalLine(
 	ENUM_LINE_STYLE style = STYLE_SOLID,
 	int width = 1,
 	long chartId = 0
-	) {
+) {
 	ObjectDelete(chartId, name);
 
 	if (!ObjectCreate(chartId, name, OBJ_HLINE, 0, 0, price))

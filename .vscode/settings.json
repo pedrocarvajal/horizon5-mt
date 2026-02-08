@@ -17,6 +17,19 @@
     }
   },
   "files.autoSave": "onFocusChange",
+  "C_Cpp.files.exclude": {
+    "**/*.mq5": true,
+    "**/*.mqh": true
+  },
+  "editor.formatOnSave": false,
+  "editor.formatOnType": false,
+  "editor.formatOnPaste": false,
+  "[cpp]": {
+    "editor.defaultFormatter": null
+  },
+  "[c]": {
+    "editor.defaultFormatter": null
+  },
   "achilleshr.runonsave": {
     "commands": [
       {
