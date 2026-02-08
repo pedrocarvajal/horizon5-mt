@@ -2,7 +2,6 @@
 #define __SE_ASSET_MQH__
 
 #include "../entities/EOrder.mqh"
-#include "../helpers/HIsMarketClosed.mqh"
 #include "../helpers/HStringToNumber.mqh"
 #include "../interfaces/IAsset.mqh"
 #include "../services/SELogger/SELogger.mqh"
@@ -92,6 +91,9 @@ public:
 			strategies[i].OnTesterInit();
 
 		return INIT_SUCCEEDED;
+	}
+
+	virtual void OnTimer() {
 	}
 
 	virtual void OnTick() {
