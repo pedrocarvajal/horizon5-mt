@@ -11,15 +11,13 @@
 #define MAX_RETRY_COUNT 3
 
 class SEOrderPersistence;
-class SEReportOfOrderHistory;
 
 extern SEDateTime dtime;
-extern SEOrderPersistence *orderPersistence;
-extern SEReportOfOrderHistory *orderHistoryReporter;
 
 class EOrder:
 public ATrade {
 public:
+	SEOrderPersistence * persistence;
 	bool isInitialized;
 	bool isProcessed;
 	bool isMarketOrder;
@@ -58,6 +56,7 @@ public:
 
 		symbol = strategySymbol;
 		magicNumber = strategyMagicNumber;
+		persistence = NULL;
 
 		isInitialized = false;
 		isProcessed = false;
@@ -75,6 +74,7 @@ public:
 	EOrder(const EOrder& other) {
 		logger.SetPrefix("Order");
 
+		persistence = other.persistence;
 		isInitialized = other.isInitialized;
 		isProcessed = other.isProcessed;
 		isMarketOrder = other.isMarketOrder;
@@ -215,13 +215,7 @@ public:
 
 		if (retryCount >= MAX_RETRY_COUNT) {
 			logger.warning(StringFormat("[%s] Max retry count reached, cancelling order", GetId()));
-			status = ORDER_STATUS_CANCELLED;
-			pendingToOpen = false;
-			isProcessed = true;
-
-			if (CheckPointer(orderPersistence) != POINTER_INVALID)
-				orderPersistence.DeleteOrderJson(source, GetId());
-
+			Cancel();
 			return;
 		}
 
@@ -278,15 +272,8 @@ public:
 		}
 
 		if (!ValidateMinimumVolume()) {
-			status = ORDER_STATUS_CANCELLED;
-			isProcessed = true;
-			pendingToOpen = false;
-
 			logger.info(StringFormat("[%s] Order cancelled - Volume does not meet minimum requirements", GetId()));
-
-			if (CheckPointer(orderPersistence) != POINTER_INVALID)
-				orderPersistence.DeleteOrderJson(source, GetId());
-
+			Cancel();
 			return;
 		}
 
@@ -349,12 +336,7 @@ public:
 		if (status == ORDER_STATUS_PENDING) {
 			if (GetOrderId() == 0) {
 				logger.info(StringFormat("[%s] Cannot cancel order: invalid orderId", GetId()));
-				status = ORDER_STATUS_CANCELLED;
-				pendingToOpen = false;
-
-				if (CheckPointer(orderPersistence) != POINTER_INVALID)
-					orderPersistence.DeleteOrderJson(source, GetId());
-
+				Cancel();
 				return;
 			}
 
@@ -364,12 +346,7 @@ public:
 					GetId(),
 					GetOrderId()
 				));
-				status = ORDER_STATUS_CANCELLED;
-				pendingToOpen = false;
-
-				if (CheckPointer(orderPersistence) != POINTER_INVALID)
-					orderPersistence.DeleteOrderJson(source, GetId());
-
+				Cancel();
 				return;
 			}
 
@@ -401,14 +378,8 @@ public:
 				MAX_RETRY_COUNT
 			));
 
-			if (retryCount >= MAX_RETRY_COUNT) {
-				status = ORDER_STATUS_CANCELLED;
-				isProcessed = true;
-				pendingToOpen = false;
-
-				if (CheckPointer(orderPersistence) != POINTER_INVALID)
-					orderPersistence.DeleteOrderJson(source, GetId());
-			}
+			if (retryCount >= MAX_RETRY_COUNT)
+				Cancel();
 
 			return;
 		}
@@ -456,8 +427,8 @@ public:
 
 		Snapshot();
 
-		if (CheckPointer(orderPersistence) != POINTER_INVALID)
-			orderPersistence.SaveOrderToJson(this);
+		if (CheckPointer(persistence) != POINTER_INVALID)
+			persistence.SaveOrderToJson(this);
 	}
 
 	void OnClose(
@@ -479,11 +450,6 @@ public:
 		orderCloseReason = reason;
 		Snapshot();
 
-		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
-			orderHistoryReporter.AddOrderSnapshot(snapshot);
-			logger.info(StringFormat("[%s] Order snapshot added to report", GetId()));
-		}
-
 		if (reason == DEAL_REASON_TP)
 			logger.info(StringFormat("[%s] Order closed by Take Profit", GetId()));
 
@@ -503,8 +469,8 @@ public:
 			logger.info(StringFormat("[%s] Order closed by Stop Loss", GetId()));
 
 		if (status == ORDER_STATUS_CLOSED)
-			if (CheckPointer(orderPersistence) != POINTER_INVALID)
-				orderPersistence.DeleteOrderJson(source, GetId());
+			if (CheckPointer(persistence) != POINTER_INVALID)
+				persistence.DeleteOrderJson(source, GetId());
 	}
 
 	void OnDeinit() {
@@ -513,6 +479,15 @@ public:
 		status = ORDER_STATUS_CLOSED;
 		isInitialized = false;
 		isProcessed = false;
+	}
+
+	void Cancel() {
+		status = ORDER_STATUS_CANCELLED;
+		pendingToOpen = false;
+		isProcessed = true;
+
+		if (CheckPointer(persistence) != POINTER_INVALID)
+			persistence.DeleteOrderJson(source, GetId());
 	}
 
 	string GetId() {
@@ -740,6 +715,10 @@ public:
 
 	void SetRetryAfter(datetime value) {
 		retryAfter = value;
+	}
+
+	void SetPersistence(SEOrderPersistence *value) {
+		persistence = value;
 	}
 };
 

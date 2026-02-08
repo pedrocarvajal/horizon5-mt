@@ -15,8 +15,17 @@ private:
 	SELogger logger;
 
 	string reportsDir;
+	string reportName;
 	bool useCommonFiles;
 	SSOrderHistory orderHistory[];
+
+	void initialize(string directory, string name, bool useCommon) {
+		logger.SetPrefix("OrderHistoryReporter");
+		reportsDir = directory;
+		reportName = name;
+		useCommonFiles = useCommon;
+		ArrayResize(orderHistory, 0);
+	}
 
 	JSON::Object *OrderHistoryToJson(const SSOrderHistory &history) {
 		JSON::Object *obj = new JSON::Object();
@@ -56,29 +65,7 @@ private:
 		return arr;
 	}
 
-public:
-	SEReportOfOrderHistory() {
-		logger.SetPrefix("OrderHistoryReporter");
-
-		reportsDir = StringFormat("/Reports/%s/%s", _Symbol, TimeToString(dtime.Timestamp(), TIME_DATE));
-		useCommonFiles = false;
-		ArrayResize(orderHistory, 0);
-	}
-
-	SEReportOfOrderHistory(string customDir, bool useCommonFolder = false) {
-		logger.SetPrefix("OrderHistoryReporter");
-
-		reportsDir = customDir;
-		useCommonFiles = useCommonFolder;
-		ArrayResize(orderHistory, 0);
-	}
-
-	void AddOrderSnapshot(const SSOrderHistory &snapshot) {
-		ArrayResize(orderHistory, ArraySize(orderHistory) + 1);
-		orderHistory[ArraySize(orderHistory) - 1] = snapshot;
-	}
-
-	void ExportOrderHistoryToJsonFile() {
+	JSON::Object *BuildJsonReport() {
 		JSON::Object *root = new JSON::Object();
 		root.setProperty("name", "Orders Report");
 
@@ -90,16 +77,40 @@ public:
 			root.setProperty("data", OrderHistoryArrayToJsonArray(orderHistory, ArraySize(orderHistory)));
 		}
 
+		return root;
+	}
+
+public:
+	SEReportOfOrderHistory() {
+		initialize(
+			StringFormat("/Reports/%s/%lld", _Symbol, (long)dtime.Timestamp()),
+			"Orders",
+			false
+		);
+	}
+
+	SEReportOfOrderHistory(string customDir, bool useCommonFolder = false, string customReportName = "Orders") {
+		initialize(customDir, customReportName, useCommonFolder);
+	}
+
+	void AddOrderSnapshot(const SSOrderHistory &snapshot) {
+		ArrayResize(orderHistory, ArraySize(orderHistory) + 1);
+		orderHistory[ArraySize(orderHistory) - 1] = snapshot;
+	}
+
+	void ExportOrderHistoryToJsonFile() {
+		JSON::Object *root = BuildJsonReport();
 		string jsonStr = root.toString();
-		string filename = StringFormat("%s/OrdersReport.json", reportsDir);
+		string filename = StringFormat("%s/%s.json", reportsDir, reportName);
 		int flags = FILE_WRITE | FILE_TXT | FILE_ANSI;
 
 		if (useCommonFiles)
 			flags |= FILE_COMMON;
 
-		logger.debug(StringFormat("Attempting to create order history file: %s", filename));
-		logger.debug(StringFormat("Full path: %s\\OrdersReport.json", GetCurrentReportsPath()));
-		logger.debug(StringFormat("Orders to export: %d", ArraySize(orderHistory)));
+		logger.debug(StringFormat(
+			"Exporting %d orders to %s (full: %s\\%s.json)",
+			ArraySize(orderHistory), filename, GetCurrentReportsPath(), reportName
+		));
 
 		int file = FileOpen(filename, flags);
 
@@ -125,7 +136,8 @@ public:
 			FileClose(file);
 
 			logger.info(StringFormat(
-				"Order history saved - OrdersReport.json with %d orders",
+				"Order history saved - %s.json with %d orders",
+				reportName,
 				ArraySize(orderHistory)
 			));
 		}

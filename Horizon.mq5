@@ -14,8 +14,6 @@ input double EquityAtRisk = 10; // [1] > Equity at risk value (in percentage)
 
 #include <Trade/Trade.mqh>
 #include "services/SEDateTime/SEDateTime.mqh"
-#include "services/SEReportOfOrderHistory/SEReportOfOrderHistory.mqh"
-#include "services/SEOrderPersistence/SEOrderPersistence.mqh"
 
 #include "helpers/HIsLiveTrading.mqh"
 #include "helpers/HGetPipSize.mqh"
@@ -27,8 +25,6 @@ input double EquityAtRisk = 10; // [1] > Equity at risk value (in percentage)
 
 SEDateTime dtime;
 SELogger hlogger;
-SEReportOfOrderHistory *orderHistoryReporter;
-SEOrderPersistence *orderPersistence;
 
 int lastCheckedDay = -1;
 int lastCheckedHour = -1;
@@ -49,13 +45,6 @@ int OnInit() {
 	lastCheckedHour = dtime.Today().hour;
 	lastCheckedMonth = dtime.Today().month;
 	lastCheckedWeek = dtime.Now().dayOfWeek;
-
-	string timestampedReportsDir = StringFormat("/Reports/%s/%s", _Symbol, TimeToString(dtime.Timestamp(), TIME_DATE));
-
-	if (EnableOrderHistoryReport)
-		orderHistoryReporter = new SEReportOfOrderHistory(timestampedReportsDir, true);
-
-	orderPersistence = new SEOrderPersistence();
 
 	// Initialize assets
 	int assetCount = ArraySize(assets);
@@ -133,79 +122,6 @@ int OnInit() {
 		return INIT_FAILED;
 	}
 
-	// Restore orders from JSON files
-	if (isLiveTrading() && CheckPointer(orderPersistence) != POINTER_INVALID) {
-		int totalRestored = 0;
-		bool restorationFailed = false;
-
-		for (int i = 0; i < ArraySize(assets); i++) {
-			for (int s = 0; s < ArraySize(assets[i].strategies); s++) {
-				SEStrategy *strategy = assets[i].strategies[s];
-				string strategyPrefix = strategy.GetPrefix();
-				hlogger.info(StringFormat("Processing strategy: %s", strategyPrefix));
-
-				EOrder restoredOrders[];
-				int restoredCount =
-					orderPersistence.LoadOrdersFromJson(strategyPrefix,
-						restoredOrders);
-
-				if (restoredCount == -1) {
-					hlogger.error(StringFormat(
-						"CRITICAL ERROR: Failed to restore orders for strategy: %s",
-						strategyPrefix
-					));
-
-					hlogger.error(
-						"This includes JSON deserialization errors and file access problems."
-					);
-
-					restorationFailed = true;
-					break;
-				}
-
-				for (int j = 0; j < restoredCount; j++) {
-					string restoredId = restoredOrders[j].GetId();
-					int existingIndex = strategy.FindOrderIndexById(restoredId);
-
-					if (existingIndex != -1) {
-						hlogger.debug(StringFormat("Skipping duplicate order: %s", restoredId));
-						continue;
-					}
-
-					restoredOrders[j].OnInit();
-					strategy.AddOrder(restoredOrders[j]);
-					totalRestored++;
-					EOrder *addedOrder = strategy.GetOrderAtIndex(strategy.GetOrdersCount() - 1);
-
-					if (addedOrder != NULL)
-						strategy.OnOpenOrder(addedOrder);
-				}
-			}
-
-			if (restorationFailed)
-				break;
-		}
-
-		if (restorationFailed) {
-			hlogger.error("CRITICAL ERROR: Order restoration failed!");
-			hlogger.error("Expert Advisor cannot start safely with corrupted or inaccessible order data.");
-			hlogger.error("Please check the JSON files in the Live/ directory or delete them to start fresh.");
-			return INIT_FAILED;
-		}
-
-		if (totalRestored > 0) {
-			hlogger.info(StringFormat(
-				"Successfully restored %d orders from JSON files",
-				totalRestored
-			));
-
-			hlogger.info(StringFormat("Open positions in MetaTrader: %d", PositionsTotal()));
-			hlogger.debug("Restored orders for tracking");
-		} else {
-			hlogger.info("No orders found to restore");
-		}
-	}
-
 	return INIT_SUCCEEDED;
 }
 
@@ -214,12 +130,6 @@ void OnDeinit(const int reason) {
 
 	for (int i = 0; i < ArraySize(assets); i++)
 		assets[i].OnDeinit();
-
-	if (CheckPointer(orderHistoryReporter) != POINTER_INVALID)
-		delete orderHistoryReporter;
-
-	if (CheckPointer(orderPersistence) != POINTER_INVALID)
-		delete orderPersistence;
 
 	if (reason != REASON_CHARTCHANGE && reason != REASON_PARAMETERS) {
 		for (int i = 0; i < ArraySize(assets); i++)
@@ -536,11 +446,8 @@ double OnTester() {
 			quality = MathPow(quality * assetQuality, 1.0 / 2.0);
 	}
 
-	if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
-		orderHistoryReporter.PrintCurrentPath();
-		orderHistoryReporter.ExportOrderHistoryToJsonFile();
-		hlogger.info(StringFormat("Order history exported with %d orders", orderHistoryReporter.GetOrderCount()));
-	}
+	for (int i = 0; i < ArraySize(assets); i++)
+		assets[i].ExportOrderHistory();
 
 	return quality;
 }

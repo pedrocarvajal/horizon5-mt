@@ -15,6 +15,8 @@ class SEAsset;
 #include "../entities/EOrder.mqh"
 #include "../services/SEStatistics/SEStatistics.mqh"
 #include "../services/SELotSize/SELotSize.mqh"
+#include "../services/SEReportOfOrderHistory/SEReportOfOrderHistory.mqh"
+#include "../services/SEOrderPersistence/SEOrderPersistence.mqh"
 
 #define ORDER_TYPE_ANY    -1
 #define ORDER_STATUS_ANY  -1
@@ -34,6 +36,8 @@ private:
 	SEAsset *asset;
 	SEStatistics *statistics;
 	SELotSize *lotSize;
+	SEReportOfOrderHistory *orderHistoryReporter;
+	SEOrderPersistence *orderPersistence;
 
 	void filterOrders(
 		EOrder& resultOrders[],
@@ -44,15 +48,13 @@ private:
 		ArrayResize(resultOrders, 0);
 
 		for (int i = 0; i < ArraySize(orders); i++) {
-			bool isSideMatch = (side == ORDER_TYPE_ANY) ||
-					   (orders[i].GetSide() == side);
+			bool isSideMatch = (side == ORDER_TYPE_ANY) || (orders[i].GetSide() == side);
 			bool isStatusMatch = false;
 
 			if (status == ORDER_STATUS_ANY) {
 				isStatusMatch = (orders[i].GetStatus() == defaultStatus1);
 				if (defaultStatus2 != ORDER_STATUS_ANY)
-					isStatusMatch = isStatusMatch ||
-							(orders[i].GetStatus() == defaultStatus2);
+					isStatusMatch = isStatusMatch || (orders[i].GetStatus() == defaultStatus2);
 			} else {
 				isStatusMatch = (orders[i].GetStatus() == status);
 			}
@@ -86,6 +88,44 @@ private:
 		SetQualityThresholds(thresholds);
 	}
 
+	int RestoreOrders() {
+		if (CheckPointer(orderPersistence) == POINTER_INVALID)
+			return 0;
+
+		EOrder restoredOrders[];
+		int restoredCount = orderPersistence.LoadOrdersFromJson(prefix, restoredOrders);
+
+		if (restoredCount == -1) {
+			logger.error(StringFormat(
+				"Failed to restore orders for strategy: %s",
+				prefix
+			));
+
+			return -1;
+		}
+
+		int totalRestored = 0;
+
+		for (int i = 0; i < restoredCount; i++) {
+			if (FindOrderIndexById(restoredOrders[i].GetId()) != -1)
+				continue;
+
+			restoredOrders[i].OnInit();
+			AddOrder(restoredOrders[i]);
+			totalRestored++;
+
+			EOrder *addedOrder = GetOrderAtIndex(GetOrdersCount() - 1);
+
+			if (addedOrder != NULL)
+				OnOpenOrder(addedOrder);
+		}
+
+		if (totalRestored > 0)
+			logger.info(StringFormat("Restored %d orders from JSON", totalRestored));
+
+		return totalRestored;
+	}
+
 protected:
 	SELogger logger;
 
@@ -98,41 +138,52 @@ public:
 	virtual int OnInit() {
 		if (name == "") {
 			logger.error("Name not defined for strategy");
+
 			return INIT_FAILED;
 		}
 
 		if (symbol == "") {
 			logger.error(StringFormat(
 				"Symbol not defined for strategy: %s",
-				name));
+				name
+			));
+
 			return INIT_FAILED;
 		}
 
 		if (prefix == "") {
 			logger.error(StringFormat(
 				"Prefix not defined for strategy: %s",
-				name));
+				name
+			));
+
 			return INIT_FAILED;
 		}
 
 		if (strategyMagicNumber == 0) {
 			logger.error(StringFormat(
 				"Magic number not defined for strategy: %s",
-				name));
+				name
+			));
+
 			return INIT_FAILED;
 		}
 
 		if (balance <= 0) {
 			logger.error(StringFormat(
 				"Balance not defined for strategy: %s",
-				name));
+				name
+			));
+
 			return INIT_FAILED;
 		}
 
 		if (!SymbolSelect(symbol, true)) {
 			logger.error(StringFormat(
 				"Symbol '%s' does not exist or cannot be selected",
-				symbol));
+				symbol
+			));
+
 			return INIT_FAILED;
 		}
 
@@ -143,7 +194,26 @@ public:
 		statistics = new SEStatistics(symbol, name, prefix, balance);
 		lotSize = new SELotSize(symbol);
 
+		if (EnableOrderHistoryReport) {
+			string reportsDir = StringFormat(
+				"/Reports/%s/%lld",
+				symbol,
+				(long)dtime.Timestamp()
+			);
+
+			string reportName = StringFormat("%s_Orders", prefix);
+			orderHistoryReporter = new SEReportOfOrderHistory(reportsDir, true, reportName);
+		}
+
 		initializeDefaultThresholds();
+
+		if (isLiveTrading()) {
+			orderPersistence = new SEOrderPersistence();
+			int restored = RestoreOrders();
+
+			if (restored == -1)
+				return INIT_FAILED;
+		}
 
 		return INIT_SUCCEEDED;
 	}
@@ -183,6 +253,9 @@ public:
 		statistics.OnCloseOrder(order, reason, orders);
 		countOpenOrders--;
 		countClosedOrders++;
+
+		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID)
+			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
 	}
 
 	virtual void OnEndWeek() {
@@ -195,12 +268,30 @@ public:
 		ArrayResize(orders, 0);
 	}
 
+	void ExportOrderHistory() {
+		if (CheckPointer(orderHistoryReporter) == POINTER_INVALID)
+			return;
+
+		orderHistoryReporter.ExportOrderHistoryToJsonFile();
+
+		logger.info(StringFormat(
+			"Order history exported with %d orders",
+			orderHistoryReporter.GetOrderCount()
+		));
+	}
+
 	virtual ~SEStrategy() {
 		if (CheckPointer(statistics) == POINTER_DYNAMIC)
 			delete statistics;
 
 		if (CheckPointer(lotSize) == POINTER_DYNAMIC)
 			delete lotSize;
+
+		if (CheckPointer(orderHistoryReporter) == POINTER_DYNAMIC)
+			delete orderHistoryReporter;
+
+		if (CheckPointer(orderPersistence) == POINTER_DYNAMIC)
+			delete orderPersistence;
 	}
 
 	EOrder * OpenNewOrder(
@@ -212,7 +303,9 @@ public:
 		double stopLoss = 0
 	) {
 		EOrder *order = new EOrder(strategyMagicNumber, symbol);
-		double currentPrice = (side == ORDER_TYPE_BUY) ? SymbolInfoDouble(symbol, SYMBOL_ASK) : SymbolInfoDouble(symbol, SYMBOL_BID);
+		double askPrice = SymbolInfoDouble(symbol, SYMBOL_ASK);
+		double bidPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
+		double currentPrice = (side == ORDER_TYPE_BUY) ? askPrice : bidPrice;
 
 		order.SetStatus(ORDER_STATUS_PENDING);
 		order.SetSource(prefix);
@@ -231,10 +324,7 @@ public:
 			order.SetTakeProfit(takeProfit);
 
 		order.GetId();
-
-		ArrayResize(orders, ArraySize(orders) + 1);
-		orders[ArraySize(orders) - 1] = *order;
-
+		AddOrder(*order);
 		countOrdersOfToday++;
 		countOpenOrders++;
 
@@ -266,16 +356,10 @@ public:
 
 	void CloseAllActiveOrders() {
 		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetStatus() == ORDER_STATUS_OPEN) {
+			if (orders[i].GetStatus() == ORDER_STATUS_OPEN)
 				orders[i].Close();
-			} else if (orders[i].GetStatus() == ORDER_STATUS_PENDING) {
-				orders[i].SetStatus(ORDER_STATUS_CANCELLED);
-				orders[i].SetPendingToOpen(false);
-				orders[i].SetIsProcessed(true);
-
-				if (CheckPointer(orderPersistence) != POINTER_INVALID)
-					orderPersistence.DeleteOrderJson(orders[i].GetSource(), orders[i].GetId());
-			}
+			else if (orders[i].GetStatus() == ORDER_STATUS_PENDING)
+				orders[i].Cancel();
 		}
 	}
 
@@ -328,27 +412,26 @@ public:
 	}
 
 	void CleanupClosedOrders() {
-		EOrder activeOrders[];
-		int activeCount = 0;
+		int writeIndex = 0;
 
 		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetStatus() != ORDER_STATUS_CLOSED &&
-			    orders[i].GetStatus() != ORDER_STATUS_CANCELLED) {
-				ArrayResize(activeOrders, activeCount + 1);
-				activeOrders[activeCount] = orders[i];
-				activeCount++;
-			} else {
+			if (
+				orders[i].GetStatus() == ORDER_STATUS_CLOSED ||
+				orders[i].GetStatus() == ORDER_STATUS_CANCELLED
+			) {
 				orders[i].OnDeinit();
+			} else {
+				if (writeIndex != i)
+					orders[writeIndex] = orders[i];
+				writeIndex++;
 			}
 		}
 
-		ArrayResize(orders, activeCount);
-
-		for (int i = 0; i < activeCount; i++)
-			orders[i] = activeOrders[i];
+		ArrayResize(orders, writeIndex);
 	}
 
 	void AddOrder(EOrder &order) {
+		order.SetPersistence(orderPersistence);
 		ArrayResize(orders, ArraySize(orders) + 1);
 		orders[ArraySize(orders) - 1] = order;
 	}
@@ -366,19 +449,19 @@ public:
 	}
 
 	double GetLotSizeByCapital() {
-		double nav =
-			EquityAtRiskCompounded ? statistics.GetNav() :
-			statistics.GetInitialBalance();
+		double nav = EquityAtRiskCompounded
+			? statistics.GetNav()
+			: statistics.GetInitialBalance();
+
 		return lotSize.CalculateByCapital(nav * EquityAtRisk / 100.0);
 	}
 
 	double GetLotSizeByVolatility(double atrValue, double equityAtRisk) {
-		return lotSize.CalculateByVolatility(
-			EquityAtRiskCompounded ? statistics.GetNav() :
-			statistics.GetInitialBalance(),
-			atrValue,
-			equityAtRisk
-		);
+		double nav = EquityAtRiskCompounded
+			? statistics.GetNav()
+			: statistics.GetInitialBalance();
+
+		return lotSize.CalculateByVolatility(nav, atrValue, equityAtRisk);
 	}
 
 	ulong GetMagicNumber() {
