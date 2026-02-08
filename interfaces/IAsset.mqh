@@ -7,6 +7,7 @@ interface IAsset {
 	int OnInit();
 	int OnTesterInit();
 
+	void OnTimer();
 	void OnTick();
 	void OnStartMinute();
 	void OnStartHour();
