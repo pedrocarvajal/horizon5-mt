@@ -63,13 +63,15 @@ public:
 			int result = strategies[i].OnInit();
 
 			if (result != INIT_SUCCEEDED) {
-				logger.error("Strategy initialization failed: " + strategies[i].GetName());
+				logger.error("Strategy initialization failed: " +
+					     strategies[i].GetName());
 				return INIT_FAILED;
 			}
 		}
 
-		logger.info(StringFormat("%s initialized | symbol: %s | strategies: %d | weight: %.4f | balance: %.2f",
-					 name, symbol, strategyCount, weight, balance));
+		logger.info(StringFormat(
+				    "%s initialized | symbol: %s | strategies: %d | weight: %.4f | balance: %.2f",
+				    name, symbol, strategyCount, weight, balance));
 
 		return INIT_SUCCEEDED;
 	}
@@ -142,7 +144,8 @@ public:
 	void AddStrategy(SEStrategy *strategy) {
 		strategy.SetAsset(GetPointer(this));
 		strategy.SetSymbol(symbol);
-		strategy.SetMagicNumber(StringToNumber(symbol + "_" + name + "_" + strategy.GetName()));
+		strategy.SetMagicNumber(StringToNumber(symbol + "_" + name + "_" +
+						       strategy.GetName()));
 
 		ArrayResize(strategies, ArraySize(strategies) + 1);
 		strategies[ArraySize(strategies) - 1] = strategy;
@@ -157,18 +160,21 @@ public:
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].GetStatistics().OnForceEnd();
-			double strategyQuality = strategies[i].GetStatistics().GetQuality().quality;
+			double strategyQuality =
+				strategies[i].GetStatistics().GetQuality().quality;
 
 			if (strategyQuality == 0)
 				return 0;
 
-			quality = MathPow(quality * strategyQuality, GEOMETRIC_MEAN_EXPONENT);
+			quality = MathPow(quality * strategyQuality,
+					  GEOMETRIC_MEAN_EXPONENT);
 		}
 
 		return quality;
 	}
 
-	bool FindOrderByOrderId(ulong orderId, int &strategyIndex, int &orderIndex) {
+	bool FindOrderByOrderId(ulong orderId, int &strategyIndex,
+				int &orderIndex) {
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			int idx = strategies[i].FindOrderIndexByOrderId(orderId);
 
@@ -182,7 +188,8 @@ public:
 		return false;
 	}
 
-	bool FindOrderByPositionId(ulong positionId, int &strategyIndex, int &orderIndex) {
+	bool FindOrderByPositionId(ulong positionId, int &strategyIndex,
+				   int &orderIndex) {
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			int idx = strategies[i].FindOrderIndexByPositionId(positionId);
 

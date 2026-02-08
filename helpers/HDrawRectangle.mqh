@@ -11,10 +11,11 @@ bool drawRectangle(
 	ENUM_LINE_STYLE style = STYLE_SOLID,
 	int width = 1,
 	long chartId = 0
-	) {
+) {
 	ObjectDelete(chartId, name);
 
-	if (!ObjectCreate(chartId, name, OBJ_RECTANGLE, 0, time1, price1, time2, price2))
+	if (!ObjectCreate(chartId, name, OBJ_RECTANGLE, 0, time1, price1, time2,
+			  price2))
 		return false;
 
 	ObjectSetInteger(chartId, name, OBJPROP_COLOR, rectColor);

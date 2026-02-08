@@ -19,16 +19,19 @@ SMarketStatus getMarketStatus(string checkSymbol, int safetyMarginMinutes = 1) {
 	int currentSeconds = currentMinutes * 60 + dt.sec;
 
 	for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
-		ENUM_DAY_OF_WEEK checkDay = (ENUM_DAY_OF_WEEK)((dt.day_of_week + dayOffset) % 7);
+		ENUM_DAY_OF_WEEK checkDay = (ENUM_DAY_OF_WEEK)((dt.day_of_week +
+								dayOffset) % 7);
 		datetime sessionStart, sessionEnd;
 		uint sessionIndex = 0;
 
-		while (SymbolInfoSessionTrade(checkSymbol, checkDay, sessionIndex, sessionStart, sessionEnd)) {
+		while (SymbolInfoSessionTrade(checkSymbol, checkDay, sessionIndex,
+					      sessionStart, sessionEnd)) {
 			MqlDateTime startDt, endDt;
 			TimeToStruct(sessionStart, startDt);
 			TimeToStruct(sessionEnd, endDt);
 
-			int startMinutes = startDt.hour * 60 + startDt.min + safetyMarginMinutes;
+			int startMinutes = startDt.hour * 60 + startDt.min +
+					   safetyMarginMinutes;
 			int endMinutes = endDt.hour * 60 + endDt.min - safetyMarginMinutes;
 			int startSeconds = startMinutes * 60;
 			int endSeconds = endMinutes * 60;
@@ -37,13 +40,15 @@ SMarketStatus getMarketStatus(string checkSymbol, int safetyMarginMinutes = 1) {
 				bool isOvernightSession = (endMinutes <= startMinutes);
 
 				if (isOvernightSession) {
-					if (currentMinutes >= startMinutes || currentMinutes <= endMinutes) {
+					if (currentMinutes >= startMinutes ||
+					    currentMinutes <= endMinutes) {
 						status.isClosed = false;
 						status.opensInSeconds = 0;
 						return status;
 					}
 				} else {
-					if (currentMinutes >= startMinutes && currentMinutes <= endMinutes) {
+					if (currentMinutes >= startMinutes &&
+					    currentMinutes <= endMinutes) {
 						status.isClosed = false;
 						status.opensInSeconds = 0;
 						return status;
@@ -57,7 +62,8 @@ SMarketStatus getMarketStatus(string checkSymbol, int safetyMarginMinutes = 1) {
 			} else {
 				int secondsUntilMidnight = 86400 - currentSeconds;
 				int secondsFromPreviousDays = (dayOffset - 1) * 86400;
-				status.opensInSeconds = secondsUntilMidnight + secondsFromPreviousDays + startSeconds;
+				status.opensInSeconds = secondsUntilMidnight +
+							secondsFromPreviousDays + startSeconds;
 				return status;
 			}
 

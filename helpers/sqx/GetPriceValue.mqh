@@ -1,7 +1,8 @@
 #ifndef __SQX_GET_PRICE_VALUE_MQH__
 #define __SQX_GET_PRICE_VALUE_MQH__
 
-double GetPriceValue(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType, int shift) {
+double GetPriceValue(string symbolName, ENUM_TIMEFRAMES timeframe,
+		     int priceType, int shift) {
 	double prices[];
 	ArraySetAsSeries(prices, true);
 
@@ -22,7 +23,8 @@ double GetPriceValue(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType
 	return 0.0;
 }
 
-bool GetPriceValues(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType, int shift, int count, double &prices[]) {
+bool GetPriceValues(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType,
+		    int shift, int count, double &prices[]) {
 	int copied = 0;
 
 	if (priceType == PRICE_OPEN)

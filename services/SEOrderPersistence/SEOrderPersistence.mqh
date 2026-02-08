@@ -20,15 +20,18 @@ private:
 		string strategyPath = symbolPath + "/" + strategyName;
 		string ordersPath = strategyPath + "/orders";
 
-		int handle = FileOpen(symbolPath + "/.keep", FILE_WRITE | FILE_TXT | FILE_COMMON);
+		int handle = FileOpen(symbolPath + "/.keep",
+				      FILE_WRITE | FILE_TXT | FILE_COMMON);
 		if (handle != INVALID_HANDLE)
 			FileClose(handle);
 
-		handle = FileOpen(strategyPath + "/.keep", FILE_WRITE | FILE_TXT | FILE_COMMON);
+		handle = FileOpen(strategyPath + "/.keep",
+				  FILE_WRITE | FILE_TXT | FILE_COMMON);
 		if (handle != INVALID_HANDLE)
 			FileClose(handle);
 
-		handle = FileOpen(ordersPath + "/.keep", FILE_WRITE | FILE_TXT | FILE_COMMON);
+		handle = FileOpen(ordersPath + "/.keep",
+				  FILE_WRITE | FILE_TXT | FILE_COMMON);
 		if (handle != INVALID_HANDLE) {
 			FileClose(handle);
 			return true;
@@ -66,8 +69,10 @@ private:
 		order.SetOpenAtPrice(json.getNumber("open_at_price"));
 		order.SetOpenPrice(json.getNumber("open_price"));
 
-		SDateTime signalAt = dtime.FromTimestamp((datetime)json.getNumber("signal_at"));
-		SDateTime openAt = dtime.FromTimestamp((datetime)json.getNumber("open_at"));
+		SDateTime signalAt =
+			dtime.FromTimestamp((datetime)json.getNumber("signal_at"));
+		SDateTime openAt =
+			dtime.FromTimestamp((datetime)json.getNumber("open_at"));
 		order.SetSignalAt(signalAt);
 		order.SetOpenAt(openAt);
 
@@ -76,7 +81,8 @@ private:
 
 	string GetOrderFilePath(string strategyName, string orderId) {
 		string safeOrderId = SanitizeFileName(orderId);
-		return basePath + "/" + _Symbol + "/" + strategyName + "/orders/" + safeOrderId + ".json";
+		return basePath + "/" + _Symbol + "/" + strategyName + "/orders/" +
+		       safeOrderId + ".json";
 	}
 
 	string GetStrategyOrdersPath(string strategyName) {
@@ -145,7 +151,8 @@ public:
 		if (!FileDelete(filePath, FILE_COMMON)) {
 			int error = GetLastError();
 			if (error != ERR_FILE_NOT_EXIST) {
-				logger.error(" Cannot delete order file: " + filePath + " Error: " + IntegerToString(error));
+				logger.error(" Cannot delete order file: " + filePath +
+					     " Error: " + IntegerToString(error));
 				return false;
 			}
 		}
@@ -176,7 +183,8 @@ public:
 		do {
 			processedFiles++;
 
-			if (StringFind(fileName, "._") == 0 || StringFind(fileName, ".") == 0) {
+			if (StringFind(fileName, "._") == 0 || StringFind(fileName,
+									  ".") == 0) {
 				logger.info("Skipping system file: " + fileName);
 				continue;
 			}
@@ -188,7 +196,9 @@ public:
 
 			logger.info("Processing order file: " + fileName);
 			string fullPath = ordersPath + fileName;
-			int handle = FileOpen(fullPath, FILE_READ | FILE_TXT | FILE_COMMON | FILE_ANSI);
+			int handle = FileOpen(fullPath,
+					      FILE_READ | FILE_TXT | FILE_COMMON |
+					      FILE_ANSI);
 
 			if (handle != INVALID_HANDLE) {
 				string jsonData = "";
@@ -199,23 +209,33 @@ public:
 				EOrder order;
 				if (DeserializeOrder(jsonData, order)) {
 					if (ValidateOrderExists(order)) {
-						ArrayResize(restoredOrders, ArraySize(restoredOrders) + 1);
+						ArrayResize(restoredOrders,
+							    ArraySize(restoredOrders) + 1);
 						restoredOrders[ArraySize(restoredOrders) - 1] = order;
 						loadedCount++;
-						logger.info("Order loaded successfully: " + order.GetId() + " (Status: " + EnumToString(order.GetStatus()) + ")");
+						logger.info("Order loaded successfully: " +
+							    order.GetId() + " (Status: " +
+							    EnumToString(order.GetStatus()) + ")");
 					} else {
-						logger.warning(" Order no longer exists in MetaTrader, cleaning up: " + order.GetId());
+						logger.warning(
+							" Order no longer exists in MetaTrader, cleaning up: "
+							+ order.GetId());
 						DeleteOrderJson(strategyName, order.GetId());
 					}
 				} else {
-					logger.error("CRITICAL ERROR: Failed to deserialize order from: " + fileName);
-					logger.info("JSON data length: " + IntegerToString(StringLen(jsonData)));
-					logger.info("First 100 chars: " + StringSubstr(jsonData, 0, 100));
+					logger.error(
+						"CRITICAL ERROR: Failed to deserialize order from: " +
+						fileName);
+					logger.info("JSON data length: " +
+						    IntegerToString(StringLen(jsonData)));
+					logger.info("First 100 chars: " + StringSubstr(jsonData, 0,
+										       100));
 					FileFindClose(searchHandle);
 					return -1;
 				}
 			} else {
-				logger.error("CRITICAL ERROR: Cannot open file: " + fileName + " Error: " + IntegerToString(GetLastError()));
+				logger.error("CRITICAL ERROR: Cannot open file: " + fileName +
+					     " Error: " + IntegerToString(GetLastError()));
 				FileFindClose(searchHandle);
 				return -1;
 			}
@@ -223,7 +243,8 @@ public:
 
 		FileFindClose(searchHandle);
 
-		logger.info("Order restoration completed for strategy: " + strategyName);
+		logger.info("Order restoration completed for strategy: " +
+			    strategyName);
 		logger.info("Files processed: " + IntegerToString(processedFiles));
 		logger.info("Orders loaded: " + IntegerToString(loadedCount));
 		return loadedCount;
@@ -234,16 +255,19 @@ public:
 			return true;
 
 		if (!CreateDirectoryStructure(order.GetSource())) {
-			logger.error("Cannot create directory structure for strategy: " + order.GetSource());
+			logger.error("Cannot create directory structure for strategy: " +
+				     order.GetSource());
 			return false;
 		}
 
 		string filePath = GetOrderFilePath(order.GetSource(), order.GetId());
 		string jsonData = SerializeOrder(order);
 
-		int handle = FileOpen(filePath, FILE_WRITE | FILE_TXT | FILE_COMMON | FILE_ANSI);
+		int handle = FileOpen(filePath,
+				      FILE_WRITE | FILE_TXT | FILE_COMMON | FILE_ANSI);
 		if (handle == INVALID_HANDLE) {
-			logger.error(" Cannot create order file: " + filePath + " Error: " + IntegerToString(GetLastError()));
+			logger.error(" Cannot create order file: " + filePath + " Error: " +
+				     IntegerToString(GetLastError()));
 			return false;
 		}
 

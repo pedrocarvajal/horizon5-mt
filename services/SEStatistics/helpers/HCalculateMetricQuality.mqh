@@ -1,7 +1,8 @@
 #ifndef __H_CALCULATE_METRIC_QUALITY_MQH__
 #define __H_CALCULATE_METRIC_QUALITY_MQH__
 
-double calculateMetricQuality(double currentValue, double expectedValue, double thresholdValue, bool higherIsBetter) {
+double calculateMetricQuality(double currentValue, double expectedValue,
+			      double thresholdValue, bool higherIsBetter) {
 	if (higherIsBetter) {
 		if (currentValue < thresholdValue)
 			return 0;
@@ -9,7 +10,8 @@ double calculateMetricQuality(double currentValue, double expectedValue, double 
 		if (currentValue >= expectedValue)
 			return 1;
 
-		return (currentValue - thresholdValue) / (expectedValue - thresholdValue);
+		return (currentValue - thresholdValue) /
+		       (expectedValue - thresholdValue);
 	} else {
 		if (currentValue > thresholdValue)
 			return 0;
@@ -17,7 +19,8 @@ double calculateMetricQuality(double currentValue, double expectedValue, double 
 		if (currentValue <= expectedValue)
 			return 1;
 
-		return (thresholdValue - currentValue) / (thresholdValue - expectedValue);
+		return (thresholdValue - currentValue) /
+		       (thresholdValue - expectedValue);
 	}
 }
 

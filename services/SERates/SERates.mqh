@@ -12,14 +12,16 @@ public:
 		logger.SetPrefix("SERates");
 	}
 
-	int Get(string symbol, ENUM_TIMEFRAMES timeframe, MqlDateTime &fromDate, MqlDateTime &toDate, MqlRates &candles[]) {
+	int Get(string symbol, ENUM_TIMEFRAMES timeframe, MqlDateTime &fromDate,
+		MqlDateTime &toDate, MqlRates &candles[]) {
 		ArrayFree(candles);
 		ArraySetAsSeries(candles, true);
 
 		datetime startTime = StructToTime(fromDate);
 		datetime endTime = StructToTime(toDate);
 
-		int wasCopied = CopyRates(symbol, timeframe, startTime, endTime, candles);
+		int wasCopied = CopyRates(symbol, timeframe, startTime, endTime,
+					  candles);
 
 		if (wasCopied <= 0) {
 			logger.error("Failed to copy rates for " + symbol);
