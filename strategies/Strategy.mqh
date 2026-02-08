@@ -121,29 +121,37 @@ public:
 		}
 
 		if (symbol == "") {
-			logger.error("Symbol not defined for strategy: " + name);
+			logger.error(StringFormat(
+				"Symbol not defined for strategy: %s",
+				name));
 			return INIT_FAILED;
 		}
 
 		if (prefix == "") {
-			logger.error("Prefix not defined for strategy: " + name);
+			logger.error(StringFormat(
+				"Prefix not defined for strategy: %s",
+				name));
 			return INIT_FAILED;
 		}
 
 		if (strategyMagicNumber == 0) {
-			logger.error("Magic number not defined for strategy: " + name);
+			logger.error(StringFormat(
+				"Magic number not defined for strategy: %s",
+				name));
 			return INIT_FAILED;
 		}
 
 		if (balance <= 0) {
-			logger.error("Balance not defined for strategy: " + name);
+			logger.error(StringFormat(
+				"Balance not defined for strategy: %s",
+				name));
 			return INIT_FAILED;
 		}
 
 		if (!SymbolSelect(symbol, true)) {
 			logger.error(StringFormat(
-					     "Symbol '%s' does not exist or cannot be selected",
-					     symbol));
+				"Symbol '%s' does not exist or cannot be selected",
+				symbol));
 			return INIT_FAILED;
 		}
 
@@ -229,7 +237,7 @@ public:
 
 		double currentPrice = (side ==
 				       ORDER_TYPE_BUY) ? SymbolInfoDouble(symbol,
-									  SYMBOL_ASK) :
+			SYMBOL_ASK) :
 				      SymbolInfoDouble(symbol, SYMBOL_BID);
 
 		order.SetStatus(ORDER_STATUS_PENDING);
@@ -263,7 +271,7 @@ public:
 			   ENUM_ORDER_TYPE side = ORDER_TYPE_ANY,
 			   ENUM_ORDER_STATUSES status = ORDER_STATUS_ANY) {
 		filterOrders(resultOrders, side, status, ORDER_STATUS_OPEN,
-			     ORDER_STATUS_PENDING);
+			ORDER_STATUS_PENDING);
 	}
 
 	int GetOrdersCount() {
@@ -385,9 +393,9 @@ public:
 	}
 
 	string GetObjectName(string objectName) {
-		string result = GetSymbol() + "_" + GetPrefix() + "_" + GetName() +
-				"_" + objectName + "_" +
-				IntegerToString(GetMagicNumber());
+		string result = StringFormat("%s_%s_%s_%s_%s",
+			GetSymbol(), GetPrefix(), GetName(),
+			objectName, IntegerToString(GetMagicNumber()));
 		StringToUpper(result);
 		return result;
 	}

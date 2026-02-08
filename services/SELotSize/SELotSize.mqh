@@ -29,8 +29,8 @@ public:
 
 		double result = nav / marginPerLot;
 		logger.info(StringFormat(
-				    "CalculateByCapital: nav=%.2f, marginPerLot=%.2f, lotSize=%.4f",
-				    nav, marginPerLot, result));
+			"CalculateByCapital: nav=%.2f, marginPerLot=%.2f, lotSize=%.4f",
+			nav, marginPerLot, result));
 
 		return result;
 	}
@@ -63,9 +63,9 @@ public:
 		double result = riskAmount / dollarVolatility;
 
 		logger.info(StringFormat(
-				    "CalculateByVolatility: nav=%.2f, ATR=%.5f, equityAtRisk=%.2f, dollarVol=%.2f, riskAmt=%.2f, lotSize=%.4f",
-				    nav, atrValue, equityAtRisk, dollarVolatility,
-				    riskAmount, result));
+			"CalculateByVolatility: nav=%.2f, ATR=%.5f, equityAtRisk=%.2f, dollarVol=%.2f, riskAmt=%.2f, lotSize=%.4f",
+			nav, atrValue, equityAtRisk, dollarVolatility,
+			riskAmount, result));
 
 		return result;
 	}

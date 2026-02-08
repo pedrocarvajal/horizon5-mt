@@ -7,6 +7,7 @@
 #include "../SEDateTime/SEDateTime.mqh"
 #include "../SEDateTime/structs/SDateTime.mqh"
 
+
 extern SEDateTime dtime;
 
 class SEReportOfOrderHistory {
@@ -26,9 +27,8 @@ private:
 		obj.setProperty("status", (int)history.status);
 		obj.setProperty("side", history.side);
 		obj.setProperty("order_close_reason", (int)history.orderCloseReason);
-		obj.setProperty("main_take_profit_at_price",
-				history.mainTakeProfitAtPrice);
-		obj.setProperty("main_stop_loss_at_price", history.mainStopLossAtPrice);
+		obj.setProperty("main_take_profit_at_price", history.takeProfitPrice);
+		obj.setProperty("main_stop_loss_at_price", history.stopLossPrice);
 		obj.setProperty("signal_at", (long)history.signalAt);
 		obj.setProperty("open_time", (long)history.openTime);
 		obj.setProperty("open_price", history.openPrice);
@@ -40,11 +40,15 @@ private:
 		return obj;
 	}
 
-	JSON::Array *OrderHistoryArrayToJsonArray(const SSOrderHistory &histories[],
-						  int count) {
+	JSON::Array *OrderHistoryArrayToJsonArray(
+		const SSOrderHistory &histories[],
+		int count
+	) {
 		JSON::Array *arr = new JSON::Array();
+
 		for (int i = 0; i < count; i++)
 			arr.add(OrderHistoryToJson(histories[i]));
+
 		return arr;
 	}
 
@@ -52,11 +56,7 @@ public:
 	SEReportOfOrderHistory() {
 		logger.SetPrefix("OrderHistoryReporter");
 
-		SDateTime dt = dtime.Now();
-		string timestamp = StringFormat("%04d%02d%02d_%02d%02d%02d", dt.year,
-						dt.month, dt.day, dt.hour, dt.minute,
-						dt.second);
-		reportsDir = "/Reports/" + _Symbol + "/" + timestamp;
+		reportsDir = StringFormat("/Reports/%s/%s", _Symbol, dtime.Timestamp());
 		useCommonFiles = false;
 		ArrayResize(orderHistory, 0);
 	}
@@ -79,54 +79,58 @@ public:
 		root.setProperty("name", "Orders Report");
 
 		if (ArraySize(orderHistory) == 0) {
-			logger.warning(
-				"No order history data to export - creating empty report");
+			logger.warning("No order history data to export - creating empty report");
 			JSON::Array *emptyArray = new JSON::Array();
 			root.setProperty("data", emptyArray);
 		} else {
-			root.setProperty("data",
-					 OrderHistoryArrayToJsonArray(orderHistory,
-								      ArraySize(
-									      orderHistory)));
+			root.setProperty("data", OrderHistoryArrayToJsonArray(orderHistory, ArraySize(orderHistory)));
 		}
 
 		string jsonStr = root.toString();
-		string filename = reportsDir + "/OrdersReport.json";
-
+		string filename = StringFormat("%s/OrdersReport.json", reportsDir);
 		int flags = FILE_WRITE | FILE_TXT | FILE_ANSI;
+
 		if (useCommonFiles)
 			flags |= FILE_COMMON;
 
-		logger.debug("Attempting to create order history file: " + filename);
-		logger.debug("Full path: " + GetCurrentReportsPath() +
-			     "\\OrdersReport.json");
-		logger.debug("Orders to export: " +
-			     IntegerToString(ArraySize(orderHistory)));
+		logger.debug(StringFormat("Attempting to create order history file: %s", filename));
+		logger.debug(StringFormat("Full path: %s\\OrdersReport.json", GetCurrentReportsPath()));
+		logger.debug(StringFormat("Orders to export: %d", ArraySize(orderHistory)));
 
 		int file = FileOpen(filename, flags);
 
 		if (file == INVALID_HANDLE) {
 			int errorCode = GetLastError();
-			logger.error("Cannot create order history file '" + filename +
-				     "' - Error code: " + IntegerToString(errorCode));
-			logger.error("Flags used: " + IntegerToString(flags) +
-				     " (FILE_WRITE=" + IntegerToString(FILE_WRITE) +
-				     ", FILE_TXT=" + IntegerToString(FILE_TXT) +
-				     ", FILE_ANSI=" + IntegerToString(FILE_ANSI) +
-				     ", FILE_COMMON=" + IntegerToString(FILE_COMMON) + ")");
+
+			logger.error(StringFormat(
+				"Cannot create order history file '%s' - Error code: %d",
+				filename,
+				errorCode
+			));
+
+			logger.error(StringFormat(
+				"Flags used: %d (FILE_WRITE=%d, FILE_TXT=%d, FILE_ANSI=%d, FILE_COMMON=%d)",
+				flags,
+				FILE_WRITE,
+				FILE_TXT,
+				FILE_ANSI,
+				FILE_COMMON
+			));
 		} else {
 			FileWriteString(file, jsonStr);
 			FileClose(file);
-			logger.info("Order history saved - OrdersReport.json with " +
-				    IntegerToString(ArraySize(orderHistory)) + " orders");
+
+			logger.info(StringFormat(
+				"Order history saved - OrdersReport.json with %d orders",
+				ArraySize(orderHistory)
+			));
 		}
 
 		delete root;
 	}
 
 	void PrintCurrentPath() {
-		logger.info("Order history reports saved to: " +
-			    GetCurrentReportsPath());
+		logger.info(StringFormat("Order history reports saved to: %s", GetCurrentReportsPath()));
 	}
 
 	int GetOrderCount() {
@@ -138,12 +142,20 @@ public:
 		string convertedDir = reportsDir;
 		StringReplace(convertedDir, "/", pathSeparator);
 
-		if (useCommonFiles)
-			return TerminalInfoString(TERMINAL_COMMONDATA_PATH) +
-			       pathSeparator + "Files" + convertedDir;
-		else
-			return TerminalInfoString(TERMINAL_DATA_PATH) + pathSeparator +
-			       "MQL5" + pathSeparator + "Files" + convertedDir;
+		if (useCommonFiles) {
+			return StringFormat("%s%sFiles%s",
+				TerminalInfoString(TERMINAL_COMMONDATA_PATH),
+				pathSeparator,
+				convertedDir
+			);
+		} else {
+			return StringFormat("%s%sMQL5%sFiles%s",
+				TerminalInfoString(TERMINAL_DATA_PATH),
+				pathSeparator,
+				pathSeparator,
+				convertedDir
+			);
+		}
 	}
 };
 
