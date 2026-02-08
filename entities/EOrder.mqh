@@ -123,19 +123,23 @@ public:
 
 private:
 	void Snapshot() {
-		snapshot.openTime = signalAt.timestamp;
-		snapshot.openPrice = signalPrice;
-		snapshot.openLot = volume;
 		snapshot.orderId = GetId();
-		snapshot.side = side;
-		snapshot.magicNumber = magicNumber;
+		snapshot.symbol = symbol;
 		snapshot.strategyName = source;
 		snapshot.strategyPrefix = source;
+		snapshot.magicNumber = magicNumber;
+		snapshot.dealId = GetDealId();
+		snapshot.positionId = GetPositionId();
 		snapshot.status = status;
+		snapshot.side = side;
 		snapshot.orderCloseReason = orderCloseReason;
 		snapshot.takeProfitPrice = takeProfitPrice;
 		snapshot.stopLossPrice = stopLossPrice;
 		snapshot.signalAt = signalAt.timestamp;
+		snapshot.signalPrice = signalPrice;
+		snapshot.openTime = openAt.timestamp;
+		snapshot.openPrice = openPrice;
+		snapshot.openLot = volume;
 		snapshot.closeTime = closeAt.timestamp;
 		snapshot.closePrice = closePrice;
 		snapshot.profitInDollars = profitInDollars;
@@ -230,7 +234,7 @@ public:
 		if (marketStatus.isClosed) {
 			retryAfter = currentTime + marketStatus.opensInSeconds;
 			logger.info(StringFormat(
-				"-------- [%s] Open pending: Market closed, will retry in %d seconds",
+				"[%s] Open pending: Market closed, will retry in %d seconds",
 				GetId(),
 				marketStatus.opensInSeconds
 			));

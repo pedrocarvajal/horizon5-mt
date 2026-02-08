@@ -18,8 +18,6 @@ private:
 	bool enabled;
 	double balance;
 
-	static const double GEOMETRIC_MEAN_EXPONENT;
-
 protected:
 	string symbol;
 
@@ -36,19 +34,22 @@ public:
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			if (CheckPointer(strategies[i]) != POINTER_DYNAMIC)
 				continue;
+
 			delete strategies[i];
 		}
 	}
 
 	virtual int OnInit() {
+		int strategyCount = ArraySize(strategies);
+
 		if (!enabled) {
 			logger.info(StringFormat(
 				"Asset skipped (disabled): %s",
-				name));
+				name
+			));
+
 			return INIT_SUCCEEDED;
 		}
-
-		int strategyCount = ArraySize(strategies);
 
 		if (strategyCount == 0) {
 			logger.error(StringFormat(
@@ -76,7 +77,12 @@ public:
 
 		logger.info(StringFormat(
 			"%s initialized | symbol: %s | strategies: %d | weight: %.4f | balance: %.2f",
-			name, symbol, strategyCount, weight, balance));
+			name,
+			symbol,
+			strategyCount,
+			weight,
+			balance
+		));
 
 		return INIT_SUCCEEDED;
 	}
@@ -94,8 +100,6 @@ public:
 	}
 
 	virtual void OnStartMinute() {
-		logger.info("OnMinute()");
-
 		for (int i = 0; i < ArraySize(strategies); i++)
 			strategies[i].OnStartMinute();
 	}
@@ -152,7 +156,13 @@ public:
 		strategy.SetAsset(GetPointer(this));
 		strategy.SetSymbol(symbol);
 		strategy.SetMagicNumber(StringToNumber(
-			StringFormat("%s_%s_%s", symbol, name, strategy.GetName())));
+			StringFormat(
+				"%s_%s_%s",
+				symbol,
+				name,
+				strategy.GetName()
+			)
+		));
 
 		ArrayResize(strategies, ArraySize(strategies) + 1);
 		strategies[ArraySize(strategies) - 1] = strategy;
@@ -167,21 +177,27 @@ public:
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].GetStatistics().OnForceEnd();
+
 			double strategyQuality =
 				strategies[i].GetStatistics().GetQuality().quality;
 
 			if (strategyQuality == 0)
 				return 0;
 
-			quality = MathPow(quality * strategyQuality,
-				GEOMETRIC_MEAN_EXPONENT);
+			quality = MathPow(
+				quality * strategyQuality,
+				0.5
+			);
 		}
 
 		return quality;
 	}
 
-	bool FindOrderByOrderId(ulong orderId, int &strategyIndex,
-				int &orderIndex) {
+	bool FindOrderByOrderId(
+		ulong orderId,
+		int &strategyIndex,
+		int &orderIndex
+	) {
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			int idx = strategies[i].FindOrderIndexByOrderId(orderId);
 
@@ -195,8 +211,11 @@ public:
 		return false;
 	}
 
-	bool FindOrderByPositionId(ulong positionId, int &strategyIndex,
-				   int &orderIndex) {
+	bool FindOrderByPositionId(
+		ulong positionId,
+		int &strategyIndex,
+		int &orderIndex
+	) {
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			int idx = strategies[i].FindOrderIndexByPositionId(positionId);
 
@@ -270,7 +289,5 @@ public:
 		return enabled;
 	}
 };
-
-const double SEAsset::GEOMETRIC_MEAN_EXPONENT = 0.5;
 
 #endif

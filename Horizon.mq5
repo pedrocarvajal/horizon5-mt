@@ -39,6 +39,7 @@ int lastStartWeekYday = -1;
 int lastEndWeekYday = -1;
 
 int OnInit() {
+	TesterHideIndicators(true);
 	EventSetTimer(1);
 
 	// Variables
@@ -51,7 +52,7 @@ int OnInit() {
 	lastCheckedMonth = dtime.Today().month;
 	lastCheckedWeek = dtime.Now().dayOfWeek;
 
-	string timestampedReportsDir = StringFormat("/Reports/%s/%s", _Symbol, dtime.Timestamp());
+	string timestampedReportsDir = StringFormat("/Reports/%s/%s", _Symbol, TimeToString(dtime.Timestamp(), TIME_DATE));
 
 	if (EnableOrderHistoryReport)
 		orderHistoryReporter = new SEReportOfOrderHistory(timestampedReportsDir, true);
