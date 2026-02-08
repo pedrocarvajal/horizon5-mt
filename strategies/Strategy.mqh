@@ -46,13 +46,15 @@ private:
 		ArrayResize(resultOrders, 0);
 
 		for (int i = 0; i < ArraySize(orders); i++) {
-			bool isSideMatch = (side == ORDER_TYPE_ANY) || (orders[i].GetSide() == side);
+			bool isSideMatch = (side == ORDER_TYPE_ANY) ||
+					   (orders[i].GetSide() == side);
 			bool isStatusMatch = false;
 
 			if (status == ORDER_STATUS_ANY) {
 				isStatusMatch = (orders[i].GetStatus() == defaultStatus1);
 				if (defaultStatus2 != ORDER_STATUS_ANY)
-					isStatusMatch = isStatusMatch || (orders[i].GetStatus() == defaultStatus2);
+					isStatusMatch = isStatusMatch ||
+							(orders[i].GetStatus() == defaultStatus2);
 			} else {
 				isStatusMatch = (orders[i].GetStatus() == status);
 			}
@@ -66,12 +68,14 @@ private:
 
 	bool validateTradingMode(ENUM_ORDER_TYPE side) {
 		if (tradingMode == TRADING_MODE_BUY_ONLY && side == ORDER_TYPE_SELL) {
-			logger.warning("Order blocked: Trading mode is BUY_ONLY, cannot open SELL order");
+			logger.warning(
+				"Order blocked: Trading mode is BUY_ONLY, cannot open SELL order");
 			return false;
 		}
 
 		if (tradingMode == TRADING_MODE_SELL_ONLY && side == ORDER_TYPE_BUY) {
-			logger.warning("Order blocked: Trading mode is SELL_ONLY, cannot open BUY order");
+			logger.warning(
+				"Order blocked: Trading mode is SELL_ONLY, cannot open BUY order");
 			return false;
 		}
 
@@ -137,7 +141,9 @@ public:
 		}
 
 		if (!SymbolSelect(symbol, true)) {
-			logger.error(StringFormat("Symbol '%s' does not exist or cannot be selected", symbol));
+			logger.error(StringFormat(
+					     "Symbol '%s' does not exist or cannot be selected",
+					     symbol));
 			return INIT_FAILED;
 		}
 
@@ -215,13 +221,16 @@ public:
 		bool isMarketOrder = true,
 		double takeProfit = 0,
 		double stopLoss = 0
-		) {
+	) {
 		if (!validateTradingMode(side))
 			return NULL;
 
 		EOrder *order = new EOrder(strategyMagicNumber, symbol);
 
-		double currentPrice = (side == ORDER_TYPE_BUY) ? SymbolInfoDouble(symbol, SYMBOL_ASK) : SymbolInfoDouble(symbol, SYMBOL_BID);
+		double currentPrice = (side ==
+				       ORDER_TYPE_BUY) ? SymbolInfoDouble(symbol,
+									  SYMBOL_ASK) :
+				      SymbolInfoDouble(symbol, SYMBOL_BID);
 
 		order.SetStatus(ORDER_STATUS_PENDING);
 		order.SetSource(prefix);
@@ -250,8 +259,11 @@ public:
 		return order;
 	}
 
-	void GetOpenOrders(EOrder& resultOrders[], ENUM_ORDER_TYPE side = ORDER_TYPE_ANY, ENUM_ORDER_STATUSES status = ORDER_STATUS_ANY) {
-		filterOrders(resultOrders, side, status, ORDER_STATUS_OPEN, ORDER_STATUS_PENDING);
+	void GetOpenOrders(EOrder& resultOrders[],
+			   ENUM_ORDER_TYPE side = ORDER_TYPE_ANY,
+			   ENUM_ORDER_STATUSES status = ORDER_STATUS_ANY) {
+		filterOrders(resultOrders, side, status, ORDER_STATUS_OPEN,
+			     ORDER_STATUS_PENDING);
 	}
 
 	int GetOrdersCount() {
@@ -307,7 +319,8 @@ public:
 		int activeCount = 0;
 
 		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetStatus() != ORDER_STATUS_CLOSED && orders[i].GetStatus() != ORDER_STATUS_CANCELLED) {
+			if (orders[i].GetStatus() != ORDER_STATUS_CLOSED &&
+			    orders[i].GetStatus() != ORDER_STATUS_CANCELLED) {
 				ArrayResize(activeOrders, activeCount + 1);
 				activeOrders[activeCount] = orders[i];
 				activeCount++;
@@ -340,16 +353,19 @@ public:
 	}
 
 	double GetLotSizeByCapital() {
-		double nav = EquityAtRiskCompounded ? statistics.GetNav() : statistics.GetInitialBalance();
+		double nav =
+			EquityAtRiskCompounded ? statistics.GetNav() :
+			statistics.GetInitialBalance();
 		return lotSize.CalculateByCapital(nav * EquityAtRisk / 100.0);
 	}
 
 	double GetLotSizeByVolatility(double atrValue, double equityAtRisk) {
 		return lotSize.CalculateByVolatility(
-			EquityAtRiskCompounded ? statistics.GetNav() : statistics.GetInitialBalance(),
+			EquityAtRiskCompounded ? statistics.GetNav() :
+			statistics.GetInitialBalance(),
 			atrValue,
 			equityAtRisk
-			);
+		);
 	}
 
 	ulong GetMagicNumber() {
@@ -369,7 +385,9 @@ public:
 	}
 
 	string GetObjectName(string objectName) {
-		string result = GetSymbol() + "_" + GetPrefix() + "_" + GetName() + "_" + objectName + "_" + IntegerToString(GetMagicNumber());
+		string result = GetSymbol() + "_" + GetPrefix() + "_" + GetName() +
+				"_" + objectName + "_" +
+				IntegerToString(GetMagicNumber());
 		StringToUpper(result);
 		return result;
 	}

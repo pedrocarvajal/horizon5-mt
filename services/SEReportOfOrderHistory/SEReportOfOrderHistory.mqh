@@ -26,7 +26,8 @@ private:
 		obj.setProperty("status", (int)history.status);
 		obj.setProperty("side", history.side);
 		obj.setProperty("order_close_reason", (int)history.orderCloseReason);
-		obj.setProperty("main_take_profit_at_price", history.mainTakeProfitAtPrice);
+		obj.setProperty("main_take_profit_at_price",
+				history.mainTakeProfitAtPrice);
 		obj.setProperty("main_stop_loss_at_price", history.mainStopLossAtPrice);
 		obj.setProperty("signal_at", (long)history.signalAt);
 		obj.setProperty("open_time", (long)history.openTime);
@@ -39,7 +40,8 @@ private:
 		return obj;
 	}
 
-	JSON::Array *OrderHistoryArrayToJsonArray(const SSOrderHistory &histories[], int count) {
+	JSON::Array *OrderHistoryArrayToJsonArray(const SSOrderHistory &histories[],
+						  int count) {
 		JSON::Array *arr = new JSON::Array();
 		for (int i = 0; i < count; i++)
 			arr.add(OrderHistoryToJson(histories[i]));
@@ -51,7 +53,9 @@ public:
 		logger.SetPrefix("OrderHistoryReporter");
 
 		SDateTime dt = dtime.Now();
-		string timestamp = StringFormat("%04d%02d%02d_%02d%02d%02d", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+		string timestamp = StringFormat("%04d%02d%02d_%02d%02d%02d", dt.year,
+						dt.month, dt.day, dt.hour, dt.minute,
+						dt.second);
 		reportsDir = "/Reports/" + _Symbol + "/" + timestamp;
 		useCommonFiles = false;
 		ArrayResize(orderHistory, 0);
@@ -75,11 +79,15 @@ public:
 		root.setProperty("name", "Orders Report");
 
 		if (ArraySize(orderHistory) == 0) {
-			logger.warning("No order history data to export - creating empty report");
+			logger.warning(
+				"No order history data to export - creating empty report");
 			JSON::Array *emptyArray = new JSON::Array();
 			root.setProperty("data", emptyArray);
 		} else {
-			root.setProperty("data", OrderHistoryArrayToJsonArray(orderHistory, ArraySize(orderHistory)));
+			root.setProperty("data",
+					 OrderHistoryArrayToJsonArray(orderHistory,
+								      ArraySize(
+									      orderHistory)));
 		}
 
 		string jsonStr = root.toString();
@@ -90,26 +98,35 @@ public:
 			flags |= FILE_COMMON;
 
 		logger.debug("Attempting to create order history file: " + filename);
-		logger.debug("Full path: " + GetCurrentReportsPath() + "\\OrdersReport.json");
-		logger.debug("Orders to export: " + IntegerToString(ArraySize(orderHistory)));
+		logger.debug("Full path: " + GetCurrentReportsPath() +
+			     "\\OrdersReport.json");
+		logger.debug("Orders to export: " +
+			     IntegerToString(ArraySize(orderHistory)));
 
 		int file = FileOpen(filename, flags);
 
 		if (file == INVALID_HANDLE) {
 			int errorCode = GetLastError();
-			logger.error("Cannot create order history file '" + filename + "' - Error code: " + IntegerToString(errorCode));
-			logger.error("Flags used: " + IntegerToString(flags) + " (FILE_WRITE=" + IntegerToString(FILE_WRITE) + ", FILE_TXT=" + IntegerToString(FILE_TXT) + ", FILE_ANSI=" + IntegerToString(FILE_ANSI) + ", FILE_COMMON=" + IntegerToString(FILE_COMMON) + ")");
+			logger.error("Cannot create order history file '" + filename +
+				     "' - Error code: " + IntegerToString(errorCode));
+			logger.error("Flags used: " + IntegerToString(flags) +
+				     " (FILE_WRITE=" + IntegerToString(FILE_WRITE) +
+				     ", FILE_TXT=" + IntegerToString(FILE_TXT) +
+				     ", FILE_ANSI=" + IntegerToString(FILE_ANSI) +
+				     ", FILE_COMMON=" + IntegerToString(FILE_COMMON) + ")");
 		} else {
 			FileWriteString(file, jsonStr);
 			FileClose(file);
-			logger.info("Order history saved - OrdersReport.json with " + IntegerToString(ArraySize(orderHistory)) + " orders");
+			logger.info("Order history saved - OrdersReport.json with " +
+				    IntegerToString(ArraySize(orderHistory)) + " orders");
 		}
 
 		delete root;
 	}
 
 	void PrintCurrentPath() {
-		logger.info("Order history reports saved to: " + GetCurrentReportsPath());
+		logger.info("Order history reports saved to: " +
+			    GetCurrentReportsPath());
 	}
 
 	int GetOrderCount() {
@@ -122,9 +139,11 @@ public:
 		StringReplace(convertedDir, "/", pathSeparator);
 
 		if (useCommonFiles)
-			return TerminalInfoString(TERMINAL_COMMONDATA_PATH) + pathSeparator + "Files" + convertedDir;
+			return TerminalInfoString(TERMINAL_COMMONDATA_PATH) +
+			       pathSeparator + "Files" + convertedDir;
 		else
-			return TerminalInfoString(TERMINAL_DATA_PATH) + pathSeparator + "MQL5" + pathSeparator + "Files" + convertedDir;
+			return TerminalInfoString(TERMINAL_DATA_PATH) + pathSeparator +
+			       "MQL5" + pathSeparator + "Files" + convertedDir;
 	}
 };
 

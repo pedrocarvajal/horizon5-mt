@@ -1,6 +1,6 @@
 #property copyright "Horizon, by Pedro Carvajal"
 #property version "1.00"
-#property description "Horizon is an advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization. Built for professional traders seeking systematic, data-driven market execution with robust risk management."
+#property description "Horizon is an advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 #property description "Horizon is developed with MQL5."
 
 input group "General Settings";
@@ -52,7 +52,9 @@ int OnInit() {
 	lastCheckedWeek = dtime.Now().dayOfWeek;
 
 	SDateTime dt = dtime.Now();
-	string timestamp = StringFormat("%04d%02d%02d_%02d%02d%02d", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+	string timestamp = StringFormat("%04d%02d%02d_%02d%02d%02d", dt.year,
+					dt.month, dt.day, dt.hour, dt.minute,
+					dt.second);
 	string timestampedReportsDir = "/Reports/" + _Symbol + "/" + timestamp;
 
 	if (EnableOrderHistoryReport)
@@ -72,7 +74,8 @@ int OnInit() {
 
 	for (int i = 0; i < assetCount; i++) {
 		assets[i].SetWeight(weightPerAsset);
-		assets[i].SetBalance(AccountInfoDouble(ACCOUNT_BALANCE) * weightPerAsset);
+		assets[i].SetBalance(AccountInfoDouble(ACCOUNT_BALANCE) *
+				     weightPerAsset);
 
 		int result = assets[i].OnInit();
 
@@ -86,12 +89,15 @@ int OnInit() {
 	for (int i = 0; i < assetCount; i++) {
 		for (int j = 0; j < ArraySize(assets[i].strategies); j++) {
 			ulong currentMagic = assets[i].strategies[j].GetMagicNumber();
-			string currentSource = assets[i].GetSymbol() + "/" + assets[i].strategies[j].GetPrefix();
+			string currentSource = assets[i].GetSymbol() + "/" +
+					       assets[i].strategies[j].GetPrefix();
 
 			for (int k = 0; k < ArraySize(magicNumbers); k++) {
 				if (magicNumbers[k] == currentMagic) {
-					hlogger.error("Duplicate magic number detected: " + IntegerToString(currentMagic));
-					hlogger.error("Conflict between: " + magicSources[k] + " and " + currentSource);
+					hlogger.error("Duplicate magic number detected: " +
+						      IntegerToString(currentMagic));
+					hlogger.error("Conflict between: " + magicSources[k] +
+						      " and " + currentSource);
 					return INIT_FAILED;
 				}
 			}
@@ -105,7 +111,8 @@ int OnInit() {
 	}
 
 	if (ArraySize(magicNumbers) == 0) {
-		hlogger.error("No strategies enabled. Enable at least one strategy to start.");
+		hlogger.error(
+			"No strategies enabled. Enable at least one strategy to start.");
 		return INIT_FAILED;
 	}
 
@@ -121,11 +128,16 @@ int OnInit() {
 				hlogger.info("Processing strategy: " + strategyPrefix);
 
 				EOrder restoredOrders[];
-				int restoredCount = orderPersistence.LoadOrdersFromJson(strategyPrefix, restoredOrders);
+				int restoredCount =
+					orderPersistence.LoadOrdersFromJson(strategyPrefix,
+									    restoredOrders);
 
 				if (restoredCount == -1) {
-					hlogger.error("CRITICAL ERROR: Failed to restore orders for strategy: " + strategyPrefix);
-					hlogger.error("This includes JSON deserialization errors and file access problems.");
+					hlogger.error(
+						"CRITICAL ERROR: Failed to restore orders for strategy: "
+						+ strategyPrefix);
+					hlogger.error(
+						"This includes JSON deserialization errors and file access problems.");
 					restorationFailed = true;
 					break;
 				}
@@ -135,7 +147,8 @@ int OnInit() {
 					int existingIndex = strategy.FindOrderIndexById(restoredId);
 
 					if (existingIndex != -1) {
-						hlogger.debug("Skipping duplicate order: " + restoredId);
+						hlogger.debug("Skipping duplicate order: " +
+							      restoredId);
 						continue;
 					}
 
@@ -143,7 +156,8 @@ int OnInit() {
 					strategy.AddOrder(restoredOrders[j]);
 					totalRestored++;
 
-					EOrder *addedOrder = strategy.GetOrderAtIndex(strategy.GetOrdersCount() - 1);
+					EOrder *addedOrder =
+						strategy.GetOrderAtIndex(strategy.GetOrdersCount() - 1);
 
 					if (addedOrder != NULL)
 						strategy.OnOpenOrder(addedOrder);
@@ -156,14 +170,19 @@ int OnInit() {
 
 		if (restorationFailed) {
 			hlogger.error("CRITICAL ERROR: Order restoration failed!");
-			hlogger.error("Expert Advisor cannot start safely with corrupted or inaccessible order data.");
-			hlogger.error("Please check the JSON files in the Live/ directory or delete them to start fresh.");
+			hlogger.error(
+				"Expert Advisor cannot start safely with corrupted or inaccessible order data.");
+			hlogger.error(
+				"Please check the JSON files in the Live/ directory or delete them to start fresh.");
 			return INIT_FAILED;
 		}
 
 		if (totalRestored > 0) {
-			hlogger.info("Successfully restored " + IntegerToString(totalRestored) + " orders from JSON files");
-			hlogger.info("Open positions in MetaTrader: " + IntegerToString(PositionsTotal()));
+			hlogger.info("Successfully restored " +
+				     IntegerToString(totalRestored) +
+				     " orders from JSON files");
+			hlogger.info("Open positions in MetaTrader: " +
+				     IntegerToString(PositionsTotal()));
 			hlogger.debug("Restored orders for tracking");
 		} else {
 			hlogger.info("No orders found to restore");
@@ -202,7 +221,8 @@ void OnTimer() {
 	}
 
 	// End of week (Friday 23:00 or later) - executed BEFORE daily/hourly triggers
-	if (now.dayOfWeek == 5 && now.hour >= 23 && lastEndWeekYday != now.dayOfYear) {
+	if (now.dayOfWeek == 5 && now.hour >= 23 &&
+	    lastEndWeekYday != now.dayOfYear) {
 		for (int i = 0; i < ArraySize(assets); i++)
 			assets[i].OnEndWeek();
 
@@ -257,10 +277,11 @@ void OnTradeTransaction(
 	const MqlTradeTransaction &transaction,
 	const MqlTradeRequest &request,
 	const MqlTradeResult &result
-	) {
+) {
 	if (transaction.type == TRADE_TRANSACTION_HISTORY_ADD) {
 		if (HistoryOrderSelect(transaction.order)) {
-			ulong orderState = HistoryOrderGetInteger(transaction.order, ORDER_STATE);
+			ulong orderState = HistoryOrderGetInteger(transaction.order,
+								  ORDER_STATE);
 
 			if (orderState == 2) {
 				ulong orderId = transaction.order;
@@ -268,14 +289,23 @@ void OnTradeTransaction(
 				int orderIndex = -1;
 
 				for (int i = 0; i < ArraySize(assets); i++) {
-					if (assets[i].FindOrderByOrderId(orderId, strategyIndex, orderIndex)) {
-						EOrder *order = assets[i].strategies[strategyIndex].GetOrderAtIndex(orderIndex);
+					if (assets[i].FindOrderByOrderId(orderId, strategyIndex,
+									 orderIndex)) {
+						EOrder *order =
+							assets[i].strategies[strategyIndex].GetOrderAtIndex(
+								orderIndex);
 
-						if (order != NULL && (order.GetStatus() == ORDER_STATUS_CLOSING || order.GetStatus() == ORDER_STATUS_PENDING)) {
+						if (order != NULL &&
+						    (order.GetStatus() == ORDER_STATUS_CLOSING ||
+						     order.GetStatus() == ORDER_STATUS_PENDING)) {
 							SDateTime cancelTime = dtime.Now();
-							order.OnClose(cancelTime, 0.0, 0.0, DEAL_REASON_EXPERT);
-							assets[i].strategies[strategyIndex].OnCloseOrder(order, DEAL_REASON_EXPERT);
-							hlogger.debug("OnTradeTransaction: Order cancelled with orderId=" + IntegerToString(orderId));
+							order.OnClose(cancelTime, 0.0, 0.0,
+								      DEAL_REASON_EXPERT);
+							assets[i].strategies[strategyIndex].OnCloseOrder(
+								order, DEAL_REASON_EXPERT);
+							hlogger.debug(
+								"OnTradeTransaction: Order cancelled with orderId="
+								+ IntegerToString(orderId));
 						}
 
 						break;
@@ -307,39 +337,61 @@ void OnTradeTransaction(
 			return;
 
 		if (transaction.type == TRADE_TRANSACTION_DEAL_ADD) {
-			int entry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(transaction.deal, DEAL_ENTRY);
-			int reason = (int)HistoryDealGetInteger(transaction.deal, DEAL_REASON);
-			string comment = HistoryDealGetString(transaction.deal, DEAL_COMMENT);
+			int entry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(transaction.deal,
+									   DEAL_ENTRY);
+			int reason = (int)HistoryDealGetInteger(transaction.deal,
+								DEAL_REASON);
+			string comment = HistoryDealGetString(transaction.deal,
+							      DEAL_COMMENT);
 			ulong positionId = transaction.position;
 			ulong orderId = transaction.order;
 			ulong dealId = transaction.deal;
 
-			hlogger.debug("OnTradeTransaction: comment=" + comment + ", positionId=" + IntegerToString(positionId) + ", orderId=" + IntegerToString(orderId) + ", dealId=" + IntegerToString(dealId));
-			hlogger.debug("OnTradeTransaction: entry=" + IntegerToString(entry) + ", reason=" + IntegerToString(reason));
+			hlogger.debug("OnTradeTransaction: comment=" + comment +
+				      ", positionId=" + IntegerToString(positionId) +
+				      ", orderId=" + IntegerToString(orderId) +
+				      ", dealId=" + IntegerToString(dealId));
+			hlogger.debug("OnTradeTransaction: entry=" +
+				      IntegerToString(entry) + ", reason=" +
+				      IntegerToString(reason));
 
 			if (entry == DEAL_ENTRY_OUT) {
 				SDateTime dealTime = dtime.Now();
 				double dealPrice = HistoryDealGetDouble(dealId, DEAL_PRICE);
 				double dealProfit = HistoryDealGetDouble(dealId, DEAL_PROFIT);
-				double dealCommission = HistoryDealGetDouble(dealId, DEAL_COMMISSION);
+				double dealCommission = HistoryDealGetDouble(dealId,
+									     DEAL_COMMISSION);
 				double dealSwap = HistoryDealGetDouble(dealId, DEAL_SWAP);
 				double netProfit = dealProfit + (dealCommission * 2) + dealSwap;
-				ENUM_DEAL_REASON dealReason = (ENUM_DEAL_REASON)HistoryDealGetInteger(dealId, DEAL_REASON);
+				ENUM_DEAL_REASON dealReason =
+					(ENUM_DEAL_REASON)HistoryDealGetInteger(dealId,
+										DEAL_REASON);
 
-				hlogger.debug("OnTradeTransaction: Closing order with dealId=" + IntegerToString(dealId) + ", positionId=" + IntegerToString(positionId));
+				hlogger.debug("OnTradeTransaction: Closing order with dealId=" +
+					      IntegerToString(dealId) + ", positionId=" +
+					      IntegerToString(positionId));
 
 				int strategyIndex = -1;
 				int orderIndex = -1;
 				bool found = false;
 
 				for (int i = 0; i < ArraySize(assets); i++) {
-					if (assets[i].FindOrderByPositionId(positionId, strategyIndex, orderIndex)) {
-						EOrder *order = assets[i].strategies[strategyIndex].GetOrderAtIndex(orderIndex);
+					if (assets[i].FindOrderByPositionId(positionId,
+									    strategyIndex,
+									    orderIndex)) {
+						EOrder *order =
+							assets[i].strategies[strategyIndex].GetOrderAtIndex(
+								orderIndex);
 
 						if (order != NULL) {
-							order.OnClose(dealTime, dealPrice, netProfit, dealReason);
-							assets[i].strategies[strategyIndex].OnCloseOrder(order, dealReason);
-							hlogger.info("OnTradeTransaction: Order closed with positionId=" + IntegerToString(positionId) + ", profit=" + DoubleToString(netProfit, 2));
+							order.OnClose(dealTime, dealPrice, netProfit,
+								      dealReason);
+							assets[i].strategies[strategyIndex].OnCloseOrder(
+								order, dealReason);
+							hlogger.info(
+								"OnTradeTransaction: Order closed with positionId="
+								+ IntegerToString(positionId) + ", profit=" +
+								DoubleToString(netProfit, 2));
 							found = true;
 						}
 
@@ -348,15 +400,20 @@ void OnTradeTransaction(
 				}
 
 				if (!found)
-					hlogger.warning("OnTradeTransaction: Order not found with positionId=" + IntegerToString(positionId));
+					hlogger.warning(
+						"OnTradeTransaction: Order not found with positionId=" +
+						IntegerToString(positionId));
 			} else if (entry == DEAL_ENTRY_IN) {
 				int strategyIndex = -1;
 				int orderIndex = -1;
 				bool found = false;
 
 				for (int i = 0; i < ArraySize(assets); i++) {
-					if (assets[i].FindOrderByOrderId(orderId, strategyIndex, orderIndex)) {
-						EOrder *order = assets[i].strategies[strategyIndex].GetOrderAtIndex(orderIndex);
+					if (assets[i].FindOrderByOrderId(orderId, strategyIndex,
+									 orderIndex)) {
+						EOrder *order =
+							assets[i].strategies[strategyIndex].GetOrderAtIndex(
+								orderIndex);
 
 						if (order != NULL) {
 							if (order.GetStatus() != ORDER_STATUS_OPEN) {
@@ -364,13 +421,18 @@ void OnTradeTransaction(
 								ZeroMemory(openResult);
 								openResult.deal = dealId;
 								openResult.order = orderId;
-								openResult.price = HistoryDealGetDouble(dealId, DEAL_PRICE);
+								openResult.price = HistoryDealGetDouble(dealId,
+													DEAL_PRICE);
 								openResult.retcode = 10009;
 								order.OnOpen(openResult);
 							}
 
-							assets[i].strategies[strategyIndex].OnOpenOrder(order);
-							hlogger.debug("OnTradeTransaction: Updated order with dealId=" + IntegerToString(dealId) + ", positionId=" + IntegerToString(positionId));
+							assets[i].strategies[strategyIndex].OnOpenOrder(
+								order);
+							hlogger.debug(
+								"OnTradeTransaction: Updated order with dealId="
+								+ IntegerToString(dealId) + ", positionId=" +
+								IntegerToString(positionId));
 							found = true;
 						}
 
@@ -379,7 +441,9 @@ void OnTradeTransaction(
 				}
 
 				if (!found)
-					hlogger.warning("OnTradeTransaction: Order not found with orderId=" + IntegerToString(orderId));
+					hlogger.warning(
+						"OnTradeTransaction: Order not found with orderId=" +
+						IntegerToString(orderId));
 			}
 		}
 	}
@@ -400,7 +464,9 @@ double OnTester() {
 	if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 		orderHistoryReporter.PrintCurrentPath();
 		orderHistoryReporter.ExportOrderHistoryToJsonFile();
-		hlogger.info("Order history exported with " + IntegerToString(orderHistoryReporter.GetOrderCount()) + " orders");
+		hlogger.info("Order history exported with " +
+			     IntegerToString(orderHistoryReporter.GetOrderCount()) +
+			     " orders");
 	}
 
 	return quality;

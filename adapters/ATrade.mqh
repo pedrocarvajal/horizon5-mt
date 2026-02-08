@@ -65,14 +65,17 @@ public:
 		return PositionSelectByTicket(ticket);
 	}
 
-	bool Modify(double price = 0, double stopLoss = 0, double takeProfit = 0, ulong magicNumber = 0) {
-		logger.info(StringFormat("Modifying order, position_id=%d, order_id=%d", GetPositionId(), GetOrderId()));
+	bool Modify(double price = 0, double stopLoss = 0, double takeProfit = 0,
+		    ulong magicNumber = 0) {
+		logger.info(StringFormat("Modifying order, position_id=%d, order_id=%d",
+					 GetPositionId(), GetOrderId()));
 
 		if (stopLoss == 0 && takeProfit == 0)
 			return false;
 
 		if (!PositionSelectByTicket(GetPositionId())) {
-			logger.error("Error selecting position: " + IntegerToString(GetPositionId()));
+			logger.error("Error selecting position: " +
+				     IntegerToString(GetPositionId()));
 			return false;
 		}
 
@@ -91,16 +94,26 @@ public:
 		request.symbol = positionSymbol;
 		request.magic = magicNumber;
 		request.price = (price > 0) ? price : openPrice;
-		request.sl = (stopLoss > 0) ? NormalizeDouble(stopLoss, (int)SymbolInfoInteger(positionSymbol, SYMBOL_DIGITS)) : currentSl;
-		request.tp = (takeProfit > 0) ? NormalizeDouble(takeProfit, (int)SymbolInfoInteger(positionSymbol, SYMBOL_DIGITS)) : currentTp;
+		request.sl = (stopLoss > 0) ? NormalizeDouble(stopLoss,
+							      (int)SymbolInfoInteger(
+								      positionSymbol,
+								      SYMBOL_DIGITS)) :
+			     currentSl;
+		request.tp = (takeProfit > 0) ? NormalizeDouble(takeProfit,
+								(int)SymbolInfoInteger(
+									positionSymbol,
+									SYMBOL_DIGITS)) :
+			     currentTp;
 
 		if (!OrderSend(request, result)) {
-			logger.error("Error sending order modification: " + IntegerToString(GetLastError()));
+			logger.error("Error sending order modification: " +
+				     IntegerToString(GetLastError()));
 			return false;
 		}
 
 		if (result.retcode != TRADE_RETCODE_DONE) {
-			logger.error("Error modifying order: " + IntegerToString(result.retcode));
+			logger.error("Error modifying order: " +
+				     IntegerToString(result.retcode));
 			return false;
 		}
 
@@ -134,27 +147,39 @@ public:
 		ZeroMemory(request);
 		ZeroMemory(result);
 
-		double currentPrice = (isBuy) ? SymbolInfoDouble(symbol, SYMBOL_ASK) : SymbolInfoDouble(symbol, SYMBOL_BID);
-		double minDistance = (double)SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL) * SymbolInfoDouble(symbol, SYMBOL_POINT);
+		double currentPrice = (isBuy) ? SymbolInfoDouble(symbol,
+								 SYMBOL_ASK) :
+				      SymbolInfoDouble(symbol, SYMBOL_BID);
+		double minDistance = (double)SymbolInfoInteger(symbol,
+							       SYMBOL_TRADE_STOPS_LEVEL)
+				     * SymbolInfoDouble(symbol, SYMBOL_POINT);
 		double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
 		double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
 
 		if (isMarketOrder) {
 			request.type = isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
 		} else {
-			request.type = isBuy ? (openAtPrice < currentPrice ? ORDER_TYPE_BUY_LIMIT : ORDER_TYPE_BUY_STOP) : (openAtPrice > currentPrice ? ORDER_TYPE_SELL_LIMIT : ORDER_TYPE_SELL_STOP);
+			request.type = isBuy ? (openAtPrice <
+						currentPrice ? ORDER_TYPE_BUY_LIMIT :
+						ORDER_TYPE_BUY_STOP) : (openAtPrice >
+									currentPrice ?
+									ORDER_TYPE_SELL_LIMIT
+	    : ORDER_TYPE_SELL_STOP);
 
 			if (request.type == ORDER_TYPE_BUY_STOP)
 				if (openAtPrice <= ask + minDistance)
-					openAtPrice = ask + minDistance + (5 * SymbolInfoDouble(symbol, SYMBOL_POINT));
+					openAtPrice = ask + minDistance +
+						      (5 * SymbolInfoDouble(symbol, SYMBOL_POINT));
 
 			if (request.type == ORDER_TYPE_SELL_STOP)
 				if (openAtPrice >= bid - minDistance)
-					openAtPrice = bid - minDistance - (5 * SymbolInfoDouble(symbol, SYMBOL_POINT));
+					openAtPrice = bid - minDistance -
+						      (5 * SymbolInfoDouble(symbol, SYMBOL_POINT));
 		}
 
 		request.comment = id;
-		request.action = (isMarketOrder) ? TRADE_ACTION_DEAL : TRADE_ACTION_PENDING;
+		request.action =
+			(isMarketOrder) ? TRADE_ACTION_DEAL : TRADE_ACTION_PENDING;
 		request.symbol = symbol;
 		request.volume = Volume(symbol, lot);
 		request.deviation = 5;
@@ -163,10 +188,14 @@ public:
 		request.price = (isMarketOrder) ? currentPrice : openAtPrice;
 
 		if (stopLoss > 0)
-			request.sl = NormalizeDouble(stopLoss, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS));
+			request.sl = NormalizeDouble(stopLoss,
+						     (int)SymbolInfoInteger(symbol,
+									    SYMBOL_DIGITS));
 
 		if (takeProfit > 0)
-			request.tp = NormalizeDouble(takeProfit, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS));
+			request.tp = NormalizeDouble(takeProfit,
+						     (int)SymbolInfoInteger(symbol,
+									    SYMBOL_DIGITS));
 
 		logger.separator("Trade request");
 		logger.debug(StringFormat("Comment: %s", request.comment));
@@ -175,13 +204,15 @@ public:
 		logger.debug(StringFormat("Volume: %f", request.volume));
 		logger.debug(StringFormat("Deviation: %d", request.deviation));
 		logger.debug(StringFormat("Magic: %d", request.magic));
-		logger.debug(StringFormat("Type filling: %s", EnumToString(request.type_filling)));
+		logger.debug(StringFormat("Type filling: %s",
+					  EnumToString(request.type_filling)));
 		logger.debug(StringFormat("Price: %f", request.price));
 		logger.debug(StringFormat("Stop loss: %f", request.sl));
 		logger.debug(StringFormat("Take profit: %f", request.tp));
 
 		if (!OrderSend(request, result)) {
-			logger.error("Error opening order: " + IntegerToString(GetLastError()));
+			logger.error("Error opening order: " +
+				     IntegerToString(GetLastError()));
 			return result;
 		}
 
@@ -191,10 +222,13 @@ public:
 		if (GetDealId() > 0) {
 			HistoryDealSelect(GetDealId());
 			SetPositionId(HistoryDealGetInteger(GetDealId(), DEAL_POSITION_ID));
-			logger.info("Position ID found: " + IntegerToString(GetPositionId()));
+			logger.info("Position ID found: " +
+				    IntegerToString(GetPositionId()));
 		}
 
-		logger.info(StringFormat("Order opened, deal_id=%d, order_id=%d, position_id=%d", GetDealId(), GetOrderId(), GetPositionId()));
+		logger.info(StringFormat(
+				    "Order opened, deal_id=%d, order_id=%d, position_id=%d",
+				    GetDealId(), GetOrderId(), GetPositionId()));
 		return result;
 	}
 

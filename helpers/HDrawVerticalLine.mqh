@@ -8,7 +8,7 @@ bool drawVerticalLine(
 	ENUM_LINE_STYLE style = STYLE_SOLID,
 	int width = 1,
 	long chartId = 0
-	) {
+) {
 	ObjectDelete(chartId, name);
 
 	if (!ObjectCreate(chartId, name, OBJ_VLINE, 0, time, 0))
