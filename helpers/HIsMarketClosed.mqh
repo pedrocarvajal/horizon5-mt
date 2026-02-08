@@ -25,7 +25,7 @@ SMarketStatus getMarketStatus(string checkSymbol, int safetyMarginMinutes = 1) {
 		uint sessionIndex = 0;
 
 		while (SymbolInfoSessionTrade(checkSymbol, checkDay, sessionIndex,
-					      sessionStart, sessionEnd)) {
+			sessionStart, sessionEnd)) {
 			MqlDateTime startDt, endDt;
 			TimeToStruct(sessionStart, startDt);
 			TimeToStruct(sessionEnd, endDt);

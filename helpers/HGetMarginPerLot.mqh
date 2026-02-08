@@ -9,7 +9,7 @@ double GetMarginPerLot(string symbolName) {
 		return 0.0;
 
 	if (!OrderCalcMargin(ORDER_TYPE_BUY, symbolName, 1.0, price,
-			     marginRequired))
+		marginRequired))
 		return 0.0;
 
 	return marginRequired;

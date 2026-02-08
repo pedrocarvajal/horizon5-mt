@@ -13,8 +13,8 @@ struct SSOrderHistory {
 	int side;
 	ENUM_DEAL_REASON orderCloseReason;
 
-	double mainTakeProfitAtPrice;
-	double mainStopLossAtPrice;
+	double takeProfitPrice;
+	double stopLossPrice;
 
 	datetime signalAt;
 	datetime openTime;

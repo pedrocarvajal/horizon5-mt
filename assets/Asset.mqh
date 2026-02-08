@@ -42,14 +42,18 @@ public:
 
 	virtual int OnInit() {
 		if (!enabled) {
-			logger.info("Asset skipped (disabled): " + name);
+			logger.info(StringFormat(
+				"Asset skipped (disabled): %s",
+				name));
 			return INIT_SUCCEEDED;
 		}
 
 		int strategyCount = ArraySize(strategies);
 
 		if (strategyCount == 0) {
-			logger.error("No strategies defined for enabled asset: " + name);
+			logger.error(StringFormat(
+				"No strategies defined for enabled asset: %s",
+				name));
 			return INIT_FAILED;
 		}
 
@@ -63,15 +67,16 @@ public:
 			int result = strategies[i].OnInit();
 
 			if (result != INIT_SUCCEEDED) {
-				logger.error("Strategy initialization failed: " +
-					     strategies[i].GetName());
+				logger.error(StringFormat(
+					"Strategy initialization failed: %s",
+					strategies[i].GetName()));
 				return INIT_FAILED;
 			}
 		}
 
 		logger.info(StringFormat(
-				    "%s initialized | symbol: %s | strategies: %d | weight: %.4f | balance: %.2f",
-				    name, symbol, strategyCount, weight, balance));
+			"%s initialized | symbol: %s | strategies: %d | weight: %.4f | balance: %.2f",
+			name, symbol, strategyCount, weight, balance));
 
 		return INIT_SUCCEEDED;
 	}
@@ -89,6 +94,8 @@ public:
 	}
 
 	virtual void OnStartMinute() {
+		logger.info("OnMinute()");
+
 		for (int i = 0; i < ArraySize(strategies); i++)
 			strategies[i].OnStartMinute();
 	}
@@ -144,8 +151,8 @@ public:
 	void AddStrategy(SEStrategy *strategy) {
 		strategy.SetAsset(GetPointer(this));
 		strategy.SetSymbol(symbol);
-		strategy.SetMagicNumber(StringToNumber(symbol + "_" + name + "_" +
-						       strategy.GetName()));
+		strategy.SetMagicNumber(StringToNumber(
+			StringFormat("%s_%s_%s", symbol, name, strategy.GetName())));
 
 		ArrayResize(strategies, ArraySize(strategies) + 1);
 		strategies[ArraySize(strategies) - 1] = strategy;
@@ -167,7 +174,7 @@ public:
 				return 0;
 
 			quality = MathPow(quality * strategyQuality,
-					  GEOMETRIC_MEAN_EXPONENT);
+				GEOMETRIC_MEAN_EXPONENT);
 		}
 
 		return quality;
@@ -257,6 +264,10 @@ public:
 
 	string GetSymbol() {
 		return symbol;
+	}
+
+	bool IsEnabled() {
+		return enabled;
 	}
 };
 
