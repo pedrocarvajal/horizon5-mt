@@ -448,20 +448,12 @@ public:
 		return countClosedOrders;
 	}
 
-	double GetLotSizeByCapital() {
+	double GetLotSizeByStopLoss(double stopLossDistance) {
 		double nav = EquityAtRiskCompounded
 			? statistics.GetNav()
 			: statistics.GetInitialBalance();
 
-		return lotSize.CalculateByCapital(nav * EquityAtRisk / 100.0);
-	}
-
-	double GetLotSizeByVolatility(double atrValue, double equityAtRisk) {
-		double nav = EquityAtRiskCompounded
-			? statistics.GetNav()
-			: statistics.GetInitialBalance();
-
-		return lotSize.CalculateByVolatility(nav, atrValue, equityAtRisk);
+		return lotSize.CalculateByStopLoss(nav, stopLossDistance, EquityAtRisk / 100.0);
 	}
 
 	ulong GetMagicNumber() {
