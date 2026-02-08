@@ -47,8 +47,8 @@ public:
 	double openPrice;
 	double closePrice;
 	double profitInDollars;
-	double mainTakeProfitAtPrice;
-	double mainStopLossAtPrice;
+	double takeProfitPrice;
+	double stopLossPrice;
 
 	// === TIMESTAMPS ===
 	SDateTime signalAt;
@@ -111,8 +111,8 @@ public:
 
 		profitInDollars = other.profitInDollars;
 
-		mainTakeProfitAtPrice = other.mainTakeProfitAtPrice;
-		mainStopLossAtPrice = other.mainStopLossAtPrice;
+		takeProfitPrice = other.takeProfitPrice;
+		stopLossPrice = other.stopLossPrice;
 
 		snapshot = other.snapshot;
 
@@ -121,9 +121,84 @@ public:
 		SetPositionId(other.GetPositionId());
 	}
 
+private:
+	void Snapshot() {
+		snapshot.openTime = signalAt.timestamp;
+		snapshot.openPrice = signalPrice;
+		snapshot.openLot = volume;
+		snapshot.orderId = GetId();
+		snapshot.side = side;
+		snapshot.magicNumber = magicNumber;
+		snapshot.strategyName = source;
+		snapshot.strategyPrefix = source;
+		snapshot.status = status;
+		snapshot.orderCloseReason = orderCloseReason;
+		snapshot.takeProfitPrice = takeProfitPrice;
+		snapshot.stopLossPrice = stopLossPrice;
+		snapshot.signalAt = signalAt.timestamp;
+		snapshot.closeTime = closeAt.timestamp;
+		snapshot.closePrice = closePrice;
+		snapshot.profitInDollars = profitInDollars;
+	}
+
+	void RefreshId() {
+		string uuid = "";
+		for (int i = 0; i < 8; i++)
+			uuid += IntegerToString(MathRand() % 10);
+		id = StringFormat("%s_%s", source, uuid);
+	}
+
+	bool ValidateMinimumVolume() {
+		double minLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
+		double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
+		double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
+
+		if (volume <= 0) {
+			logger.info(StringFormat(
+				"[%s] Validation failed - Volume is zero or negative: %.5f",
+				GetId(),
+				volume
+			));
+			return false;
+		}
+
+		if (volume < minLot) {
+			logger.info(StringFormat(
+				"[%s] Validation failed - Volume %.5f is below minimum lot size: %.5f",
+				GetId(),
+				volume,
+				minLot
+			));
+			return false;
+		}
+
+		if (volume > maxLot) {
+			logger.info(StringFormat(
+				"[%s] Validation failed - Volume %.5f exceeds maximum lot size: %.5f",
+				GetId(),
+				volume,
+				maxLot
+			));
+			return false;
+		}
+
+		double normalizedVolume = MathFloor(volume / lotStep) * lotStep;
+		if (normalizedVolume < minLot) {
+			logger.info(StringFormat(
+				"[%s] Validation failed - Normalized volume %.5f is below minimum after lot step adjustment",
+				GetId(),
+				normalizedVolume
+			));
+			return false;
+		}
+
+		return true;
+	}
+
+public:
 	void OnInit() {
 		if (isInitialized) {
-			logger.info("[" + GetId() + "] Order already initialized");
+			logger.info(StringFormat("[%s] Order already initialized", GetId()));
 			return;
 		}
 
@@ -141,8 +216,7 @@ public:
 			return;
 
 		if (retryCount >= MAX_RETRY_COUNT) {
-			logger.warning("[" + GetId() +
-				       "] Max retry count reached, cancelling order");
+			logger.warning(StringFormat("[%s] Max retry count reached, cancelling order", GetId()));
 			status = ORDER_STATUS_CANCELLED;
 			pendingToOpen = false;
 			isProcessed = true;
@@ -155,14 +229,15 @@ public:
 
 		if (marketStatus.isClosed) {
 			retryAfter = currentTime + marketStatus.opensInSeconds;
-			logger.info("-------- [" + GetId() +
-				    "] Open pending: Market closed, will retry in " +
-				    IntegerToString(marketStatus.opensInSeconds) +
-				    " seconds");
+			logger.info(StringFormat(
+				"-------- [%s] Open pending: Market closed, will retry in %d seconds",
+				GetId(),
+				marketStatus.opensInSeconds
+			));
 			return;
 		}
 
-		logger.info("[" + GetId() + "] Opening order, id: " + GetId());
+		logger.info(StringFormat("[%s] Opening order, id: %s", GetId(), GetId()));
 		Open();
 	}
 
@@ -177,18 +252,18 @@ public:
 			return;
 
 		if (retryCount >= MAX_RETRY_COUNT) {
-			logger.warning("[" + GetId() +
-				       "] Max retry count reached for close, giving up");
+			logger.warning(StringFormat("[%s] Max retry count reached for close, giving up", GetId()));
 			pendingToClose = false;
 			retryCount = 0;
 			return;
 		}
 
 		if (marketStatus.isClosed) {
-			logger.info("[" + GetId() +
-				    "] Close pending: Market closed, will retry in " +
-				    IntegerToString(marketStatus.opensInSeconds) +
-				    " seconds");
+			logger.info(StringFormat(
+				"[%s] Close pending: Market closed, will retry in %d seconds",
+				GetId(),
+				marketStatus.opensInSeconds
+			));
 			retryAfter = currentTime + marketStatus.opensInSeconds;
 			return;
 		}
@@ -209,8 +284,7 @@ public:
 			isProcessed = true;
 			pendingToOpen = false;
 
-			logger.info("[" + GetId() +
-				    "] Order cancelled - Volume does not meet minimum requirements");
+			logger.info(StringFormat("[%s] Order cancelled - Volume does not meet minimum requirements", GetId()));
 
 			if (CheckPointer(orderPersistence) != POINTER_INVALID)
 				orderPersistence.DeleteOrderJson(source, GetId());
@@ -227,8 +301,8 @@ public:
 			isMarketOrder,
 			openAtPrice,
 			volume,
-			mainTakeProfitAtPrice,
-			mainStopLossAtPrice,
+			takeProfitPrice,
+			stopLossPrice,
 			magicNumber
 		);
 
@@ -242,28 +316,32 @@ public:
 			if (marketStatus.isClosed) {
 				pendingToClose = true;
 				retryAfter = dtime.Timestamp() + marketStatus.opensInSeconds;
-				logger.info("[" + GetId() +
-					    "] Close pending: Market closed, will retry in " +
-					    IntegerToString(marketStatus.opensInSeconds) +
-					    " seconds");
+				logger.info(StringFormat(
+					"[%s] Close pending: Market closed, will retry in %d seconds",
+					GetId(),
+					marketStatus.opensInSeconds
+				));
 				return;
 			}
 
-			logger.info("[" + GetId() +
-				    "] Closing open position, position_id: " +
-				    IntegerToString(GetPositionId()));
+			logger.info(StringFormat(
+				"[%s] Closing open position, position_id: %llu",
+				GetId(),
+				GetPositionId()
+			));
 
 			if (!ATrade::Close(GetPositionId())) {
 				retryCount++;
-				logger.error("[" + GetId() +
-					     "] Failed to close open position, retry " +
-					     IntegerToString(retryCount) + "/" +
-					     IntegerToString(MAX_RETRY_COUNT));
+				logger.error(StringFormat(
+					"[%s] Failed to close open position, retry %d/%d",
+					GetId(),
+					retryCount,
+					MAX_RETRY_COUNT
+				));
 				return;
 			}
 
-			logger.info("[" + GetId() +
-				    "] Close order sent to broker, waiting for confirmation...");
+			logger.info(StringFormat("[%s] Close order sent to broker, waiting for confirmation...", GetId()));
 			status = ORDER_STATUS_CLOSING;
 			pendingToClose = false;
 			retryCount = 0;
@@ -272,8 +350,7 @@ public:
 
 		if (status == ORDER_STATUS_PENDING) {
 			if (GetOrderId() == 0) {
-				logger.info("[" + GetId() +
-					    "] Cannot cancel order: invalid orderId");
+				logger.info(StringFormat("[%s] Cannot cancel order: invalid orderId", GetId()));
 				status = ORDER_STATUS_CANCELLED;
 				pendingToOpen = false;
 
@@ -284,10 +361,11 @@ public:
 			}
 
 			if (!OrderSelect(GetOrderId())) {
-				logger.info("[" + GetId() +
-					    "] Order no longer exists (orderId: " +
-					    IntegerToString(GetOrderId()) +
-					    "), updating status to cancelled");
+				logger.info(StringFormat(
+					"[%s] Order no longer exists (orderId: %llu), updating status to cancelled",
+					GetId(),
+					GetOrderId()
+				));
 				status = ORDER_STATUS_CANCELLED;
 				pendingToOpen = false;
 
@@ -298,14 +376,15 @@ public:
 			}
 
 			if (!ATrade::Cancel(GetOrderId())) {
-				logger.error("[" + GetId() +
-					     "] Failed to cancel pending order, orderId: " +
-					     IntegerToString(GetOrderId()));
+				logger.error(StringFormat(
+					"[%s] Failed to cancel pending order, orderId: %llu",
+					GetId(),
+					GetOrderId()
+				));
 				return;
 			}
 
-			logger.info("[" + GetId() +
-				    "] Cancel order sent to broker, waiting for confirmation...");
+			logger.info(StringFormat("[%s] Cancel order sent to broker, waiting for confirmation...", GetId()));
 			status = ORDER_STATUS_CLOSING;
 			pendingToOpen = false;
 			return;
@@ -316,10 +395,13 @@ public:
 		if (result.retcode != 0 && result.retcode != 10009 &&
 		    result.retcode != 10010) {
 			retryCount++;
-			logger.error("[" + GetId() + "] Error opening order: " +
-				     IntegerToString(result.retcode) + ", retry " +
-				     IntegerToString(retryCount) + "/" +
-				     IntegerToString(MAX_RETRY_COUNT));
+			logger.error(StringFormat(
+				"[%s] Error opening order: %d, retry %d/%d",
+				GetId(),
+				result.retcode,
+				retryCount,
+				MAX_RETRY_COUNT
+			));
 
 			if (retryCount >= MAX_RETRY_COUNT) {
 				status = ORDER_STATUS_CANCELLED;
@@ -349,19 +431,26 @@ public:
 
 		if (GetDealId() == 0) {
 			status = ORDER_STATUS_PENDING;
-			logger.info("[" + GetId() + "] Order opened as pending, orderId: " +
-				    IntegerToString(GetOrderId()));
+			logger.info(StringFormat(
+				"[%s] Order opened as pending, orderId: %llu",
+				GetId(),
+				GetOrderId()
+			));
 		} else {
 			if (wasPending) {
-				logger.info("[" + GetId() +
-					    "] Pending order has opened, dealId: " +
-					    IntegerToString(GetDealId()) + ", positionId: " +
-					    IntegerToString(GetPositionId()));
+				logger.info(StringFormat(
+					"[%s] Pending order has opened, dealId: %llu, positionId: %llu",
+					GetId(),
+					GetDealId(),
+					GetPositionId()
+				));
 			} else {
-				logger.info("[" + GetId() +
-					    "] Order opened immediately, dealId: " +
-					    IntegerToString(GetDealId()) + ", positionId: " +
-					    IntegerToString(GetPositionId()));
+				logger.info(StringFormat(
+					"[%s] Order opened immediately, dealId: %llu, positionId: %llu",
+					GetId(),
+					GetDealId(),
+					GetPositionId()
+				));
 			}
 
 			status = ORDER_STATUS_OPEN;
@@ -386,7 +475,7 @@ public:
 
 		if (profits == 0.0 && price == 0.0) {
 			status = ORDER_STATUS_CANCELLED;
-			logger.info("[" + GetId() + "] Order cancelled");
+			logger.info(StringFormat("[%s] Order cancelled", GetId()));
 		}
 
 		orderCloseReason = reason;
@@ -394,26 +483,26 @@ public:
 
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(snapshot);
-			logger.info("[" + GetId() + "] Order snapshot added to report");
+			logger.info(StringFormat("[%s] Order snapshot added to report", GetId()));
 		}
 
 		if (reason == DEAL_REASON_TP)
-			logger.info("[" + GetId() + "] Order closed by Take Profit");
+			logger.info(StringFormat("[%s] Order closed by Take Profit", GetId()));
 
 		if (reason == DEAL_REASON_EXPERT)
-			logger.info("[" + GetId() + "] Order closed by Expert");
+			logger.info(StringFormat("[%s] Order closed by Expert", GetId()));
 
 		if (reason == DEAL_REASON_CLIENT)
-			logger.info("[" + GetId() + "] Order closed by Client");
+			logger.info(StringFormat("[%s] Order closed by Client", GetId()));
 
 		if (reason == DEAL_REASON_MOBILE)
-			logger.info("[" + GetId() + "] Order closed by Mobile");
+			logger.info(StringFormat("[%s] Order closed by Mobile", GetId()));
 
 		if (reason == DEAL_REASON_WEB)
-			logger.info("[" + GetId() + "] Order closed by Web");
+			logger.info(StringFormat("[%s] Order closed by Web", GetId()));
 
 		if (reason == DEAL_REASON_SL)
-			logger.info("[" + GetId() + "] Order closed by Stop Loss");
+			logger.info(StringFormat("[%s] Order closed by Stop Loss", GetId()));
 
 		if (status == ORDER_STATUS_CLOSED)
 			if (CheckPointer(orderPersistence) != POINTER_INVALID)
@@ -426,73 +515,6 @@ public:
 		status = ORDER_STATUS_CLOSED;
 		isInitialized = false;
 		isProcessed = false;
-	}
-
-	void Snapshot() {
-		snapshot.openTime = signalAt.timestamp;
-		snapshot.openPrice = signalPrice;
-		snapshot.openLot = volume;
-		snapshot.orderId = GetId();
-		snapshot.side = side;
-		snapshot.magicNumber = magicNumber;
-		snapshot.strategyName = source;
-		snapshot.strategyPrefix = source;
-		snapshot.status = status;
-		snapshot.orderCloseReason = orderCloseReason;
-		snapshot.mainTakeProfitAtPrice = mainTakeProfitAtPrice;
-		snapshot.mainStopLossAtPrice = mainStopLossAtPrice;
-		snapshot.signalAt = signalAt.timestamp;
-		snapshot.closeTime = closeAt.timestamp;
-		snapshot.closePrice = closePrice;
-		snapshot.profitInDollars = profitInDollars;
-	}
-
-	void RefreshId() {
-		string uuid = "";
-		for (int i = 0; i < 8; i++)
-			uuid += IntegerToString(MathRand() % 10);
-		id = source + "_" + uuid;
-	}
-
-	bool ValidateMinimumVolume() {
-		double minLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
-		double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
-		double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
-
-		if (volume <= 0) {
-			logger.info("[" + GetId() +
-				    "] Validation failed - Volume is zero or negative: " +
-				    DoubleToString(volume, 5));
-			return false;
-		}
-
-		if (volume < minLot) {
-			logger.info("[" + GetId() + "] Validation failed - Volume " +
-				    DoubleToString(volume,
-						   5) + " is below minimum lot size: " +
-				    DoubleToString(minLot, 5));
-			return false;
-		}
-
-		if (volume > maxLot) {
-			logger.info("[" + GetId() + "] Validation failed - Volume " +
-				    DoubleToString(volume,
-						   5) + " exceeds maximum lot size: " +
-				    DoubleToString(maxLot, 5));
-			return false;
-		}
-
-		double normalizedVolume = MathFloor(volume / lotStep) * lotStep;
-		if (normalizedVolume < minLot) {
-			logger.info("[" + GetId() +
-				    "] Validation failed - Normalized volume " +
-				    DoubleToString(normalizedVolume,
-						   5) +
-				    " is below minimum after lot step adjustment");
-			return false;
-		}
-
-		return true;
 	}
 
 	string GetId() {
@@ -520,10 +542,6 @@ public:
 
 	int GetSide() {
 		return side;
-	}
-
-	ENUM_DEAL_REASON GetOrderCloseReason() {
-		return orderCloseReason;
 	}
 
 	double GetVolume() {
@@ -572,10 +590,6 @@ public:
 		return openAt;
 	}
 
-	SDateTime GetCloseAt() {
-		return closeAt;
-	}
-
 	SSOrderHistory GetSnapshot() {
 		return snapshot;
 	}
@@ -612,45 +626,47 @@ public:
 		id = newId;
 	}
 
-	bool SetTakeProfit(double takeProfitAtPrice = 0) {
-		if (takeProfitAtPrice <= 0)
+	bool SetTakeProfit(double newTakeProfitPrice = 0) {
+		if (newTakeProfitPrice <= 0)
 			return false;
 
-		mainTakeProfitAtPrice = takeProfitAtPrice;
+		takeProfitPrice = newTakeProfitPrice;
 
 		if (status == ORDER_STATUS_OPEN) {
-			if (!ATrade::ModifyTakeProfit(takeProfitAtPrice, magicNumber)) {
-				logger.error("[" + GetId() +
-					     "] Failed to modify take profit on open position");
+			if (!ATrade::ModifyTakeProfit(takeProfitPrice, magicNumber)) {
+				logger.error(StringFormat("[%s] Failed to modify take profit on open position", GetId()));
 				return false;
 			}
 
-			logger.info("[" + GetId() + "] Take profit modified to: " +
-				    DoubleToString(takeProfitAtPrice,
-						   (int)SymbolInfoInteger(symbol,
-									  SYMBOL_DIGITS)));
+			logger.info(StringFormat(
+				"[%s] Take profit modified to: %.*f",
+				GetId(),
+				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
+				takeProfitPrice
+			));
 		}
 
 		return true;
 	}
 
-	bool SetStopLoss(double stopLossAtPrice = 0) {
-		if (stopLossAtPrice <= 0)
+	bool SetStopLoss(double newStopLossPrice = 0) {
+		if (newStopLossPrice <= 0)
 			return false;
 
-		mainStopLossAtPrice = stopLossAtPrice;
+		stopLossPrice = newStopLossPrice;
 
 		if (status == ORDER_STATUS_OPEN) {
-			if (!ATrade::ModifyStopLoss(stopLossAtPrice, magicNumber)) {
-				logger.error("[" + GetId() +
-					     "] Failed to modify stop loss on open position");
+			if (!ATrade::ModifyStopLoss(stopLossPrice, magicNumber)) {
+				logger.error(StringFormat("[%s] Failed to modify stop loss on open position", GetId()));
 				return false;
 			}
 
-			logger.info("[" + GetId() + "] Stop loss modified to: " +
-				    DoubleToString(stopLossAtPrice,
-						   (int)SymbolInfoInteger(symbol,
-									  SYMBOL_DIGITS)));
+			logger.info(StringFormat(
+				"[%s] Stop loss modified to: %.*f",
+				GetId(),
+				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
+				stopLossPrice
+			));
 		}
 
 		return true;

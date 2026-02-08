@@ -37,11 +37,11 @@ public:
 	}
 
 	datetime Timestamp() {
-		return TimeCurrent();
+		return TimeTradeServer();
 	}
 
 	SDateTime Now() {
-		datetime ts = TimeCurrent();
+		datetime ts = TimeTradeServer();
 		MqlDateTime mql;
 
 		TimeToStruct(ts, mql);
@@ -51,7 +51,7 @@ public:
 	}
 
 	SDateTime Today() {
-		datetime ts = TimeCurrent();
+		datetime ts = TimeTradeServer();
 		MqlDateTime mql;
 
 		TimeToStruct(ts, mql);

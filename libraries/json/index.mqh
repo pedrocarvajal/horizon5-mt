@@ -15,7 +15,7 @@ public:
 			int parceJsonCharCounter = 0;
 			bool isSuccess = true;
 			JSON::_parseJSONObject(json, parceJsonCharCounter, isSuccess,
-					       &this);
+				&this);
 			if (!isSuccess) this._clearResources();
 		};
 
@@ -290,7 +290,7 @@ private:
 				object.setProperty(key, JSON::_parseNull(json, i, isSuccess));
 			else if (json[i] == 't' || json[i] == 'f')
 				object.setProperty(key,
-						   JSON::_parseBoolean(json, i, isSuccess));
+					JSON::_parseBoolean(json, i, isSuccess));
 			else if (json[i] == '"')
 				object.setProperty(key, JSON::_parseString(json, i, isSuccess));
 			else if (json[i] == '{')
@@ -514,7 +514,7 @@ public:
 			    JSONBoolType) return string(this.booleanValue);
 			if (this.valueType == JSONNumberType) {
 				if (MathMod(this.doubleValue,
-					    1.0) == 0.0 &&
+					1.0) == 0.0 &&
 				    MathAbs(this.doubleValue) < 9007199254740992.0)
 					return IntegerToString((long)this.doubleValue);
 				return DoubleToString(this.doubleValue, 8);

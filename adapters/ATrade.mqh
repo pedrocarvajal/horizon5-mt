@@ -44,16 +44,16 @@ public:
 
 	bool CloseOrCancel(ulong ticket) {
 		if (IsPendingOrder(ticket)) {
-			logger.info("Canceling pending order: " + IntegerToString(ticket));
+			logger.info(StringFormat("Canceling pending order: %llu", ticket));
 			return Cancel(ticket);
 		}
 
 		if (IsOpenPosition(ticket)) {
-			logger.info("Closing open position: " + IntegerToString(ticket));
+			logger.info(StringFormat("Closing open position: %llu", ticket));
 			return Close(ticket);
 		}
 
-		logger.debug("Order/Position not found: " + IntegerToString(ticket));
+		logger.debug(StringFormat("Order/Position not found: %llu", ticket));
 		return false;
 	}
 
@@ -68,14 +68,13 @@ public:
 	bool Modify(double price = 0, double stopLoss = 0, double takeProfit = 0,
 		    ulong magicNumber = 0) {
 		logger.info(StringFormat("Modifying order, position_id=%d, order_id=%d",
-					 GetPositionId(), GetOrderId()));
+			GetPositionId(), GetOrderId()));
 
 		if (stopLoss == 0 && takeProfit == 0)
 			return false;
 
 		if (!PositionSelectByTicket(GetPositionId())) {
-			logger.error("Error selecting position: " +
-				     IntegerToString(GetPositionId()));
+			logger.error(StringFormat("Error selecting position: %llu", GetPositionId()));
 			return false;
 		}
 
@@ -95,25 +94,23 @@ public:
 		request.magic = magicNumber;
 		request.price = (price > 0) ? price : openPrice;
 		request.sl = (stopLoss > 0) ? NormalizeDouble(stopLoss,
-							      (int)SymbolInfoInteger(
-								      positionSymbol,
-								      SYMBOL_DIGITS)) :
+			(int)SymbolInfoInteger(
+				positionSymbol,
+				SYMBOL_DIGITS)) :
 			     currentSl;
 		request.tp = (takeProfit > 0) ? NormalizeDouble(takeProfit,
-								(int)SymbolInfoInteger(
-									positionSymbol,
-									SYMBOL_DIGITS)) :
+			(int)SymbolInfoInteger(
+				positionSymbol,
+				SYMBOL_DIGITS)) :
 			     currentTp;
 
 		if (!OrderSend(request, result)) {
-			logger.error("Error sending order modification: " +
-				     IntegerToString(GetLastError()));
+			logger.error(StringFormat("Error sending order modification: %d", GetLastError()));
 			return false;
 		}
 
 		if (result.retcode != TRADE_RETCODE_DONE) {
-			logger.error("Error modifying order: " +
-				     IntegerToString(result.retcode));
+			logger.error(StringFormat("Error modifying order: %d", result.retcode));
 			return false;
 		}
 
@@ -148,10 +145,10 @@ public:
 		ZeroMemory(result);
 
 		double currentPrice = (isBuy) ? SymbolInfoDouble(symbol,
-								 SYMBOL_ASK) :
+			SYMBOL_ASK) :
 				      SymbolInfoDouble(symbol, SYMBOL_BID);
 		double minDistance = (double)SymbolInfoInteger(symbol,
-							       SYMBOL_TRADE_STOPS_LEVEL)
+			SYMBOL_TRADE_STOPS_LEVEL)
 				     * SymbolInfoDouble(symbol, SYMBOL_POINT);
 		double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
 		double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
@@ -189,13 +186,13 @@ public:
 
 		if (stopLoss > 0)
 			request.sl = NormalizeDouble(stopLoss,
-						     (int)SymbolInfoInteger(symbol,
-									    SYMBOL_DIGITS));
+				(int)SymbolInfoInteger(symbol,
+					SYMBOL_DIGITS));
 
 		if (takeProfit > 0)
 			request.tp = NormalizeDouble(takeProfit,
-						     (int)SymbolInfoInteger(symbol,
-									    SYMBOL_DIGITS));
+				(int)SymbolInfoInteger(symbol,
+					SYMBOL_DIGITS));
 
 		logger.separator("Trade request");
 		logger.debug(StringFormat("Comment: %s", request.comment));
@@ -205,14 +202,13 @@ public:
 		logger.debug(StringFormat("Deviation: %d", request.deviation));
 		logger.debug(StringFormat("Magic: %d", request.magic));
 		logger.debug(StringFormat("Type filling: %s",
-					  EnumToString(request.type_filling)));
+			EnumToString(request.type_filling)));
 		logger.debug(StringFormat("Price: %f", request.price));
 		logger.debug(StringFormat("Stop loss: %f", request.sl));
 		logger.debug(StringFormat("Take profit: %f", request.tp));
 
 		if (!OrderSend(request, result)) {
-			logger.error("Error opening order: " +
-				     IntegerToString(GetLastError()));
+			logger.error(StringFormat("Error opening order: %d", GetLastError()));
 			return result;
 		}
 
@@ -222,13 +218,12 @@ public:
 		if (GetDealId() > 0) {
 			HistoryDealSelect(GetDealId());
 			SetPositionId(HistoryDealGetInteger(GetDealId(), DEAL_POSITION_ID));
-			logger.info("Position ID found: " +
-				    IntegerToString(GetPositionId()));
+			logger.info(StringFormat("Position ID found: %llu", GetPositionId()));
 		}
 
 		logger.info(StringFormat(
-				    "Order opened, deal_id=%d, order_id=%d, position_id=%d",
-				    GetDealId(), GetOrderId(), GetPositionId()));
+			"Order opened, deal_id=%d, order_id=%d, position_id=%d",
+			GetDealId(), GetOrderId(), GetPositionId()));
 		return result;
 	}
 

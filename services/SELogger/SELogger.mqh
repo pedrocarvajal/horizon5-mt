@@ -32,7 +32,7 @@ public:
 
 	void separator(string title) {
 		Print("[INFO] ", prefix, ": ", title,
-		      " -------------------------------- ");
+			" -------------------------------- ");
 	}
 
 	void warning(string message) {

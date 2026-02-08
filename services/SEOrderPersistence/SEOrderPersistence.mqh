@@ -16,28 +16,24 @@ private:
 	string basePath;
 
 	bool CreateDirectoryStructure(string strategyName) {
-		string symbolPath = basePath + "/" + _Symbol;
-		string strategyPath = symbolPath + "/" + strategyName;
-		string ordersPath = strategyPath + "/orders";
+		string symbolPath = StringFormat("%s/%s", basePath, _Symbol);
+		string strategyPath = StringFormat("%s/%s", symbolPath, strategyName);
+		string ordersPath = StringFormat("%s/orders", strategyPath);
 
-		int handle = FileOpen(symbolPath + "/.keep",
-				      FILE_WRITE | FILE_TXT | FILE_COMMON);
-		if (handle != INVALID_HANDLE)
-			FileClose(handle);
+		string paths[] = { symbolPath, strategyPath, ordersPath };
 
-		handle = FileOpen(strategyPath + "/.keep",
-				  FILE_WRITE | FILE_TXT | FILE_COMMON);
-		if (handle != INVALID_HANDLE)
-			FileClose(handle);
+		for (int i = 0; i < ArraySize(paths); i++) {
+			string keepFile = StringFormat("%s/.keep", paths[i]);
+			int handle = FileOpen(keepFile, FILE_WRITE | FILE_TXT | FILE_COMMON);
 
-		handle = FileOpen(ordersPath + "/.keep",
-				  FILE_WRITE | FILE_TXT | FILE_COMMON);
-		if (handle != INVALID_HANDLE) {
+			if (handle == INVALID_HANDLE)
+				return false;
+
 			FileClose(handle);
-			return true;
+			FileDelete(keepFile, FILE_COMMON);
 		}
 
-		return false;
+		return true;
 	}
 
 	bool DeserializeOrder(string jsonData, EOrder &order) {
@@ -59,6 +55,8 @@ private:
 
 		order.SetId(json.getString("id"));
 		order.SetSource(json.getString("source"));
+		order.SetSymbol(json.getString("symbol"));
+		order.SetMagicNumber((ulong)json.getNumber("magic_number"));
 		order.SetSide((int)json.getNumber("side"));
 		order.SetOrderId((ulong)json.getNumber("order_id"));
 		order.SetDealId((ulong)json.getNumber("deal_id"));
@@ -68,11 +66,11 @@ private:
 		order.SetSignalPrice(json.getNumber("signal_price"));
 		order.SetOpenAtPrice(json.getNumber("open_at_price"));
 		order.SetOpenPrice(json.getNumber("open_price"));
+		order.takeProfitPrice = json.getNumber("take_profit_price");
+		order.stopLossPrice = json.getNumber("stop_loss_price");
 
-		SDateTime signalAt =
-			dtime.FromTimestamp((datetime)json.getNumber("signal_at"));
-		SDateTime openAt =
-			dtime.FromTimestamp((datetime)json.getNumber("open_at"));
+		SDateTime signalAt = dtime.FromTimestamp((datetime)json.getNumber("signal_at"));
+		SDateTime openAt = dtime.FromTimestamp((datetime)json.getNumber("open_at"));
 		order.SetSignalAt(signalAt);
 		order.SetOpenAt(openAt);
 
@@ -81,12 +79,11 @@ private:
 
 	string GetOrderFilePath(string strategyName, string orderId) {
 		string safeOrderId = SanitizeFileName(orderId);
-		return basePath + "/" + _Symbol + "/" + strategyName + "/orders/" +
-		       safeOrderId + ".json";
+		return StringFormat("%s/%s/%s/orders/%s.json", basePath, _Symbol, strategyName, safeOrderId);
 	}
 
 	string GetStrategyOrdersPath(string strategyName) {
-		return basePath + "/" + _Symbol + "/" + strategyName + "/orders/";
+		return StringFormat("%s/%s/%s/orders/", basePath, _Symbol, strategyName);
 	}
 
 	string SanitizeFileName(string filename) {
@@ -117,6 +114,8 @@ private:
 
 		json.setProperty("id", order.GetId());
 		json.setProperty("source", order.GetSource());
+		json.setProperty("symbol", order.GetSymbol());
+		json.setProperty("magic_number", (long)order.GetMagicNumber());
 		json.setProperty("side", order.GetSide());
 		json.setProperty("order_id", (long)order.GetOrderId());
 		json.setProperty("deal_id", (long)order.GetDealId());
@@ -126,6 +125,8 @@ private:
 		json.setProperty("signal_price", order.GetSignalPrice());
 		json.setProperty("open_at_price", order.GetOpenAtPrice());
 		json.setProperty("open_price", order.GetOpenPrice());
+		json.setProperty("take_profit_price", order.takeProfitPrice);
+		json.setProperty("stop_loss_price", order.stopLossPrice);
 
 		json.setProperty("signal_at", (long)order.GetSignalAt().timestamp);
 		json.setProperty("open_at", (long)order.GetOpenAt().timestamp);
@@ -138,8 +139,7 @@ private:
 public:
 	SEOrderPersistence() {
 		logger.SetPrefix("OrderPersistence");
-
-		basePath = "Live";
+		basePath = "Horizon5";
 	}
 
 	bool DeleteOrderJson(string strategyName, string orderId) {
@@ -150,14 +150,19 @@ public:
 
 		if (!FileDelete(filePath, FILE_COMMON)) {
 			int error = GetLastError();
+
 			if (error != ERR_FILE_NOT_EXIST) {
-				logger.error(" Cannot delete order file: " + filePath +
-					     " Error: " + IntegerToString(error));
+				logger.error(StringFormat(
+					" Cannot delete order file: %s Error: %d",
+					filePath,
+					error
+				));
+
 				return false;
 			}
 		}
 
-		logger.info("Order JSON deleted: " + filePath);
+		logger.info(StringFormat("Order JSON deleted: %s", filePath));
 		return true;
 	}
 
@@ -165,15 +170,15 @@ public:
 		if (!isLiveTrading())
 			return 0;
 
-		logger.info("Starting order restoration for strategy: " + strategyName);
+		logger.info(StringFormat("Starting order restoration for strategy: %s", strategyName));
 
 		string ordersPath = GetStrategyOrdersPath(strategyName);
-		string searchPattern = ordersPath + "*.json";
-
+		string searchPattern = StringFormat("%s*.json", ordersPath);
 		string fileName;
+
 		long searchHandle = FileFindFirst(searchPattern, fileName, FILE_COMMON);
 		if (searchHandle == INVALID_HANDLE) {
-			logger.info("No order files found for strategy: " + strategyName);
+			logger.info(StringFormat("No order files found for strategy: %s", strategyName));
 			return 0;
 		}
 
@@ -183,59 +188,66 @@ public:
 		do {
 			processedFiles++;
 
-			if (StringFind(fileName, "._") == 0 || StringFind(fileName,
-									  ".") == 0) {
-				logger.info("Skipping system file: " + fileName);
+			if (StringFind(fileName, "._") == 0 || StringFind(fileName, ".") == 0) {
+				logger.info(StringFormat("Skipping system file: %s", fileName));
 				continue;
 			}
 
 			if (StringFind(fileName, ".json") == -1) {
-				logger.info("Skipping non-JSON file: " + fileName);
+				logger.info(StringFormat("Skipping non-JSON file: %s", fileName));
 				continue;
 			}
 
-			logger.info("Processing order file: " + fileName);
+			logger.info(StringFormat("Processing order file: %s", fileName));
 			string fullPath = ordersPath + fileName;
-			int handle = FileOpen(fullPath,
-					      FILE_READ | FILE_TXT | FILE_COMMON |
-					      FILE_ANSI);
+			int handle = FileOpen(fullPath, FILE_READ | FILE_TXT | FILE_COMMON | FILE_ANSI);
 
 			if (handle != INVALID_HANDLE) {
 				string jsonData = "";
+				EOrder order;
+
 				while (!FileIsEnding(handle))
 					jsonData += FileReadString(handle);
+
 				FileClose(handle);
 
-				EOrder order;
 				if (DeserializeOrder(jsonData, order)) {
 					if (ValidateOrderExists(order)) {
-						ArrayResize(restoredOrders,
-							    ArraySize(restoredOrders) + 1);
+						ArrayResize(restoredOrders, ArraySize(restoredOrders) + 1);
 						restoredOrders[ArraySize(restoredOrders) - 1] = order;
 						loadedCount++;
-						logger.info("Order loaded successfully: " +
-							    order.GetId() + " (Status: " +
-							    EnumToString(order.GetStatus()) + ")");
+
+						logger.info(StringFormat(
+							"Order loaded successfully: %s (Status: %s)",
+							order.GetId(),
+							EnumToString(order.GetStatus())
+						));
 					} else {
-						logger.warning(
-							" Order no longer exists in MetaTrader, cleaning up: "
-							+ order.GetId());
+						logger.warning(StringFormat(
+							" Order no longer exists in MetaTrader, cleaning up: %s",
+							order.GetId()
+						));
+
 						DeleteOrderJson(strategyName, order.GetId());
 					}
 				} else {
-					logger.error(
-						"CRITICAL ERROR: Failed to deserialize order from: " +
-						fileName);
-					logger.info("JSON data length: " +
-						    IntegerToString(StringLen(jsonData)));
-					logger.info("First 100 chars: " + StringSubstr(jsonData, 0,
-										       100));
+					logger.error(StringFormat(
+						"CRITICAL ERROR: Failed to deserialize order from: %s",
+						fileName
+					));
+
+					logger.info(StringFormat("JSON data length: %d", StringLen(jsonData)));
+					logger.info(StringFormat("First 100 chars: %s", StringSubstr(jsonData, 0, 100)));
 					FileFindClose(searchHandle);
 					return -1;
 				}
 			} else {
-				logger.error("CRITICAL ERROR: Cannot open file: " + fileName +
-					     " Error: " + IntegerToString(GetLastError()));
+				logger.error(StringFormat(
+					"CRITICAL ERROR: Cannot open file: %s Error: %d",
+					fileName,
+					GetLastError()
+				));
+
 				FileFindClose(searchHandle);
 				return -1;
 			}
@@ -243,10 +255,9 @@ public:
 
 		FileFindClose(searchHandle);
 
-		logger.info("Order restoration completed for strategy: " +
-			    strategyName);
-		logger.info("Files processed: " + IntegerToString(processedFiles));
-		logger.info("Orders loaded: " + IntegerToString(loadedCount));
+		logger.info(StringFormat("Order restoration completed for strategy: %s", strategyName));
+		logger.info(StringFormat("Files processed: %d", processedFiles));
+		logger.info(StringFormat("Orders loaded: %d", loadedCount));
 		return loadedCount;
 	}
 
@@ -255,19 +266,21 @@ public:
 			return true;
 
 		if (!CreateDirectoryStructure(order.GetSource())) {
-			logger.error("Cannot create directory structure for strategy: " +
-				     order.GetSource());
+			logger.error(StringFormat("Cannot create directory structure for strategy: %s", order.GetSource()));
 			return false;
 		}
 
 		string filePath = GetOrderFilePath(order.GetSource(), order.GetId());
 		string jsonData = SerializeOrder(order);
 
-		int handle = FileOpen(filePath,
-				      FILE_WRITE | FILE_TXT | FILE_COMMON | FILE_ANSI);
+		int handle = FileOpen(filePath, FILE_WRITE | FILE_TXT | FILE_COMMON | FILE_ANSI);
 		if (handle == INVALID_HANDLE) {
-			logger.error(" Cannot create order file: " + filePath + " Error: " +
-				     IntegerToString(GetLastError()));
+			logger.error(StringFormat(
+				" Cannot create order file: %s Error: %d",
+				filePath,
+				GetLastError()
+			));
+
 			return false;
 		}
 
@@ -275,7 +288,7 @@ public:
 		FileFlush(handle);
 		FileClose(handle);
 
-		logger.info("Order saved to JSON: " + filePath);
+		logger.info(StringFormat("Order saved to JSON: %s", filePath));
 		return true;
 	}
 

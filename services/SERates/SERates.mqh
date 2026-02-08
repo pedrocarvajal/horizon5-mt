@@ -21,10 +21,12 @@ public:
 		datetime endTime = StructToTime(toDate);
 
 		int wasCopied = CopyRates(symbol, timeframe, startTime, endTime,
-					  candles);
+			candles);
 
 		if (wasCopied <= 0) {
-			logger.error("Failed to copy rates for " + symbol);
+			logger.error(StringFormat(
+				"Failed to copy rates for %s",
+				symbol));
 			return -1;
 		}
 
