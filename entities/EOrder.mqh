@@ -20,27 +20,23 @@ extern SEReportOfOrderHistory *orderHistoryReporter;
 class EOrder:
 public ATrade {
 public:
-	// === FLAGS ===
 	bool isInitialized;
 	bool isProcessed;
 	bool isMarketOrder;
 	bool pendingToOpen;
 	bool pendingToClose;
 
-	// === IDENTIFICATION ===
 	string id;
 	string source;
 	string symbol;
 	ulong magicNumber;
 
-	// === STATE ===
 	ENUM_ORDER_STATUSES status;
 	int side;
 	ENUM_DEAL_REASON orderCloseReason;
 	int retryCount;
 	datetime retryAfter;
 
-	// === VALUES ===
 	double volume;
 	double signalPrice;
 	double openAtPrice;
@@ -50,12 +46,10 @@ public:
 	double takeProfitPrice;
 	double stopLossPrice;
 
-	// === TIMESTAMPS ===
 	SDateTime signalAt;
 	SDateTime openAt;
 	SDateTime closeAt;
 
-	// === COMPOSITION ===
 	SSOrderHistory snapshot;
 	SELogger logger;
 

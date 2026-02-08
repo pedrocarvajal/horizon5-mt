@@ -4,7 +4,6 @@
 class SEAsset;
 
 #include "../enums/EOrderStatuses.mqh"
-#include "../enums/ETradingModes.mqh"
 #include "../structs/SSOrderHistory.mqh"
 #include "../structs/SSStatisticsSnapshot.mqh"
 #include "../structs/SQualityThresholds.mqh"
@@ -16,7 +15,6 @@ class SEAsset;
 #include "../entities/EOrder.mqh"
 #include "../services/SEStatistics/SEStatistics.mqh"
 #include "../services/SELotSize/SELotSize.mqh"
-#include "../helpers/HIsMarketClosed.mqh"
 
 #define ORDER_TYPE_ANY    -1
 #define ORDER_STATUS_ANY  -1
@@ -66,22 +64,6 @@ private:
 		}
 	}
 
-	bool validateTradingMode(ENUM_ORDER_TYPE side) {
-		if (tradingMode == TRADING_MODE_BUY_ONLY && side == ORDER_TYPE_SELL) {
-			logger.warning(
-				"Order blocked: Trading mode is BUY_ONLY, cannot open SELL order");
-			return false;
-		}
-
-		if (tradingMode == TRADING_MODE_SELL_ONLY && side == ORDER_TYPE_BUY) {
-			logger.warning(
-				"Order blocked: Trading mode is SELL_ONLY, cannot open BUY order");
-			return false;
-		}
-
-		return true;
-	}
-
 	void initializeDefaultThresholds() {
 		SQualityThresholds thresholds;
 
@@ -111,7 +93,6 @@ protected:
 	string symbol;
 	string prefix;
 	ulong strategyMagicNumber;
-	ENUM_TRADING_MODES tradingMode;
 
 public:
 	virtual int OnInit() {
@@ -230,15 +211,8 @@ public:
 		double takeProfit = 0,
 		double stopLoss = 0
 	) {
-		if (!validateTradingMode(side))
-			return NULL;
-
 		EOrder *order = new EOrder(strategyMagicNumber, symbol);
-
-		double currentPrice = (side ==
-				       ORDER_TYPE_BUY) ? SymbolInfoDouble(symbol,
-			SYMBOL_ASK) :
-				      SymbolInfoDouble(symbol, SYMBOL_BID);
+		double currentPrice = (side == ORDER_TYPE_BUY) ? SymbolInfoDouble(symbol, SYMBOL_ASK) : SymbolInfoDouble(symbol, SYMBOL_BID);
 
 		order.SetStatus(ORDER_STATUS_PENDING);
 		order.SetSource(prefix);
@@ -267,11 +241,18 @@ public:
 		return order;
 	}
 
-	void GetOpenOrders(EOrder& resultOrders[],
-			   ENUM_ORDER_TYPE side = ORDER_TYPE_ANY,
-			   ENUM_ORDER_STATUSES status = ORDER_STATUS_ANY) {
-		filterOrders(resultOrders, side, status, ORDER_STATUS_OPEN,
-			ORDER_STATUS_PENDING);
+	void GetOpenOrders(
+		EOrder& resultOrders[],
+		ENUM_ORDER_TYPE side = ORDER_TYPE_ANY,
+		ENUM_ORDER_STATUSES status = ORDER_STATUS_ANY
+	) {
+		filterOrders(
+			resultOrders,
+			side,
+			status,
+			ORDER_STATUS_OPEN,
+			ORDER_STATUS_PENDING
+		);
 	}
 
 	bool HasActiveOrders() {
@@ -414,14 +395,6 @@ public:
 
 	string GetSymbol() {
 		return symbol;
-	}
-
-	string GetObjectName(string objectName) {
-		string result = StringFormat("%s_%s_%s_%s_%s",
-			GetSymbol(), GetPrefix(), GetName(),
-			objectName, IntegerToString(GetMagicNumber()));
-		StringToUpper(result);
-		return result;
 	}
 
 	SEStatistics * GetStatistics() {

@@ -18,7 +18,6 @@ input double EquityAtRisk = 10; // [1] > Equity at risk value (in percentage)
 #include "services/SEOrderPersistence/SEOrderPersistence.mqh"
 
 #include "helpers/HIsLiveTrading.mqh"
-#include "helpers/HIsMarketClosed.mqh"
 #include "helpers/HGetPipSize.mqh"
 #include "helpers/HGetPipValue.mqh"
 
@@ -39,7 +38,6 @@ int lastStartWeekYday = -1;
 int lastEndWeekYday = -1;
 
 int OnInit() {
-	TesterHideIndicators(true);
 	EventSetTimer(1);
 
 	// Variables
@@ -232,6 +230,9 @@ void OnDeinit(const int reason) {
 
 void OnTimer() {
 	SDateTime now = dtime.Now();
+
+	for (int i = 0; i < ArraySize(assets); i++)
+		assets[i].OnTimer();
 
 	// Start of week (Monday) - executed FIRST
 	if (now.dayOfWeek == 1 && lastStartWeekYday != now.dayOfYear) {
