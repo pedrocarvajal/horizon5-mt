@@ -141,7 +141,8 @@ public:
 			return;
 
 		if (retryCount >= MAX_RETRY_COUNT) {
-			logger.warning("[" + GetId() + "] Max retry count reached, cancelling order");
+			logger.warning("[" + GetId() +
+				       "] Max retry count reached, cancelling order");
 			status = ORDER_STATUS_CANCELLED;
 			pendingToOpen = false;
 			isProcessed = true;
@@ -154,7 +155,10 @@ public:
 
 		if (marketStatus.isClosed) {
 			retryAfter = currentTime + marketStatus.opensInSeconds;
-			logger.info("-------- [" + GetId() + "] Open pending: Market closed, will retry in " + IntegerToString(marketStatus.opensInSeconds) + " seconds");
+			logger.info("-------- [" + GetId() +
+				    "] Open pending: Market closed, will retry in " +
+				    IntegerToString(marketStatus.opensInSeconds) +
+				    " seconds");
 			return;
 		}
 
@@ -173,14 +177,18 @@ public:
 			return;
 
 		if (retryCount >= MAX_RETRY_COUNT) {
-			logger.warning("[" + GetId() + "] Max retry count reached for close, giving up");
+			logger.warning("[" + GetId() +
+				       "] Max retry count reached for close, giving up");
 			pendingToClose = false;
 			retryCount = 0;
 			return;
 		}
 
 		if (marketStatus.isClosed) {
-			logger.info("[" + GetId() + "] Close pending: Market closed, will retry in " + IntegerToString(marketStatus.opensInSeconds) + " seconds");
+			logger.info("[" + GetId() +
+				    "] Close pending: Market closed, will retry in " +
+				    IntegerToString(marketStatus.opensInSeconds) +
+				    " seconds");
 			retryAfter = currentTime + marketStatus.opensInSeconds;
 			return;
 		}
@@ -201,7 +209,8 @@ public:
 			isProcessed = true;
 			pendingToOpen = false;
 
-			logger.info("[" + GetId() + "] Order cancelled - Volume does not meet minimum requirements");
+			logger.info("[" + GetId() +
+				    "] Order cancelled - Volume does not meet minimum requirements");
 
 			if (CheckPointer(orderPersistence) != POINTER_INVALID)
 				orderPersistence.DeleteOrderJson(source, GetId());
@@ -221,7 +230,7 @@ public:
 			mainTakeProfitAtPrice,
 			mainStopLossAtPrice,
 			magicNumber
-			);
+		);
 
 		OnOpen(result);
 	}
@@ -233,19 +242,28 @@ public:
 			if (marketStatus.isClosed) {
 				pendingToClose = true;
 				retryAfter = dtime.Timestamp() + marketStatus.opensInSeconds;
-				logger.info("[" + GetId() + "] Close pending: Market closed, will retry in " + IntegerToString(marketStatus.opensInSeconds) + " seconds");
+				logger.info("[" + GetId() +
+					    "] Close pending: Market closed, will retry in " +
+					    IntegerToString(marketStatus.opensInSeconds) +
+					    " seconds");
 				return;
 			}
 
-			logger.info("[" + GetId() + "] Closing open position, position_id: " + IntegerToString(GetPositionId()));
+			logger.info("[" + GetId() +
+				    "] Closing open position, position_id: " +
+				    IntegerToString(GetPositionId()));
 
 			if (!ATrade::Close(GetPositionId())) {
 				retryCount++;
-				logger.error("[" + GetId() + "] Failed to close open position, retry " + IntegerToString(retryCount) + "/" + IntegerToString(MAX_RETRY_COUNT));
+				logger.error("[" + GetId() +
+					     "] Failed to close open position, retry " +
+					     IntegerToString(retryCount) + "/" +
+					     IntegerToString(MAX_RETRY_COUNT));
 				return;
 			}
 
-			logger.info("[" + GetId() + "] Close order sent to broker, waiting for confirmation...");
+			logger.info("[" + GetId() +
+				    "] Close order sent to broker, waiting for confirmation...");
 			status = ORDER_STATUS_CLOSING;
 			pendingToClose = false;
 			retryCount = 0;
@@ -254,7 +272,8 @@ public:
 
 		if (status == ORDER_STATUS_PENDING) {
 			if (GetOrderId() == 0) {
-				logger.info("[" + GetId() + "] Cannot cancel order: invalid orderId");
+				logger.info("[" + GetId() +
+					    "] Cannot cancel order: invalid orderId");
 				status = ORDER_STATUS_CANCELLED;
 				pendingToOpen = false;
 
@@ -265,7 +284,10 @@ public:
 			}
 
 			if (!OrderSelect(GetOrderId())) {
-				logger.info("[" + GetId() + "] Order no longer exists (orderId: " + IntegerToString(GetOrderId()) + "), updating status to cancelled");
+				logger.info("[" + GetId() +
+					    "] Order no longer exists (orderId: " +
+					    IntegerToString(GetOrderId()) +
+					    "), updating status to cancelled");
 				status = ORDER_STATUS_CANCELLED;
 				pendingToOpen = false;
 
@@ -276,11 +298,14 @@ public:
 			}
 
 			if (!ATrade::Cancel(GetOrderId())) {
-				logger.error("[" + GetId() + "] Failed to cancel pending order, orderId: " + IntegerToString(GetOrderId()));
+				logger.error("[" + GetId() +
+					     "] Failed to cancel pending order, orderId: " +
+					     IntegerToString(GetOrderId()));
 				return;
 			}
 
-			logger.info("[" + GetId() + "] Cancel order sent to broker, waiting for confirmation...");
+			logger.info("[" + GetId() +
+				    "] Cancel order sent to broker, waiting for confirmation...");
 			status = ORDER_STATUS_CLOSING;
 			pendingToOpen = false;
 			return;
@@ -288,9 +313,13 @@ public:
 	}
 
 	void OnOpen(const MqlTradeResult &result) {
-		if (result.retcode != 0 && result.retcode != 10009 && result.retcode != 10010) {
+		if (result.retcode != 0 && result.retcode != 10009 &&
+		    result.retcode != 10010) {
 			retryCount++;
-			logger.error("[" + GetId() + "] Error opening order: " + IntegerToString(result.retcode) + ", retry " + IntegerToString(retryCount) + "/" + IntegerToString(MAX_RETRY_COUNT));
+			logger.error("[" + GetId() + "] Error opening order: " +
+				     IntegerToString(result.retcode) + ", retry " +
+				     IntegerToString(retryCount) + "/" +
+				     IntegerToString(MAX_RETRY_COUNT));
 
 			if (retryCount >= MAX_RETRY_COUNT) {
 				status = ORDER_STATUS_CANCELLED;
@@ -320,12 +349,20 @@ public:
 
 		if (GetDealId() == 0) {
 			status = ORDER_STATUS_PENDING;
-			logger.info("[" + GetId() + "] Order opened as pending, orderId: " + IntegerToString(GetOrderId()));
+			logger.info("[" + GetId() + "] Order opened as pending, orderId: " +
+				    IntegerToString(GetOrderId()));
 		} else {
-			if (wasPending)
-				logger.info("[" + GetId() + "] Pending order has opened, dealId: " + IntegerToString(GetDealId()) + ", positionId: " + IntegerToString(GetPositionId()));
-			else
-				logger.info("[" + GetId() + "] Order opened immediately, dealId: " + IntegerToString(GetDealId()) + ", positionId: " + IntegerToString(GetPositionId()));
+			if (wasPending) {
+				logger.info("[" + GetId() +
+					    "] Pending order has opened, dealId: " +
+					    IntegerToString(GetDealId()) + ", positionId: " +
+					    IntegerToString(GetPositionId()));
+			} else {
+				logger.info("[" + GetId() +
+					    "] Order opened immediately, dealId: " +
+					    IntegerToString(GetDealId()) + ", positionId: " +
+					    IntegerToString(GetPositionId()));
+			}
 
 			status = ORDER_STATUS_OPEN;
 		}
@@ -341,7 +378,7 @@ public:
 		double price,
 		double profits,
 		ENUM_DEAL_REASON reason
-		) {
+	) {
 		closeAt = time;
 		closePrice = price;
 		profitInDollars = profits;
@@ -423,23 +460,35 @@ public:
 		double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
 
 		if (volume <= 0) {
-			logger.info("[" + GetId() + "] Validation failed - Volume is zero or negative: " + DoubleToString(volume, 5));
+			logger.info("[" + GetId() +
+				    "] Validation failed - Volume is zero or negative: " +
+				    DoubleToString(volume, 5));
 			return false;
 		}
 
 		if (volume < minLot) {
-			logger.info("[" + GetId() + "] Validation failed - Volume " + DoubleToString(volume, 5) + " is below minimum lot size: " + DoubleToString(minLot, 5));
+			logger.info("[" + GetId() + "] Validation failed - Volume " +
+				    DoubleToString(volume,
+						   5) + " is below minimum lot size: " +
+				    DoubleToString(minLot, 5));
 			return false;
 		}
 
 		if (volume > maxLot) {
-			logger.info("[" + GetId() + "] Validation failed - Volume " + DoubleToString(volume, 5) + " exceeds maximum lot size: " + DoubleToString(maxLot, 5));
+			logger.info("[" + GetId() + "] Validation failed - Volume " +
+				    DoubleToString(volume,
+						   5) + " exceeds maximum lot size: " +
+				    DoubleToString(maxLot, 5));
 			return false;
 		}
 
 		double normalizedVolume = MathFloor(volume / lotStep) * lotStep;
 		if (normalizedVolume < minLot) {
-			logger.info("[" + GetId() + "] Validation failed - Normalized volume " + DoubleToString(normalizedVolume, 5) + " is below minimum after lot step adjustment");
+			logger.info("[" + GetId() +
+				    "] Validation failed - Normalized volume " +
+				    DoubleToString(normalizedVolume,
+						   5) +
+				    " is below minimum after lot step adjustment");
 			return false;
 		}
 
@@ -511,7 +560,8 @@ public:
 		if (!PositionSelectByTicket(GetPositionId()))
 			return 0.0;
 
-		return PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
+		return PositionGetDouble(POSITION_PROFIT) +
+		       PositionGetDouble(POSITION_SWAP);
 	}
 
 	SDateTime GetSignalAt() {
@@ -570,11 +620,15 @@ public:
 
 		if (status == ORDER_STATUS_OPEN) {
 			if (!ATrade::ModifyTakeProfit(takeProfitAtPrice, magicNumber)) {
-				logger.error("[" + GetId() + "] Failed to modify take profit on open position");
+				logger.error("[" + GetId() +
+					     "] Failed to modify take profit on open position");
 				return false;
 			}
 
-			logger.info("[" + GetId() + "] Take profit modified to: " + DoubleToString(takeProfitAtPrice, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS)));
+			logger.info("[" + GetId() + "] Take profit modified to: " +
+				    DoubleToString(takeProfitAtPrice,
+						   (int)SymbolInfoInteger(symbol,
+									  SYMBOL_DIGITS)));
 		}
 
 		return true;
@@ -588,11 +642,15 @@ public:
 
 		if (status == ORDER_STATUS_OPEN) {
 			if (!ATrade::ModifyStopLoss(stopLossAtPrice, magicNumber)) {
-				logger.error("[" + GetId() + "] Failed to modify stop loss on open position");
+				logger.error("[" + GetId() +
+					     "] Failed to modify stop loss on open position");
 				return false;
 			}
 
-			logger.info("[" + GetId() + "] Stop loss modified to: " + DoubleToString(stopLossAtPrice, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS)));
+			logger.info("[" + GetId() + "] Stop loss modified to: " +
+				    DoubleToString(stopLossAtPrice,
+						   (int)SymbolInfoInteger(symbol,
+									  SYMBOL_DIGITS)));
 		}
 
 		return true;

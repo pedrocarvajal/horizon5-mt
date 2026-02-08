@@ -15,7 +15,8 @@ double calculateStability(double &performance[], double totalProfit) {
 	return rSquared;
 }
 
-double calculateStabilitySQ3(double &performance[], double totalProfit, int totalTrades) {
+double calculateStabilitySQ3(double &performance[], double totalProfit,
+			     int totalTrades) {
 	if (ArraySize(performance) < 3)
 		return 0.0;
 
