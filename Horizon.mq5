@@ -23,6 +23,7 @@ input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 #include "constants/time.mqh"
 
 #include "configs/Assets.mqh"
+#include "services/SEDb/SEDbTest.mqh"
 
 SEDateTime dtime;
 SELogger hlogger;
@@ -39,8 +40,12 @@ int OnInit() {
 
 	// Variables
 	dtime = SEDateTime();
+	SEDbTest seDbTest;
 
 	hlogger.SetPrefix("Horizon");
+
+	if (!seDbTest.Run())
+		return INIT_FAILED;
 
 	lastCheckedDay = dtime.Today().dayOfYear;
 	lastCheckedHour = dtime.Today().hour;
