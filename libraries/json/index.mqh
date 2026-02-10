@@ -88,7 +88,9 @@ public:
 		void getKeysToArray(string &array[]) const {
 			ArrayResize(array, ArraySize(this._jsonValueItemsArray));
 			for (int i = 0; i < ArraySize(this._jsonValueItemsArray);
-			     array[i] = this._jsonValueItemsArray[i].key, i++) ;
+			     array[i] = this._jsonValueItemsArray[i].key, i++) {
+				;
+			}
 		}
 
 		string toString() const {
@@ -129,20 +131,24 @@ private:
 			return &this;
 		}
 		const JsonValueItem *_getProperty(string key) const {
-			for (int i = 0; i < ArraySize(this._jsonValueItemsArray); i++)
+			for (int i = 0; i < ArraySize(this._jsonValueItemsArray); i++) {
 				if (this._jsonValueItemsArray[i].key == key)
 					return this._jsonValueItemsArray[i];
+			}
 			return NULL;
 		}
 		JSONValueItemTypes _getPropertyType(string key) const {
-			for (int i = 0; i < ArraySize(this._jsonValueItemsArray); i++)
+			for (int i = 0; i < ArraySize(this._jsonValueItemsArray); i++) {
 				if (this._jsonValueItemsArray[i].key == key)
 					return this._jsonValueItemsArray[i].valueType;
+			}
 			return JSONUndefinedType;
 		}
 		void _clearResources() {
 			for (int i = 0; i < ArraySize(this._jsonValueItemsArray);
-			     i++) delete this._jsonValueItemsArray[i];
+			     i++) {
+				delete this._jsonValueItemsArray[i];
+			}
 			ArrayResize(this._jsonValueItemsArray, 0);
 		}
 	};
@@ -258,7 +264,9 @@ private:
 		}
 		void _clearResources() {
 			for (int i = 0; i < ArraySize(this._jsonValueItemsArray);
-			     i++) delete this._jsonValueItemsArray[i];
+			     i++) {
+				delete this._jsonValueItemsArray[i];
+			}
 			ArrayResize(this._jsonValueItemsArray, 0);
 		}
 	};
@@ -270,7 +278,9 @@ private:
 	static void _parseJSONObject(const string &json, int &i, bool &isSuccess,
 				     JSON::Object *object) {
 		JSON::_skipWhitespace(json, i);
-		while (i < StringLen(json) && json[i++] != '{') ; // skip '{'
+		while (i < StringLen(json) && json[i++] != '{') {
+			;                                         // skip '{'
+		}
 		JSON::_skipWhitespace(json, i);
 
 		while (i < StringLen(json)) {
@@ -314,7 +324,9 @@ private:
 	static void _parseJSONArray(const string &json, int &i, bool &isSuccess,
 				    JSON::Array *arrayObject) {
 		JSON::_skipWhitespace(json, i);
-		while (i < StringLen(json) && json[i++] != '[') ; // skip '['
+		while (i < StringLen(json) && json[i++] != '[') {
+			;                                         // skip '['
+		}
 		JSON::_skipWhitespace(json, i);
 
 		while (i < StringLen(json)) {
@@ -353,7 +365,9 @@ private:
 	static void _skipWhitespace(const string &json, int &i) {
 		while (i < StringLen(json) &&
 		       (json[i] == ' ' || json[i] == '\n' || json[i] == '\r' ||
-			json[i] == '\t')) i++;
+			json[i] == '\t')) {
+			i++;
+		}
 	}
 	static string _parseKey(const string &json, int &i, bool &isSuccess) {
 		if (i < StringLen(json) && json[i] == '"') {
@@ -361,7 +375,9 @@ private:
 			string key = "";
 
 			while (i < StringLen(json) &&
-			       json[i] != '"') key += ShortToString(json[i++]);
+			       json[i] != '"') {
+				key += ShortToString(json[i++]);
+			}
 			if (i < StringLen(json) && json[i] == '"') { // check end '"'
 				i++;                    // skip '"'
 				return key;
@@ -380,13 +396,15 @@ private:
 			i++;
 		}
 
-		while (i < StringLen(json) && JSON::_isDigit(json[i]))
+		while (i < StringLen(json) && JSON::_isDigit(json[i])) {
 			numberStr += ShortToString(json[i++]);
+		}
 
 		if (i < StringLen(json) && json[i] == '.') {
 			numberStr += ShortToString(json[i++]);
-			while (i < StringLen(json) && JSON::_isDigit(json[i]))
+			while (i < StringLen(json) && JSON::_isDigit(json[i])) {
 				numberStr += ShortToString(json[i++]);
+			}
 		}
 
 		if (StringLen(numberStr) > 0) {

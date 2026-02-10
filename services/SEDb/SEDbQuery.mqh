@@ -21,9 +21,10 @@ public:
 			return false;
 
 		int size = ArraySize(conditions);
-		for (int i = 0; i < size; i++)
+		for (int i = 0; i < size; i++) {
 			if (!evaluateCondition(document, conditions[i]))
 				return false;
+		}
 
 		return true;
 	}

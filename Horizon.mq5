@@ -72,9 +72,10 @@ int OnInit() {
 		return INIT_FAILED;
 	}
 
-	for (int i = 0; i < assetCount; i++)
+	for (int i = 0; i < assetCount; i++) {
 		if (assets[i].IsEnabled())
 			enabledAssetCount++;
+	}
 
 	if (enabledAssetCount == 0) {
 		hlogger.error("No assets are enabled.");
@@ -145,26 +146,30 @@ int OnInit() {
 void OnDeinit(const int reason) {
 	EventKillTimer();
 
-	for (int i = 0; i < ArraySize(assets); i++)
+	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].OnDeinit();
+	}
 
 	if (reason != REASON_CHARTCHANGE && reason != REASON_PARAMETERS) {
-		for (int i = 0; i < ArraySize(assets); i++)
+		for (int i = 0; i < ArraySize(assets); i++) {
 			if (CheckPointer(assets[i]) != POINTER_INVALID)
 				delete assets[i];
+		}
 	}
 }
 
 void OnTimer() {
 	SDateTime now = dtime.Now();
 
-	for (int i = 0; i < ArraySize(assets); i++)
+	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].OnTimer();
+	}
 
 	// Start of week (Monday) - executed FIRST
 	if (now.dayOfWeek == 1 && lastStartWeekYday != now.dayOfYear) {
-		for (int i = 0; i < ArraySize(assets); i++)
+		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].OnStartWeek();
+		}
 
 		lastStartWeekYday = now.dayOfYear;
 	}
@@ -172,8 +177,9 @@ void OnTimer() {
 	// End of week (Friday 23:00 or later) - executed BEFORE daily/hourly triggers
 	if (now.dayOfWeek == 5 && now.hour >= 23 &&
 	    lastEndWeekYday != now.dayOfYear) {
-		for (int i = 0; i < ArraySize(assets); i++)
+		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].OnEndWeek();
+		}
 
 		lastEndWeekYday = now.dayOfYear;
 	}
@@ -182,27 +188,31 @@ void OnTimer() {
 	if (now.dayOfYear != lastCheckedDay) {
 		lastCheckedDay = now.dayOfYear;
 
-		for (int i = 0; i < ArraySize(assets); i++)
+		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].CleanupClosedOrders();
+		}
 
-		for (int i = 0; i < ArraySize(assets); i++)
+		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].OnStartDay();
+		}
 	}
 
 	// Start of new hour
 	if (now.hour != lastCheckedHour) {
 		lastCheckedHour = now.hour;
 
-		for (int i = 0; i < ArraySize(assets); i++)
+		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].OnStartHour();
+		}
 	}
 
 	// Start of new month
 	if (now.month != lastCheckedMonth) {
 		lastCheckedMonth = now.month;
 
-		for (int i = 0; i < ArraySize(assets); i++)
+		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].OnStartMonth();
+		}
 	}
 
 	// Start of new minute
@@ -210,16 +220,19 @@ void OnTimer() {
 	if (now.minute != lastCheckedMinute) {
 		lastCheckedMinute = now.minute;
 
-		for (int i = 0; i < ArraySize(assets); i++)
+		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].OnStartMinute();
+		}
 	}
 
 	// Per-tick processing
-	for (int i = 0; i < ArraySize(assets); i++)
+	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].OnTick();
+	}
 
-	for (int i = 0; i < ArraySize(assets); i++)
+	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].ProcessOrders();
+	}
 }
 
 void OnTradeTransaction(
@@ -463,18 +476,21 @@ double OnTester() {
 			quality = MathPow(quality * assetQuality, 1.0 / 2.0);
 	}
 
-	for (int i = 0; i < ArraySize(assets); i++)
+	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].ExportOrderHistory();
+	}
 
-	for (int i = 0; i < ArraySize(assets); i++)
+	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].ExportSnapshotHistory();
+	}
 
 	return quality;
 }
 
 int OnTesterInit() {
-	for (int i = 0; i < ArraySize(assets); i++)
+	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].OnTesterInit();
+	}
 
 	return INIT_SUCCEEDED;
 }

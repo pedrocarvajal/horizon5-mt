@@ -170,8 +170,9 @@ public:
 			}
 		}
 
-		for (int i = 0; i < ArraySize(idsToDelete); i++)
+		for (int i = 0; i < ArraySize(idsToDelete); i++) {
 			ordersCollection.DeleteOne("_id", idsToDelete[i]);
+		}
 
 		logger.info(StringFormat("Order restoration completed"));
 		logger.info(StringFormat("Documents found: %d", foundCount));
