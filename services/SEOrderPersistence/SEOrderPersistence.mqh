@@ -1,10 +1,10 @@
 #ifndef __SE_ORDER_PERSISTENCE_MQH__
 #define __SE_ORDER_PERSISTENCE_MQH__
 
-#include "../../libraries/json/index.mqh"
 #include "../../helpers/HIsLiveTrading.mqh"
 #include "../SELogger/SELogger.mqh"
 #include "../SEDateTime/SEDateTime.mqh"
+#include "../SEDb/SEDb.mqh"
 #include "../../entities/EOrder.mqh"
 
 extern SEDateTime dtime;
@@ -12,35 +12,12 @@ extern SEDateTime dtime;
 class SEOrderPersistence {
 private:
 	SELogger logger;
+	SEDb database;
+	SEDbCollection *ordersCollection;
 
-	string basePath;
-
-	bool CreateDirectoryStructure(string strategyName) {
-		string symbolPath = StringFormat("%s/%s", basePath, _Symbol);
-		string strategyPath = StringFormat("%s/%s", symbolPath, strategyName);
-		string ordersPath = StringFormat("%s/orders", strategyPath);
-
-		string paths[] = { symbolPath, strategyPath, ordersPath };
-
-		for (int i = 0; i < ArraySize(paths); i++) {
-			string keepFile = StringFormat("%s/.keep", paths[i]);
-			int handle = FileOpen(keepFile, FILE_WRITE | FILE_TXT | FILE_COMMON);
-
-			if (handle == INVALID_HANDLE)
-				return false;
-
-			FileClose(handle);
-			FileDelete(keepFile, FILE_COMMON);
-		}
-
-		return true;
-	}
-
-	bool DeserializeOrder(string jsonData, EOrder &order) {
-		JSON::Object json(jsonData);
-
-		if (!json.hasValue("id")) {
-			logger.error("Failed to deserialize order JSON");
+	bool DeserializeOrder(JSON::Object *json, EOrder &order) {
+		if (json == NULL || !json.hasValue("_id")) {
+			logger.error("Failed to deserialize order document");
 			return false;
 		}
 
@@ -53,7 +30,7 @@ private:
 		order.SetRetryAfter((datetime)json.getNumber("retry_after"));
 		order.SetStatus((ENUM_ORDER_STATUSES)json.getNumber("status"));
 
-		order.SetId(json.getString("id"));
+		order.SetId(json.getString("_id"));
 		order.SetSource(json.getString("source"));
 		order.SetSymbol(json.getString("symbol"));
 		order.SetMagicNumber((ulong)json.getNumber("magic_number"));
@@ -77,32 +54,10 @@ private:
 		return true;
 	}
 
-	string GetOrderFilePath(string strategyName, string orderId) {
-		string safeOrderId = SanitizeFileName(orderId);
-		return StringFormat("%s/%s/%s/orders/%s.json", basePath, _Symbol, strategyName, safeOrderId);
-	}
+	JSON::Object *SerializeOrder(EOrder &order) {
+		JSON::Object *json = new JSON::Object();
 
-	string GetStrategyOrdersPath(string strategyName) {
-		return StringFormat("%s/%s/%s/orders/", basePath, _Symbol, strategyName);
-	}
-
-	string SanitizeFileName(string filename) {
-		string result = filename;
-		StringReplace(result, ":", "_");
-		StringReplace(result, "/", "_");
-		StringReplace(result, "\\", "_");
-		StringReplace(result, "*", "_");
-		StringReplace(result, "?", "_");
-		StringReplace(result, "\"", "_");
-		StringReplace(result, "<", "_");
-		StringReplace(result, ">", "_");
-		StringReplace(result, "|", "_");
-		return result;
-	}
-
-	string SerializeOrder(EOrder &order) {
-		JSON::Object json;
-
+		json.setProperty("_id", order.GetId());
 		json.setProperty("is_initialized", order.IsInitialized());
 		json.setProperty("is_processed", order.IsProcessed());
 		json.setProperty("is_market_order", order.IsMarketOrder());
@@ -112,7 +67,6 @@ private:
 		json.setProperty("retry_after", (long)order.GetRetryAfter());
 		json.setProperty("status", (int)order.GetStatus());
 
-		json.setProperty("id", order.GetId());
 		json.setProperty("source", order.GetSource());
 		json.setProperty("symbol", order.GetSymbol());
 		json.setProperty("magic_number", (long)order.GetMagicNumber());
@@ -130,166 +84,123 @@ private:
 
 		json.setProperty("signal_at", (long)order.GetSignalAt().timestamp);
 		json.setProperty("open_at", (long)order.GetOpenAt().timestamp);
-
 		json.setProperty("saved_at", (long)dtime.Timestamp());
 
-		return json.toString();
+		return json;
 	}
 
 public:
 	SEOrderPersistence() {
 		logger.SetPrefix("OrderPersistence");
-		basePath = "Horizon5";
+		ordersCollection = NULL;
 	}
 
-	bool DeleteOrderJson(string strategyName, string orderId) {
+	void Initialize(string strategyName) {
+		string basePath = StringFormat("Horizon5/%s/%s", _Symbol, strategyName);
+		database.Initialize(basePath, true);
+		ordersCollection = database.Collection("orders");
+	}
+
+	bool DeleteOrder(string orderId) {
 		if (!isLiveTrading())
 			return true;
 
-		string filePath = GetOrderFilePath(strategyName, orderId);
+		if (ordersCollection == NULL)
+			return false;
 
-		if (!FileDelete(filePath, FILE_COMMON)) {
-			int error = GetLastError();
+		bool deleted = ordersCollection.DeleteOne("_id", orderId);
 
-			if (error != ERR_FILE_NOT_EXIST) {
-				logger.error(StringFormat(
-					" Cannot delete order file: %s Error: %d",
-					filePath,
-					error
-				));
+		if (deleted)
+			logger.info(StringFormat("Order deleted from database: %s", orderId));
 
-				return false;
-			}
-		}
-
-		logger.info(StringFormat("Order JSON deleted: %s", filePath));
 		return true;
 	}
 
-	int LoadOrdersFromJson(string strategyName, EOrder &restoredOrders[]) {
+	int LoadOrders(EOrder &restoredOrders[]) {
 		if (!isLiveTrading())
 			return 0;
 
-		logger.info(StringFormat("Starting order restoration for strategy: %s", strategyName));
-
-		string ordersPath = GetStrategyOrdersPath(strategyName);
-		string searchPattern = StringFormat("%s*.json", ordersPath);
-		string fileName;
-
-		long searchHandle = FileFindFirst(searchPattern, fileName, FILE_COMMON);
-		if (searchHandle == INVALID_HANDLE) {
-			logger.info(StringFormat("No order files found for strategy: %s", strategyName));
+		if (ordersCollection == NULL)
 			return 0;
-		}
 
+		int documentCount = ordersCollection.Count();
+		logger.info(StringFormat("Starting order restoration, found %d documents", documentCount));
+
+		if (documentCount == 0)
+			return 0;
+
+		SEDbQuery findAll;
+		JSON::Object *documents[];
+		int foundCount = ordersCollection.Find(findAll, documents);
+
+		string idsToDelete[];
 		int loadedCount = 0;
-		int processedFiles = 0;
 
-		do {
-			processedFiles++;
+		for (int i = 0; i < foundCount; i++) {
+			EOrder order;
 
-			if (StringFind(fileName, "._") == 0 || StringFind(fileName, ".") == 0) {
-				logger.info(StringFormat("Skipping system file: %s", fileName));
-				continue;
-			}
+			if (DeserializeOrder(documents[i], order)) {
+				if (ValidateOrderExists(order)) {
+					ArrayResize(restoredOrders, ArraySize(restoredOrders) + 1);
+					restoredOrders[ArraySize(restoredOrders) - 1] = order;
+					loadedCount++;
 
-			if (StringFind(fileName, ".json") == -1) {
-				logger.info(StringFormat("Skipping non-JSON file: %s", fileName));
-				continue;
-			}
-
-			logger.info(StringFormat("Processing order file: %s", fileName));
-			string fullPath = ordersPath + fileName;
-			int handle = FileOpen(fullPath, FILE_READ | FILE_TXT | FILE_COMMON | FILE_ANSI);
-
-			if (handle != INVALID_HANDLE) {
-				string jsonData = "";
-				EOrder order;
-
-				while (!FileIsEnding(handle))
-					jsonData += FileReadString(handle);
-
-				FileClose(handle);
-
-				if (DeserializeOrder(jsonData, order)) {
-					if (ValidateOrderExists(order)) {
-						ArrayResize(restoredOrders, ArraySize(restoredOrders) + 1);
-						restoredOrders[ArraySize(restoredOrders) - 1] = order;
-						loadedCount++;
-
-						logger.info(StringFormat(
-							"Order loaded successfully: %s (Status: %s)",
-							order.GetId(),
-							EnumToString(order.GetStatus())
-						));
-					} else {
-						logger.warning(StringFormat(
-							" Order no longer exists in MetaTrader, cleaning up: %s",
-							order.GetId()
-						));
-
-						DeleteOrderJson(strategyName, order.GetId());
-					}
+					logger.info(StringFormat(
+						"Order loaded successfully: %s (Status: %s)",
+						order.GetId(),
+						EnumToString(order.GetStatus())
+					));
 				} else {
-					logger.error(StringFormat(
-						"CRITICAL ERROR: Failed to deserialize order from: %s",
-						fileName
+					logger.warning(StringFormat(
+						"Order no longer exists in MetaTrader, cleaning up: %s",
+						order.GetId()
 					));
 
-					logger.info(StringFormat("JSON data length: %d", StringLen(jsonData)));
-					logger.info(StringFormat("First 100 chars: %s", StringSubstr(jsonData, 0, 100)));
-					FileFindClose(searchHandle);
-					return -1;
+					int deleteSize = ArraySize(idsToDelete);
+					ArrayResize(idsToDelete, deleteSize + 1);
+					idsToDelete[deleteSize] = order.GetId();
 				}
 			} else {
 				logger.error(StringFormat(
-					"CRITICAL ERROR: Cannot open file: %s Error: %d",
-					fileName,
-					GetLastError()
+					"CRITICAL ERROR: Failed to deserialize order document at index %d",
+					i
 				));
 
-				FileFindClose(searchHandle);
 				return -1;
 			}
-		} while (FileFindNext(searchHandle, fileName));
+		}
 
-		FileFindClose(searchHandle);
+		for (int i = 0; i < ArraySize(idsToDelete); i++)
+			ordersCollection.DeleteOne("_id", idsToDelete[i]);
 
-		logger.info(StringFormat("Order restoration completed for strategy: %s", strategyName));
-		logger.info(StringFormat("Files processed: %d", processedFiles));
+		logger.info(StringFormat("Order restoration completed"));
+		logger.info(StringFormat("Documents found: %d", foundCount));
 		logger.info(StringFormat("Orders loaded: %d", loadedCount));
 		return loadedCount;
 	}
 
-	bool SaveOrderToJson(EOrder &order) {
+	bool SaveOrder(EOrder &order) {
 		if (!isLiveTrading())
 			return true;
 
-		if (!CreateDirectoryStructure(order.GetSource())) {
-			logger.error(StringFormat("Cannot create directory structure for strategy: %s", order.GetSource()));
+		if (ordersCollection == NULL)
 			return false;
-		}
 
-		string filePath = GetOrderFilePath(order.GetSource(), order.GetId());
-		string jsonData = SerializeOrder(order);
+		JSON::Object *json = SerializeOrder(order);
+		JSON::Object *existing = ordersCollection.FindOne("_id", order.GetId());
+		bool result;
 
-		int handle = FileOpen(filePath, FILE_WRITE | FILE_TXT | FILE_COMMON | FILE_ANSI);
-		if (handle == INVALID_HANDLE) {
-			logger.error(StringFormat(
-				" Cannot create order file: %s Error: %d",
-				filePath,
-				GetLastError()
-			));
+		if (existing != NULL)
+			result = ordersCollection.UpdateOne("_id", order.GetId(), json);
+		else
+			result = ordersCollection.InsertOne(json);
 
-			return false;
-		}
+		delete json;
 
-		FileWriteString(handle, jsonData);
-		FileFlush(handle);
-		FileClose(handle);
+		if (result)
+			logger.info(StringFormat("Order saved to database: %s", order.GetId()));
 
-		logger.info(StringFormat("Order saved to JSON: %s", filePath));
-		return true;
+		return result;
 	}
 
 	bool ValidateOrderExists(EOrder &order) {
