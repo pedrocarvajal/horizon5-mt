@@ -11,7 +11,7 @@ input bool EnableSnapshotHistoryReport = false; // [1] > Enable snapshot history
 
 input group "Risk management";
 input bool EquityAtRiskCompounded = true; // [1] > Equity at risk compounded
-input double EquityAtRisk = 10; // [1] > Equity at risk value (in percentage)
+input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
 #include <Trade/Trade.mqh>
 #include "services/SEDateTime/SEDateTime.mqh"
