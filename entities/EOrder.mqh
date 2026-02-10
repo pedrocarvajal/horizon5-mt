@@ -428,7 +428,7 @@ public:
 		Snapshot();
 
 		if (CheckPointer(persistence) != POINTER_INVALID)
-			persistence.SaveOrderToJson(this);
+			persistence.SaveOrder(this);
 	}
 
 	void OnClose(
@@ -470,7 +470,7 @@ public:
 
 		if (status == ORDER_STATUS_CLOSED)
 			if (CheckPointer(persistence) != POINTER_INVALID)
-				persistence.DeleteOrderJson(source, GetId());
+				persistence.DeleteOrder(GetId());
 	}
 
 	void OnDeinit() {
@@ -487,7 +487,7 @@ public:
 		isProcessed = true;
 
 		if (CheckPointer(persistence) != POINTER_INVALID)
-			persistence.DeleteOrderJson(source, GetId());
+			persistence.DeleteOrder(GetId());
 	}
 
 	string GetId() {

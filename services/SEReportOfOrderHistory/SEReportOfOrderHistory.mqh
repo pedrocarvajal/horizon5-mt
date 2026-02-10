@@ -1,30 +1,33 @@
 #ifndef __SE_REPORT_OF_ORDER_HISTORY_MQH__
 #define __SE_REPORT_OF_ORDER_HISTORY_MQH__
 
-#include "../../libraries/json/index.mqh"
 #include "../../structs/SSOrderHistory.mqh"
 #include "../SELogger/SELogger.mqh"
 #include "../SEDateTime/SEDateTime.mqh"
 #include "../SEDateTime/structs/SDateTime.mqh"
-
+#include "../SEDb/SEDb.mqh"
 
 extern SEDateTime dtime;
 
 class SEReportOfOrderHistory {
 private:
 	SELogger logger;
+	SEDb database;
+	SEDbCollection *ordersCollection;
 
 	string reportsDir;
 	string reportName;
 	bool useCommonFiles;
-	SSOrderHistory orderHistory[];
 
 	void initialize(string directory, string name, bool useCommon) {
 		logger.SetPrefix("OrderHistoryReporter");
 		reportsDir = directory;
 		reportName = name;
 		useCommonFiles = useCommon;
-		ArrayResize(orderHistory, 0);
+
+		database.Initialize(directory, useCommon);
+		ordersCollection = database.Collection(name);
+		ordersCollection.SetAutoFlush(false);
 	}
 
 	JSON::Object *OrderHistoryToJson(const SSOrderHistory &history) {
@@ -53,33 +56,6 @@ private:
 		return obj;
 	}
 
-	JSON::Array *OrderHistoryArrayToJsonArray(
-		const SSOrderHistory &histories[],
-		int count
-	) {
-		JSON::Array *arr = new JSON::Array();
-
-		for (int i = 0; i < count; i++)
-			arr.add(OrderHistoryToJson(histories[i]));
-
-		return arr;
-	}
-
-	JSON::Object *BuildJsonReport() {
-		JSON::Object *root = new JSON::Object();
-		root.setProperty("name", "Orders Report");
-
-		if (ArraySize(orderHistory) == 0) {
-			logger.warning("No order history data to export - creating empty report");
-			JSON::Array *emptyArray = new JSON::Array();
-			root.setProperty("data", emptyArray);
-		} else {
-			root.setProperty("data", OrderHistoryArrayToJsonArray(orderHistory, ArraySize(orderHistory)));
-		}
-
-		return root;
-	}
-
 public:
 	SEReportOfOrderHistory() {
 		initialize(
@@ -94,63 +70,28 @@ public:
 	}
 
 	void AddOrderSnapshot(const SSOrderHistory &snapshot) {
-		ArrayResize(orderHistory, ArraySize(orderHistory) + 1);
-		orderHistory[ArraySize(orderHistory) - 1] = snapshot;
+		JSON::Object *json = OrderHistoryToJson(snapshot);
+		ordersCollection.InsertOne(json);
+		delete json;
 	}
 
-	void ExportOrderHistoryToJsonFile() {
-		JSON::Object *root = BuildJsonReport();
-		string jsonStr = root.toString();
-		string filename = StringFormat("%s/%s.json", reportsDir, reportName);
-		int flags = FILE_WRITE | FILE_TXT | FILE_ANSI;
-
-		if (useCommonFiles)
-			flags |= FILE_COMMON;
-
+	void Export() {
 		logger.debug(StringFormat(
-			"Exporting %d orders to %s (full: %s\\%s.json)",
-			ArraySize(orderHistory), filename, GetCurrentReportsPath(), reportName
+			"Exporting %d orders to %s\\%s.json",
+			ordersCollection.Count(), GetCurrentReportsPath(), reportName
 		));
 
-		int file = FileOpen(filename, flags);
+		ordersCollection.Flush();
 
-		if (file == INVALID_HANDLE) {
-			int errorCode = GetLastError();
-
-			logger.error(StringFormat(
-				"Cannot create order history file '%s' - Error code: %d",
-				filename,
-				errorCode
-			));
-
-			logger.error(StringFormat(
-				"Flags used: %d (FILE_WRITE=%d, FILE_TXT=%d, FILE_ANSI=%d, FILE_COMMON=%d)",
-				flags,
-				FILE_WRITE,
-				FILE_TXT,
-				FILE_ANSI,
-				FILE_COMMON
-			));
-		} else {
-			FileWriteString(file, jsonStr);
-			FileClose(file);
-
-			logger.info(StringFormat(
-				"Order history saved - %s.json with %d orders",
-				reportName,
-				ArraySize(orderHistory)
-			));
-		}
-
-		delete root;
-	}
-
-	void PrintCurrentPath() {
-		logger.info(StringFormat("Order history reports saved to: %s", GetCurrentReportsPath()));
+		logger.info(StringFormat(
+			"Order history saved - %s.json with %d orders",
+			reportName,
+			ordersCollection.Count()
+		));
 	}
 
 	int GetOrderCount() {
-		return ArraySize(orderHistory);
+		return ordersCollection.Count();
 	}
 
 	string GetCurrentReportsPath() {
