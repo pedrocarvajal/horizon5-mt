@@ -30,7 +30,7 @@ private:
 		ordersCollection.SetAutoFlush(false);
 	}
 
-	JSON::Object *OrderHistoryToJson(const SSOrderHistory &history) {
+	JSON::Object *orderHistoryToJson(const SSOrderHistory &history) {
 		JSON::Object *obj = new JSON::Object();
 		obj.setProperty("order_id", history.orderId);
 		obj.setProperty("symbol", history.symbol);
@@ -70,7 +70,7 @@ public:
 	}
 
 	void AddOrderSnapshot(const SSOrderHistory &snapshot) {
-		JSON::Object *json = OrderHistoryToJson(snapshot);
+		JSON::Object *json = orderHistoryToJson(snapshot);
 		ordersCollection.InsertOne(json);
 		delete json;
 	}
