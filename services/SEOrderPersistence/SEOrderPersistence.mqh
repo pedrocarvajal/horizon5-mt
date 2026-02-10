@@ -22,7 +22,7 @@ public:
 	}
 
 	void Initialize(string strategyName) {
-		string basePath = StringFormat("Horizon5/%s/%s", _Symbol, strategyName);
+		string basePath = StringFormat("Live/%s/%s", _Symbol, strategyName);
 		database.Initialize(basePath, true);
 		ordersCollection = database.Collection("orders");
 	}
