@@ -4,6 +4,7 @@
 
 input group "General Settings";
 input ENUM_ORDER_TYPE_FILLING FillingMode = ORDER_FILLING_IOC; // [1] > Order filling mode
+input bool EnableTests = false; // [1] > Enable test on init
 
 input group "Reporting";
 input bool EnableOrderHistoryReport = false; // [1] > Enable order history report on tester
@@ -45,7 +46,15 @@ int OnInit() {
 	hlogger.SetPrefix("Horizon");
 
 	// Tests executions
+	bool executeAllTests = false;
+
 	if (isLiveTrading())
+		executeAllTests = true;
+	else
+	if (EnableTests)
+		executeAllTests = true;
+
+	if (executeAllTests)
 		if (!seDbTest.Run())
 			return INIT_FAILED;
 

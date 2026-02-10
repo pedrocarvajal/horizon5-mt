@@ -95,7 +95,7 @@ private:
 			return 0;
 
 		EOrder restoredOrders[];
-		int restoredCount = orderPersistence.LoadOrdersFromJson(prefix, restoredOrders);
+		int restoredCount = orderPersistence.LoadOrders(restoredOrders);
 
 		if (restoredCount == -1) {
 			logger.error(StringFormat(
@@ -219,6 +219,7 @@ public:
 
 		if (isLiveTrading()) {
 			orderPersistence = new SEOrderPersistence();
+			orderPersistence.Initialize(prefix);
 			int restored = RestoreOrders();
 
 			if (restored == -1)
@@ -285,7 +286,7 @@ public:
 		if (CheckPointer(orderHistoryReporter) == POINTER_INVALID)
 			return;
 
-		orderHistoryReporter.ExportOrderHistoryToJsonFile();
+		orderHistoryReporter.Export();
 
 		logger.info(StringFormat(
 			"Order history exported with %d orders",
@@ -298,7 +299,7 @@ public:
 			return;
 
 		snapshotHistoryReporter.AddSnapshot(statistics.GetDailySnapshot());
-		snapshotHistoryReporter.ExportSnapshotHistoryToJsonFile();
+		snapshotHistoryReporter.Export();
 
 		logger.info(StringFormat(
 			"Snapshot history exported with %d snapshots",

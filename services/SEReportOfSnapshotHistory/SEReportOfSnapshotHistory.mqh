@@ -1,30 +1,34 @@
 #ifndef __SE_REPORT_OF_SNAPSHOT_HISTORY_MQH__
 #define __SE_REPORT_OF_SNAPSHOT_HISTORY_MQH__
 
-#include "../../libraries/json/index.mqh"
 #include "../../structs/SSStatisticsSnapshot.mqh"
 #include "../../structs/SSOrderHistory.mqh"
 #include "../SELogger/SELogger.mqh"
 #include "../SEDateTime/SEDateTime.mqh"
 #include "../SEDateTime/structs/SDateTime.mqh"
+#include "../SEDb/SEDb.mqh"
 
 extern SEDateTime dtime;
 
 class SEReportOfSnapshotHistory {
 private:
 	SELogger logger;
+	SEDb database;
+	SEDbCollection *snapshotsCollection;
 
 	string reportsDir;
 	string reportName;
 	bool useCommonFiles;
-	SSStatisticsSnapshot snapshotHistory[];
 
 	void initialize(string directory, string name, bool useCommon) {
 		logger.SetPrefix("SnapshotHistoryReporter");
 		reportsDir = directory;
 		reportName = name;
 		useCommonFiles = useCommon;
-		ArrayResize(snapshotHistory, 0);
+
+		database.Initialize(directory, useCommon);
+		snapshotsCollection = database.Collection(name);
+		snapshotsCollection.SetAutoFlush(false);
 	}
 
 	JSON::Object *SnapshotToJson(const SSStatisticsSnapshot &snapshot) {
@@ -64,33 +68,6 @@ private:
 		return obj;
 	}
 
-	JSON::Array *SnapshotArrayToJsonArray(
-		const SSStatisticsSnapshot &snapshots[],
-		int count
-	) {
-		JSON::Array *arr = new JSON::Array();
-
-		for (int i = 0; i < count; i++)
-			arr.add(SnapshotToJson(snapshots[i]));
-
-		return arr;
-	}
-
-	JSON::Object *BuildJsonReport() {
-		JSON::Object *root = new JSON::Object();
-		root.setProperty("name", "Snapshot History Report");
-
-		if (ArraySize(snapshotHistory) == 0) {
-			logger.warning("No snapshot history data to export - creating empty report");
-			JSON::Array *emptyArray = new JSON::Array();
-			root.setProperty("data", emptyArray);
-		} else {
-			root.setProperty("data", SnapshotArrayToJsonArray(snapshotHistory, ArraySize(snapshotHistory)));
-		}
-
-		return root;
-	}
-
 public:
 	SEReportOfSnapshotHistory() {
 		initialize(
@@ -101,67 +78,37 @@ public:
 	}
 
 	SEReportOfSnapshotHistory(string customDir, bool useCommonFolder = false, string customReportName = "Snapshots") {
-		initialize(customDir, customReportName, useCommonFolder);
+		initialize(
+			customDir,
+			customReportName,
+			useCommonFolder
+		);
 	}
 
 	void AddSnapshot(const SSStatisticsSnapshot &snapshot) {
-		ArrayResize(snapshotHistory, ArraySize(snapshotHistory) + 1);
-		snapshotHistory[ArraySize(snapshotHistory) - 1] = snapshot;
+		JSON::Object *json = SnapshotToJson(snapshot);
+		snapshotsCollection.InsertOne(json);
+
+		delete json;
 	}
 
-	void ExportSnapshotHistoryToJsonFile() {
-		JSON::Object *root = BuildJsonReport();
-		string jsonStr = root.toString();
-		string filename = StringFormat("%s/%s.json", reportsDir, reportName);
-		int flags = FILE_WRITE | FILE_TXT | FILE_ANSI;
-
-		if (useCommonFiles)
-			flags |= FILE_COMMON;
-
+	void Export() {
 		logger.debug(StringFormat(
-			"Exporting %d snapshots to %s (full: %s\\%s.json)",
-			ArraySize(snapshotHistory), filename, GetCurrentReportsPath(), reportName
+			"Exporting %d snapshots to %s\\%s.json",
+			snapshotsCollection.Count(), GetCurrentReportsPath(), reportName
 		));
 
-		int file = FileOpen(filename, flags);
+		snapshotsCollection.Flush();
 
-		if (file == INVALID_HANDLE) {
-			int errorCode = GetLastError();
-
-			logger.error(StringFormat(
-				"Cannot create snapshot history file '%s' - Error code: %d",
-				filename,
-				errorCode
-			));
-
-			logger.error(StringFormat(
-				"Flags used: %d (FILE_WRITE=%d, FILE_TXT=%d, FILE_ANSI=%d, FILE_COMMON=%d)",
-				flags,
-				FILE_WRITE,
-				FILE_TXT,
-				FILE_ANSI,
-				FILE_COMMON
-			));
-		} else {
-			FileWriteString(file, jsonStr);
-			FileClose(file);
-
-			logger.info(StringFormat(
-				"Snapshot history saved - %s.json with %d snapshots",
-				reportName,
-				ArraySize(snapshotHistory)
-			));
-		}
-
-		delete root;
-	}
-
-	void PrintCurrentPath() {
-		logger.info(StringFormat("Snapshot history reports saved to: %s", GetCurrentReportsPath()));
+		logger.info(StringFormat(
+			"Snapshot history saved - %s.json with %d snapshots",
+			reportName,
+			snapshotsCollection.Count()
+		));
 	}
 
 	int GetSnapshotCount() {
-		return ArraySize(snapshotHistory);
+		return snapshotsCollection.Count();
 	}
 
 	string GetCurrentReportsPath() {
