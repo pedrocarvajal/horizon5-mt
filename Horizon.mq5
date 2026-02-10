@@ -44,8 +44,10 @@ int OnInit() {
 
 	hlogger.SetPrefix("Horizon");
 
-	if (!seDbTest.Run())
-		return INIT_FAILED;
+	// Tests executions
+	if (isLiveTrading())
+		if (!seDbTest.Run())
+			return INIT_FAILED;
 
 	lastCheckedDay = dtime.Today().dayOfYear;
 	lastCheckedHour = dtime.Today().hour;
