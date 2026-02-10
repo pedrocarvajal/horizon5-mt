@@ -7,6 +7,7 @@ input ENUM_ORDER_TYPE_FILLING FillingMode = ORDER_FILLING_IOC; // [1] > Order fi
 
 input group "Reporting";
 input bool EnableOrderHistoryReport = false; // [1] > Enable order history report on tester
+input bool EnableSnapshotHistoryReport = false; // [1] > Enable snapshot history report on tester
 
 input group "Risk management";
 input bool EquityAtRiskCompounded = true; // [1] > Equity at risk compounded
@@ -448,6 +449,9 @@ double OnTester() {
 
 	for (int i = 0; i < ArraySize(assets); i++)
 		assets[i].ExportOrderHistory();
+
+	for (int i = 0; i < ArraySize(assets); i++)
+		assets[i].ExportSnapshotHistory();
 
 	return quality;
 }
