@@ -1,0 +1,275 @@
+#ifndef __SE_DB_COLLECTION_MQH__
+#define __SE_DB_COLLECTION_MQH__
+
+#include "../../libraries/json/index.mqh"
+#include "../SELogger/SELogger.mqh"
+#include "SEDbQuery.mqh"
+
+class SEDbCollection {
+private:
+	SELogger logger;
+	string name;
+	string filePath;
+	int fileFlags;
+	bool autoFlush;
+	JSON::Object *documents[];
+	int idCounter;
+
+	string GenerateId() {
+		idCounter++;
+		return StringFormat("%lld_%d", (long)TimeCurrent(), idCounter);
+	}
+
+	int FindIndexByKeyValue(string key, string value) {
+		int size = ArraySize(documents);
+
+		for (int i = 0; i < size; i++) {
+			if (documents[i] != NULL && documents[i].hasValue(key))
+				if (documents[i].getString(key) == value)
+					return i;
+		}
+
+		return -1;
+	}
+
+	void RemoveAtIndex(int index) {
+		int size = ArraySize(documents);
+
+		if (index < 0 || index >= size)
+			return;
+
+		if (documents[index] != NULL && CheckPointer(documents[index]) == POINTER_DYNAMIC)
+			delete documents[index];
+
+		for (int i = index; i < size - 1; i++)
+			documents[i] = documents[i + 1];
+
+		ArrayResize(documents, size - 1);
+	}
+
+public:
+	SEDbCollection() {
+		name = "";
+		filePath = "";
+		fileFlags = FILE_TXT | FILE_ANSI;
+		autoFlush = true;
+		idCounter = 0;
+		logger.SetPrefix("SEDbCollection");
+	}
+
+	void Initialize(string collectionName, string basePath, bool useCommonFiles) {
+		name = collectionName;
+		filePath = StringFormat("%s/%s.json", basePath, collectionName);
+		fileFlags = FILE_TXT | FILE_ANSI;
+
+		if (useCommonFiles)
+			fileFlags |= FILE_COMMON;
+
+		logger.SetPrefix(StringFormat("SEDbCollection[%s]", collectionName));
+	}
+
+	~SEDbCollection() {
+		int size = ArraySize(documents);
+
+		for (int i = 0; i < size; i++)
+			if (documents[i] != NULL && CheckPointer(documents[i]) == POINTER_DYNAMIC)
+				delete documents[i];
+
+		ArrayResize(documents, 0);
+	}
+
+	string GetName() {
+		return name;
+	}
+
+	void SetAutoFlush(bool enabled) {
+		autoFlush = enabled;
+	}
+
+	bool Load() {
+		int handle = FileOpen(filePath, FILE_READ | fileFlags);
+		if (handle == INVALID_HANDLE) {
+			logger.debug(StringFormat("No existing file for collection '%s', starting empty", name));
+			return false;
+		}
+
+		string jsonData = "";
+		while (!FileIsEnding(handle))
+			jsonData += FileReadString(handle);
+		FileClose(handle);
+
+		if (StringLen(jsonData) == 0) {
+			logger.debug(StringFormat("Empty file for collection '%s'", name));
+			return true;
+		}
+
+		JSON::Array *array = new JSON::Array(jsonData);
+		int length = array.getLength();
+
+		for (int i = 0; i < length; i++) {
+			if (!array.isObject(i))
+				continue;
+
+			string objectJson = array.getObject(i).toString();
+			JSON::Object *document = new JSON::Object(objectJson);
+
+			int size = ArraySize(documents);
+			ArrayResize(documents, size + 1);
+			documents[size] = document;
+		}
+
+		delete array;
+		logger.info(StringFormat("Loaded %d documents from '%s'", ArraySize(documents), name));
+		return true;
+	}
+
+	bool Flush() {
+		JSON::Array *array = new JSON::Array();
+		int size = ArraySize(documents);
+
+		for (int i = 0; i < size; i++) {
+			if (documents[i] == NULL)
+				continue;
+
+			string objectJson = documents[i].toString();
+			JSON::Object *copy = new JSON::Object(objectJson);
+			array.add(copy);
+		}
+
+		string jsonData = array.toString();
+		delete array;
+
+		int handle = FileOpen(filePath, FILE_WRITE | fileFlags);
+		if (handle == INVALID_HANDLE) {
+			logger.error(StringFormat("Cannot write collection '%s' - Error: %d", name, GetLastError()));
+			return false;
+		}
+
+		FileWriteString(handle, jsonData);
+		FileClose(handle);
+		return true;
+	}
+
+	bool InsertOne(JSON::Object *document) {
+		if (document == NULL)
+			return false;
+
+		string documentJson = document.toString();
+		JSON::Object *stored = new JSON::Object(documentJson);
+
+		if (!stored.hasValue("_id"))
+			stored.setProperty("_id", GenerateId());
+
+		int size = ArraySize(documents);
+		ArrayResize(documents, size + 1);
+		documents[size] = stored;
+
+		if (autoFlush)
+			Flush();
+
+		return true;
+	}
+
+	JSON::Object *FindOne(string key, string value) {
+		int index = FindIndexByKeyValue(key, value);
+
+		if (index == -1)
+			return NULL;
+
+		return documents[index];
+	}
+
+	int Find(SEDbQuery &query, JSON::Object *&results[]) {
+		ArrayResize(results, 0);
+		int size = ArraySize(documents);
+
+		for (int i = 0; i < size; i++) {
+			if (documents[i] == NULL)
+				continue;
+
+			if (query.Matches(documents[i])) {
+				int resultSize = ArraySize(results);
+				ArrayResize(results, resultSize + 1);
+				results[resultSize] = documents[i];
+			}
+		}
+
+		return ArraySize(results);
+	}
+
+	bool UpdateOne(string key, string value, JSON::Object *newData) {
+		if (newData == NULL)
+			return false;
+
+		int index = FindIndexByKeyValue(key, value);
+		if (index == -1)
+			return false;
+
+		string keys[];
+		newData.getKeysToArray(keys);
+
+		for (int i = 0; i < ArraySize(keys); i++) {
+			if (newData.isString(keys[i])) {
+				documents[index].setProperty(keys[i], newData.getString(keys[i]));
+			} else if (newData.isNumber(keys[i])) {
+				documents[index].setProperty(keys[i], newData.getNumber(keys[i]));
+			} else if (newData.isBoolean(keys[i])) {
+				documents[index].setProperty(keys[i], newData.getBoolean(keys[i]));
+			} else if (newData.isObject(keys[i])) {
+				string objectJson = newData.getObject(keys[i]).toString();
+				JSON::Object *objectCopy = new JSON::Object(objectJson);
+				documents[index].setProperty(keys[i], objectCopy);
+			} else if (newData.isArray(keys[i])) {
+				string arrayJson = newData.getArray(keys[i]).toString();
+				JSON::Array *arrayCopy = new JSON::Array(arrayJson);
+				documents[index].setProperty(keys[i], arrayCopy);
+			}
+		}
+
+		if (autoFlush)
+			Flush();
+
+		return true;
+	}
+
+	bool DeleteOne(string key, string value) {
+		int index = FindIndexByKeyValue(key, value);
+		if (index == -1)
+			return false;
+
+		RemoveAtIndex(index);
+
+		if (autoFlush)
+			Flush();
+
+		return true;
+	}
+
+	int Count() {
+		return ArraySize(documents);
+	}
+
+	bool DeleteFile() {
+		int size = ArraySize(documents);
+
+		for (int i = 0; i < size; i++)
+			if (documents[i] != NULL && CheckPointer(documents[i]) == POINTER_DYNAMIC)
+				delete documents[i];
+
+		ArrayResize(documents, 0);
+		int commonFlag = (fileFlags & FILE_COMMON) != 0 ? FILE_COMMON : 0;
+
+		if (!FileDelete(filePath, commonFlag)) {
+			int error = GetLastError();
+
+			if (error != 5002) {
+				logger.error(StringFormat("Cannot delete file '%s' - Error: %d", filePath, error));
+				return false;
+			}
+		}
+
+		return true;
+	}
+};
+
+#endif
