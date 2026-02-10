@@ -32,6 +32,23 @@ private:
 		return -1;
 	}
 
+	void ensureDirectoryExists() {
+		int lastSlash = StringFind(filePath, "/");
+		int position = lastSlash;
+
+		while (position != -1) {
+			lastSlash = position;
+			position = StringFind(filePath, "/", lastSlash + 1);
+		}
+
+		if (lastSlash <= 0)
+			return;
+
+		string directory = StringSubstr(filePath, 0, lastSlash);
+		int commonFlag = (fileFlags & FILE_COMMON) != 0 ? FILE_COMMON : 0;
+		FolderCreate(directory, commonFlag);
+	}
+
 	void RemoveAtIndex(int index) {
 		int size = ArraySize(documents);
 
@@ -141,6 +158,8 @@ public:
 
 		string jsonData = array.toString();
 		delete array;
+
+		ensureDirectoryExists();
 
 		int handle = FileOpen(filePath, FILE_WRITE | fileFlags);
 		if (handle == INVALID_HANDLE) {
