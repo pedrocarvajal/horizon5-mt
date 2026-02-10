@@ -268,6 +268,11 @@ public:
 			strategies[i].ExportOrderHistory();
 	}
 
+	void ExportSnapshotHistory() {
+		for (int i = 0; i < ArraySize(strategies); i++)
+			strategies[i].ExportSnapshotHistory();
+	}
+
 	void SetName(string newName) {
 		name = newName;
 	}
