@@ -13,13 +13,13 @@
   },
   "[c]": {
     "editor.defaultFormatter": null
-  },
-  "achilleshr.runonsave": {
-    "commands": [
-      {
-        "match": "\\.(mqh|mq5)$",
-        "cmd": "cd ${workspaceFolder} && make deploy"
-      }
-    ]
   }
+  // "achilleshr.runonsave": {
+  //   "commands": [
+  //     {
+  //       "match": "\\.(mqh|mq5)$",
+  //       "cmd": "cd ${workspaceFolder} && make deploy"
+  //     }
+  //   ]
+  // }
 }
