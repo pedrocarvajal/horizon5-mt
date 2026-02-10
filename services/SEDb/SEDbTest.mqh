@@ -247,7 +247,10 @@ private:
 	void TestFlushAndLoad() {
 		test.Describe("Flush & Load (persistence)");
 
-		SEDbCollection *writeCollection = database.Collection("test_persistence");
+		SEDb writeDatabase;
+		writeDatabase.Initialize("SEDbTest");
+
+		SEDbCollection *writeCollection = writeDatabase.Collection("test_persistence");
 		writeCollection.SetAutoFlush(false);
 
 		JSON::Object *d1 = new JSON::Object();
@@ -267,9 +270,10 @@ private:
 		bool flushed = writeCollection.Flush();
 		test.AssertTrue(flushed, "Flush returns true");
 
-		database.Drop("test_persistence");
+		SEDb readDatabase;
+		readDatabase.Initialize("SEDbTest");
 
-		SEDbCollection *readCollection = database.Collection("test_persistence");
+		SEDbCollection *readCollection = readDatabase.Collection("test_persistence");
 
 		test.AssertEquals(readCollection.Count(), 2, "Loaded 2 documents from disk");
 
@@ -280,7 +284,7 @@ private:
 			test.AssertEquals((int)loaded.getNumber("value"), 42, "Persisted value matches");
 		}
 
-		database.Drop("test_persistence");
+		readDatabase.Drop("test_persistence");
 	}
 
 	void TestDatabaseCollectionManager() {
