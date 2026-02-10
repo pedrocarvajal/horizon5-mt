@@ -74,7 +74,7 @@ public:
 
 		cleanupOrphanedOrders(idsToDelete);
 
-		logger.info(StringFormat("Order restoration completed"));
+		logger.info("Order restoration completed");
 		logger.info(StringFormat("Documents found: %d", foundCount));
 		logger.info(StringFormat("Orders loaded: %d", loadedCount));
 		return loadedCount;
