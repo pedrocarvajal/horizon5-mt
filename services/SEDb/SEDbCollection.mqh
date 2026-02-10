@@ -262,7 +262,7 @@ public:
 		if (!FileDelete(filePath, commonFlag)) {
 			int error = GetLastError();
 
-			if (error != 5002) {
+			if (error != 5002 && error != 5019) {
 				logger.error(StringFormat("Cannot delete file '%s' - Error: %d", filePath, error));
 				return false;
 			}
