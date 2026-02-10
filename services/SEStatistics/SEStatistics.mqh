@@ -596,6 +596,8 @@ public:
 		SSQualityResult quality = GetQuality();
 		SSStatisticsSnapshot snapshotData = buildSnapshotData(quality);
 		ArrayResize(snapshotData.orders, 0);
+		ArrayResize(snapshotData.nav, 0);
+		ArrayResize(snapshotData.performance, 0);
 		return snapshotData;
 	}
 };
