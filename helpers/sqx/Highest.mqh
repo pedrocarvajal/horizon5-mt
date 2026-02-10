@@ -21,9 +21,10 @@ double Highest(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType,
 
 	double maxValue = values[0];
 
-	for (int i = 1; i < period; i++)
+	for (int i = 1; i < period; i++) {
 		if (values[i] > maxValue)
 			maxValue = values[i];
+	}
 
 	return maxValue;
 }
@@ -48,9 +49,10 @@ double Lowest(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType,
 
 	double minValue = values[0];
 
-	for (int i = 1; i < period; i++)
+	for (int i = 1; i < period; i++) {
 		if (values[i] < minValue)
 			minValue = values[i];
+	}
 
 	return minValue;
 }
