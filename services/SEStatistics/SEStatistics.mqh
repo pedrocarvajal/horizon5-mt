@@ -590,6 +590,14 @@ public:
 	void SetQualityThresholds(SQualityThresholds &thresholds) {
 		qualityThresholds = thresholds;
 	}
+
+	SSStatisticsSnapshot GetDailySnapshot() {
+		processPendingOrders();
+		SSQualityResult quality = GetQuality();
+		SSStatisticsSnapshot snapshotData = buildSnapshotData(quality);
+		ArrayResize(snapshotData.orders, 0);
+		return snapshotData;
+	}
 };
 
 #endif

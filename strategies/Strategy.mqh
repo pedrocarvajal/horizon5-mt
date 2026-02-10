@@ -16,6 +16,7 @@ class SEAsset;
 #include "../services/SEStatistics/SEStatistics.mqh"
 #include "../services/SELotSize/SELotSize.mqh"
 #include "../services/SEReportOfOrderHistory/SEReportOfOrderHistory.mqh"
+#include "../services/SEReportOfSnapshotHistory/SEReportOfSnapshotHistory.mqh"
 #include "../services/SEOrderPersistence/SEOrderPersistence.mqh"
 
 #define ORDER_TYPE_ANY    -1
@@ -37,6 +38,7 @@ private:
 	SEStatistics *statistics;
 	SELotSize *lotSize;
 	SEReportOfOrderHistory *orderHistoryReporter;
+	SEReportOfSnapshotHistory *snapshotHistoryReporter;
 	SEOrderPersistence *orderPersistence;
 
 	void filterOrders(
@@ -205,6 +207,17 @@ public:
 			orderHistoryReporter = new SEReportOfOrderHistory(reportsDir, true, reportName);
 		}
 
+		if (EnableSnapshotHistoryReport) {
+			string reportsDir = StringFormat(
+				"/Reports/%s/%lld",
+				symbol,
+				(long)dtime.Timestamp()
+			);
+
+			string reportName = StringFormat("%s_Snapshots", prefix);
+			snapshotHistoryReporter = new SEReportOfSnapshotHistory(reportsDir, true, reportName);
+		}
+
 		initializeDefaultThresholds();
 
 		if (isLiveTrading()) {
@@ -233,6 +246,9 @@ public:
 	}
 
 	virtual void OnStartDay() {
+		if (CheckPointer(snapshotHistoryReporter) != POINTER_INVALID)
+			snapshotHistoryReporter.AddSnapshot(statistics.GetDailySnapshot());
+
 		statistics.OnStartDay(orders);
 		countOrdersOfToday = 0;
 	}
@@ -280,6 +296,19 @@ public:
 		));
 	}
 
+	void ExportSnapshotHistory() {
+		if (CheckPointer(snapshotHistoryReporter) == POINTER_INVALID)
+			return;
+
+		snapshotHistoryReporter.AddSnapshot(statistics.GetDailySnapshot());
+		snapshotHistoryReporter.ExportSnapshotHistoryToJsonFile();
+
+		logger.info(StringFormat(
+			"Snapshot history exported with %d snapshots",
+			snapshotHistoryReporter.GetSnapshotCount()
+		));
+	}
+
 	virtual ~SEStrategy() {
 		if (CheckPointer(statistics) == POINTER_DYNAMIC)
 			delete statistics;
@@ -289,6 +318,9 @@ public:
 
 		if (CheckPointer(orderHistoryReporter) == POINTER_DYNAMIC)
 			delete orderHistoryReporter;
+
+		if (CheckPointer(snapshotHistoryReporter) == POINTER_DYNAMIC)
+			delete snapshotHistoryReporter;
 
 		if (CheckPointer(orderPersistence) == POINTER_DYNAMIC)
 			delete orderPersistence;
