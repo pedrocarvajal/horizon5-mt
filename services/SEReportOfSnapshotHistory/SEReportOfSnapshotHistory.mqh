@@ -32,6 +32,11 @@ private:
 		obj.setProperty("timestamp", (long)snapshot.timestamp);
 		obj.setProperty("id", snapshot.id);
 
+		double lastNav = (ArraySize(snapshot.nav) > 0) ? snapshot.nav[ArraySize(snapshot.nav) - 1] : 0.0;
+		double lastPerformance = (ArraySize(snapshot.performance) > 0) ? snapshot.performance[ArraySize(snapshot.performance) - 1] : 0.0;
+		obj.setProperty("nav", lastNav);
+		obj.setProperty("performance", lastPerformance);
+
 		obj.setProperty("nav_peak", snapshot.navPeak);
 		obj.setProperty("drawdown_max_in_dollars", snapshot.drawdownMaxInDollars);
 		obj.setProperty("drawdown_max_in_percentage", snapshot.drawdownMaxInPercentage);
