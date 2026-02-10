@@ -87,8 +87,9 @@ public:
 	}
 
 	virtual int OnTesterInit() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnTesterInit();
+		}
 
 		return INIT_SUCCEEDED;
 	}
@@ -97,33 +98,39 @@ public:
 	}
 
 	virtual void OnTick() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnTick();
+		}
 	}
 
 	virtual void OnStartMinute() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartMinute();
+		}
 	}
 
 	virtual void OnStartHour() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartHour();
+		}
 	}
 
 	virtual void OnStartDay() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartDay();
+		}
 	}
 
 	virtual void OnStartWeek() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartWeek();
+		}
 	}
 
 	virtual void OnStartMonth() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartMonth();
+		}
 	}
 
 	virtual void OnOpenOrder(EOrder &order) {
@@ -145,13 +152,15 @@ public:
 	}
 
 	virtual void OnEndWeek() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnEndWeek();
+		}
 	}
 
 	virtual void OnDeinit() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnDeinit();
+		}
 	}
 
 	void AddStrategy(SEStrategy *strategy) {
@@ -246,31 +255,36 @@ public:
 	}
 
 	SEStrategy * GetStrategyByPrefix(string strategyPrefix) {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			if (strategies[i].GetPrefix() == strategyPrefix)
 				return strategies[i];
+		}
 
 		return NULL;
 	}
 
 	void ProcessOrders() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].ProcessOrders();
+		}
 	}
 
 	void CleanupClosedOrders() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].CleanupClosedOrders();
+		}
 	}
 
 	void ExportOrderHistory() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].ExportOrderHistory();
+		}
 	}
 
 	void ExportSnapshotHistory() {
-		for (int i = 0; i < ArraySize(strategies); i++)
+		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].ExportSnapshotHistory();
+		}
 	}
 
 	void SetName(string newName) {

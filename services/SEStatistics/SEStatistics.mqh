@@ -133,8 +133,9 @@ private:
 							   1] : 0;
 		double nextPerformance = prevPerformance;
 
-		for (int i = 0; i < ArraySize(lastClosedOrders); i++)
+		for (int i = 0; i < ArraySize(lastClosedOrders); i++) {
 			recordOrderResult(lastClosedOrders[i], nextPerformance);
+		}
 
 		updateRatios();
 		updatePerformance(nextPerformance);
@@ -148,8 +149,9 @@ private:
 		snapshotData.id = id;
 
 		ArrayResize(snapshotData.orders, ArraySize(ordersHistory));
-		for (int i = 0; i < ArraySize(ordersHistory); i++)
+		for (int i = 0; i < ArraySize(ordersHistory); i++) {
 			snapshotData.orders[i] = ordersHistory[i];
+		}
 
 		ArrayResize(snapshotData.nav, ArraySize(nav));
 		ArrayCopy(snapshotData.nav, nav);
@@ -242,9 +244,10 @@ private:
 	double calculateFloatingPnL(EOrder &strategyOrders[]) {
 		double floatingPnL = 0.0;
 
-		for (int i = 0; i < ArraySize(strategyOrders); i++)
+		for (int i = 0; i < ArraySize(strategyOrders); i++) {
 			if (strategyOrders[i].GetStatus() == ORDER_STATUS_OPEN)
 				floatingPnL += strategyOrders[i].GetFloatingPnL();
+		}
 
 		return floatingPnL;
 	}
@@ -252,8 +255,9 @@ private:
 	double calculatePendingClosedProfit() {
 		double pendingProfit = 0.0;
 
-		for (int i = 0; i < ArraySize(lastClosedOrders); i++)
+		for (int i = 0; i < ArraySize(lastClosedOrders); i++) {
 			pendingProfit += lastClosedOrders[i].GetProfitInDollars();
+		}
 
 		return pendingProfit;
 	}
