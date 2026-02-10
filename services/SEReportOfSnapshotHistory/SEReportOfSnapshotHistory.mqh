@@ -27,22 +27,10 @@ private:
 		ArrayResize(snapshotHistory, 0);
 	}
 
-	JSON::Array *DoubleArrayToJsonArray(const double &values[], int count) {
-		JSON::Array *arr = new JSON::Array();
-
-		for (int i = 0; i < count; i++)
-			arr.add(values[i]);
-
-		return arr;
-	}
-
 	JSON::Object *SnapshotToJson(const SSStatisticsSnapshot &snapshot) {
 		JSON::Object *obj = new JSON::Object();
 		obj.setProperty("timestamp", (long)snapshot.timestamp);
 		obj.setProperty("id", snapshot.id);
-
-		obj.setProperty("nav", DoubleArrayToJsonArray(snapshot.nav, ArraySize(snapshot.nav)));
-		obj.setProperty("performance", DoubleArrayToJsonArray(snapshot.performance, ArraySize(snapshot.performance)));
 
 		obj.setProperty("nav_peak", snapshot.navPeak);
 		obj.setProperty("drawdown_max_in_dollars", snapshot.drawdownMaxInDollars);
