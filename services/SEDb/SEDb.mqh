@@ -21,10 +21,11 @@ public:
 	}
 
 	void Initialize(string databasePath, bool commonFiles = false) {
-		basePath = databasePath;
+		long accountNumber = AccountInfoInteger(ACCOUNT_LOGIN);
+		basePath = StringFormat("%lld/%s", accountNumber, databasePath);
 		useCommonFiles = commonFiles;
 		initialized = true;
-		logger.SetPrefix(StringFormat("SEDb[%s]", databasePath));
+		logger.SetPrefix(StringFormat("SEDb[%s]", basePath));
 	}
 
 	~SEDb() {
