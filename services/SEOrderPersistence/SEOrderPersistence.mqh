@@ -15,7 +15,138 @@ private:
 	SEDb database;
 	SEDbCollection *ordersCollection;
 
-	bool DeserializeOrder(JSON::Object *json, EOrder &order) {
+public:
+	SEOrderPersistence() {
+		logger.SetPrefix("OrderPersistence");
+		ordersCollection = NULL;
+	}
+
+	void Initialize(string strategyName) {
+		string basePath = StringFormat("Horizon5/%s/%s", _Symbol, strategyName);
+		database.Initialize(basePath, true);
+		ordersCollection = database.Collection("orders");
+	}
+
+	bool DeleteOrder(string orderId) {
+		if (!isLiveTrading())
+			return true;
+
+		if (ordersCollection == NULL)
+			return false;
+
+		bool deleted = ordersCollection.DeleteOne("_id", orderId);
+
+		if (deleted)
+			logger.info(StringFormat("Order deleted from database: %s", orderId));
+
+		return deleted;
+	}
+
+	int LoadOrders(EOrder &restoredOrders[]) {
+		if (!isLiveTrading())
+			return 0;
+
+		if (ordersCollection == NULL)
+			return 0;
+
+		int documentCount = ordersCollection.Count();
+		logger.info(StringFormat("Starting order restoration, found %d documents", documentCount));
+
+		if (documentCount == 0)
+			return 0;
+
+		SEDbQuery findAll;
+		JSON::Object *documents[];
+		int foundCount = ordersCollection.Find(findAll, documents);
+
+		string idsToDelete[];
+		int loadedCount = 0;
+
+		for (int i = 0; i < foundCount; i++) {
+			int result = loadAndValidateOrder(documents[i], restoredOrders, idsToDelete, i);
+
+			if (result == -1)
+				return -1;
+
+			if (result == 1)
+				loadedCount++;
+		}
+
+		cleanupOrphanedOrders(idsToDelete);
+
+		logger.info(StringFormat("Order restoration completed"));
+		logger.info(StringFormat("Documents found: %d", foundCount));
+		logger.info(StringFormat("Orders loaded: %d", loadedCount));
+		return loadedCount;
+	}
+
+	bool SaveOrder(EOrder &order) {
+		if (!isLiveTrading())
+			return true;
+
+		if (ordersCollection == NULL)
+			return false;
+
+		JSON::Object *json = serializeOrder(order);
+		JSON::Object *existing = ordersCollection.FindOne("_id", order.GetId());
+		bool result;
+
+		if (existing != NULL)
+			result = ordersCollection.UpdateOne("_id", order.GetId(), json);
+		else
+			result = ordersCollection.InsertOne(json);
+
+		delete json;
+
+		if (result)
+			logger.info(StringFormat("Order saved to database: %s", order.GetId()));
+
+		return result;
+	}
+
+private:
+	int loadAndValidateOrder(JSON::Object *document, EOrder &restoredOrders[], string &idsToDelete[], int index) {
+		EOrder order;
+
+		if (!deserializeOrder(document, order)) {
+			logger.error(StringFormat(
+				"CRITICAL ERROR: Failed to deserialize order document at index %d",
+				index
+			));
+			return -1;
+		}
+
+		if (!validateOrderExists(order)) {
+			logger.warning(StringFormat(
+				"Order no longer exists in MetaTrader, cleaning up: %s",
+				order.GetId()
+			));
+
+			int deleteSize = ArraySize(idsToDelete);
+			ArrayResize(idsToDelete, deleteSize + 1);
+			idsToDelete[deleteSize] = order.GetId();
+			return 0;
+		}
+
+		ArrayResize(restoredOrders, ArraySize(restoredOrders) + 1);
+		restoredOrders[ArraySize(restoredOrders) - 1] = order;
+
+		logger.info(StringFormat(
+			"Order loaded successfully: %s (Status: %s)",
+			order.GetId(),
+			EnumToString(order.GetStatus())
+		));
+
+		return 1;
+	}
+
+	void cleanupOrphanedOrders(string &idsToDelete[]) {
+		for (int i = 0; i < ArraySize(idsToDelete); i++) {
+			ordersCollection.DeleteOne("_id", idsToDelete[i]);
+		}
+	}
+
+	bool deserializeOrder(JSON::Object *json, EOrder &order) {
 		if (json == NULL || !json.hasValue("_id")) {
 			logger.error("Failed to deserialize order document");
 			return false;
@@ -54,7 +185,7 @@ private:
 		return true;
 	}
 
-	JSON::Object *SerializeOrder(EOrder &order) {
+	JSON::Object *serializeOrder(EOrder &order) {
 		JSON::Object *json = new JSON::Object();
 
 		json.setProperty("_id", order.GetId());
@@ -89,122 +220,7 @@ private:
 		return json;
 	}
 
-public:
-	SEOrderPersistence() {
-		logger.SetPrefix("OrderPersistence");
-		ordersCollection = NULL;
-	}
-
-	void Initialize(string strategyName) {
-		string basePath = StringFormat("Horizon5/%s/%s", _Symbol, strategyName);
-		database.Initialize(basePath, true);
-		ordersCollection = database.Collection("orders");
-	}
-
-	bool DeleteOrder(string orderId) {
-		if (!isLiveTrading())
-			return true;
-
-		if (ordersCollection == NULL)
-			return false;
-
-		bool deleted = ordersCollection.DeleteOne("_id", orderId);
-
-		if (deleted)
-			logger.info(StringFormat("Order deleted from database: %s", orderId));
-
-		return true;
-	}
-
-	int LoadOrders(EOrder &restoredOrders[]) {
-		if (!isLiveTrading())
-			return 0;
-
-		if (ordersCollection == NULL)
-			return 0;
-
-		int documentCount = ordersCollection.Count();
-		logger.info(StringFormat("Starting order restoration, found %d documents", documentCount));
-
-		if (documentCount == 0)
-			return 0;
-
-		SEDbQuery findAll;
-		JSON::Object *documents[];
-		int foundCount = ordersCollection.Find(findAll, documents);
-
-		string idsToDelete[];
-		int loadedCount = 0;
-
-		for (int i = 0; i < foundCount; i++) {
-			EOrder order;
-
-			if (DeserializeOrder(documents[i], order)) {
-				if (ValidateOrderExists(order)) {
-					ArrayResize(restoredOrders, ArraySize(restoredOrders) + 1);
-					restoredOrders[ArraySize(restoredOrders) - 1] = order;
-					loadedCount++;
-
-					logger.info(StringFormat(
-						"Order loaded successfully: %s (Status: %s)",
-						order.GetId(),
-						EnumToString(order.GetStatus())
-					));
-				} else {
-					logger.warning(StringFormat(
-						"Order no longer exists in MetaTrader, cleaning up: %s",
-						order.GetId()
-					));
-
-					int deleteSize = ArraySize(idsToDelete);
-					ArrayResize(idsToDelete, deleteSize + 1);
-					idsToDelete[deleteSize] = order.GetId();
-				}
-			} else {
-				logger.error(StringFormat(
-					"CRITICAL ERROR: Failed to deserialize order document at index %d",
-					i
-				));
-
-				return -1;
-			}
-		}
-
-		for (int i = 0; i < ArraySize(idsToDelete); i++) {
-			ordersCollection.DeleteOne("_id", idsToDelete[i]);
-		}
-
-		logger.info(StringFormat("Order restoration completed"));
-		logger.info(StringFormat("Documents found: %d", foundCount));
-		logger.info(StringFormat("Orders loaded: %d", loadedCount));
-		return loadedCount;
-	}
-
-	bool SaveOrder(EOrder &order) {
-		if (!isLiveTrading())
-			return true;
-
-		if (ordersCollection == NULL)
-			return false;
-
-		JSON::Object *json = SerializeOrder(order);
-		JSON::Object *existing = ordersCollection.FindOne("_id", order.GetId());
-		bool result;
-
-		if (existing != NULL)
-			result = ordersCollection.UpdateOne("_id", order.GetId(), json);
-		else
-			result = ordersCollection.InsertOne(json);
-
-		delete json;
-
-		if (result)
-			logger.info(StringFormat("Order saved to database: %s", order.GetId()));
-
-		return result;
-	}
-
-	bool ValidateOrderExists(EOrder &order) {
+	bool validateOrderExists(EOrder &order) {
 		if (!isLiveTrading())
 			return true;
 
