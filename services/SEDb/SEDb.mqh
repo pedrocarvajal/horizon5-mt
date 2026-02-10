@@ -30,9 +30,10 @@ public:
 	~SEDb() {
 		int size = ArraySize(collections);
 
-		for (int i = 0; i < size; i++)
+		for (int i = 0; i < size; i++) {
 			if (collections[i] != NULL && CheckPointer(collections[i]) == POINTER_DYNAMIC)
 				delete collections[i];
+		}
 
 		ArrayResize(collections, 0);
 	}
@@ -78,8 +79,9 @@ public:
 			delete collections[index];
 
 		int size = ArraySize(collections);
-		for (int i = index; i < size - 1; i++)
+		for (int i = index; i < size - 1; i++) {
 			collections[i] = collections[i + 1];
+		}
 		ArrayResize(collections, size - 1);
 
 		logger.info(StringFormat("Collection '%s' dropped", collectionName));
@@ -94,9 +96,10 @@ private:
 	int FindCollectionIndex(string collectionName) {
 		int size = ArraySize(collections);
 
-		for (int i = 0; i < size; i++)
+		for (int i = 0; i < size; i++) {
 			if (collections[i] != NULL && collections[i].GetName() == collectionName)
 				return i;
+		}
 
 		return -1;
 	}

@@ -41,8 +41,9 @@ private:
 		if (documents[index] != NULL && CheckPointer(documents[index]) == POINTER_DYNAMIC)
 			delete documents[index];
 
-		for (int i = index; i < size - 1; i++)
+		for (int i = index; i < size - 1; i++) {
 			documents[i] = documents[i + 1];
+		}
 
 		ArrayResize(documents, size - 1);
 	}
@@ -71,9 +72,10 @@ public:
 	~SEDbCollection() {
 		int size = ArraySize(documents);
 
-		for (int i = 0; i < size; i++)
+		for (int i = 0; i < size; i++) {
 			if (documents[i] != NULL && CheckPointer(documents[i]) == POINTER_DYNAMIC)
 				delete documents[i];
+		}
 
 		ArrayResize(documents, 0);
 	}
@@ -94,8 +96,9 @@ public:
 		}
 
 		string jsonData = "";
-		while (!FileIsEnding(handle))
+		while (!FileIsEnding(handle)) {
 			jsonData += FileReadString(handle);
+		}
 		FileClose(handle);
 
 		if (StringLen(jsonData) == 0) {
@@ -252,9 +255,10 @@ public:
 	bool DeleteFile() {
 		int size = ArraySize(documents);
 
-		for (int i = 0; i < size; i++)
+		for (int i = 0; i < size; i++) {
 			if (documents[i] != NULL && CheckPointer(documents[i]) == POINTER_DYNAMIC)
 				delete documents[i];
+		}
 
 		ArrayResize(documents, 0);
 		int commonFlag = (fileFlags & FILE_COMMON) != 0 ? FILE_COMMON : 0;

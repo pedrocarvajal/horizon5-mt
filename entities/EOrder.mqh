@@ -141,8 +141,9 @@ private:
 
 	void RefreshId() {
 		string uuid = "";
-		for (int i = 0; i < 8; i++)
+		for (int i = 0; i < 8; i++) {
 			uuid += IntegerToString(MathRand() % 10);
+		}
 		id = StringFormat("%s_%s", source, uuid);
 	}
 

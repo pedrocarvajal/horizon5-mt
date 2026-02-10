@@ -276,8 +276,9 @@ public:
 	}
 
 	virtual void OnDeinit() {
-		for (int i = 0; i < ArraySize(orders); i++)
+		for (int i = 0; i < ArraySize(orders); i++) {
 			orders[i].OnDeinit();
+		}
 
 		ArrayResize(orders, 0);
 	}
@@ -376,10 +377,11 @@ public:
 	}
 
 	bool HasActiveOrders() {
-		for (int i = 0; i < ArraySize(orders); i++)
+		for (int i = 0; i < ArraySize(orders); i++) {
 			if (orders[i].GetStatus() == ORDER_STATUS_OPEN ||
 			    orders[i].GetStatus() == ORDER_STATUS_PENDING)
 				return true;
+		}
 
 		return false;
 	}
@@ -405,25 +407,28 @@ public:
 	}
 
 	int FindOrderIndexByOrderId(ulong orderId) {
-		for (int i = 0; i < ArraySize(orders); i++)
+		for (int i = 0; i < ArraySize(orders); i++) {
 			if (orders[i].GetOrderId() == orderId)
 				return i;
+		}
 
 		return -1;
 	}
 
 	int FindOrderIndexByPositionId(ulong positionId) {
-		for (int i = 0; i < ArraySize(orders); i++)
+		for (int i = 0; i < ArraySize(orders); i++) {
 			if (orders[i].GetPositionId() == positionId)
 				return i;
+		}
 
 		return -1;
 	}
 
 	int FindOrderIndexById(string id) {
-		for (int i = 0; i < ArraySize(orders); i++)
+		for (int i = 0; i < ArraySize(orders); i++) {
 			if (orders[i].GetId() == id)
 				return i;
+		}
 
 		return -1;
 	}
