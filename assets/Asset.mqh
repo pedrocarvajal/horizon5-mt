@@ -80,7 +80,7 @@ public:
 		}
 
 		if (EnableMarketHistoryReport) {
-			string marketReportName = StringFormat("%s_Snapshots", symbol);
+			string marketReportName = StringFormat("%s_MARKET_Snapshots", symbol);
 			marketHistoryReporter = new SEReportOfMarketHistory(symbol, marketReportName);
 		}
 
