@@ -197,12 +197,12 @@ public:
 		lotSize = new SELotSize(symbol);
 
 		if (EnableOrderHistoryReport) {
-			string reportName = StringFormat("%s_Orders", prefix);
+			string reportName = StringFormat("%s_%s_Orders", symbol, prefix);
 			orderHistoryReporter = new SEReportOfOrderHistory(symbol, reportName);
 		}
 
 		if (EnableSnapshotHistoryReport) {
-			string reportName = StringFormat("%s_Snapshots", prefix);
+			string reportName = StringFormat("%s_%s_Snapshots", symbol, prefix);
 			snapshotHistoryReporter = new SEReportOfSnapshotHistory(symbol, reportName);
 		}
 
