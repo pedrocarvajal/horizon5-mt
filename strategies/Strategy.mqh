@@ -251,14 +251,6 @@ public:
 		countOrdersOfToday = 0;
 	}
 
-	virtual void OnStartWeek() {
-		statistics.OnStartWeek();
-	}
-
-	virtual void OnStartMonth() {
-		statistics.OnStartMonth();
-	}
-
 	virtual void OnOpenOrder(EOrder& order) {
 		statistics.OnOpenOrder(order, orders);
 	}
@@ -270,9 +262,6 @@ public:
 
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID)
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
-	}
-
-	virtual void OnEndWeek() {
 	}
 
 	virtual void OnDeinit() {
@@ -434,15 +423,17 @@ public:
 	}
 
 	void ProcessOrders() {
+		SMarketStatus marketStatus = getMarketStatus(symbol);
+
 		for (int i = 0; i < ArraySize(orders); i++) {
 			if (!orders[i].IsInitialized())
 				orders[i].OnInit();
 
 			if (orders[i].GetStatus() == ORDER_STATUS_PENDING)
-				orders[i].CheckToOpen();
+				orders[i].CheckToOpen(marketStatus);
 
 			if (orders[i].GetStatus() == ORDER_STATUS_OPEN)
-				orders[i].CheckToClose();
+				orders[i].CheckToClose(marketStatus);
 		}
 	}
 

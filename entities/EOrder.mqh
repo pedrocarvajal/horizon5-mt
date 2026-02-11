@@ -204,12 +204,11 @@ public:
 		isInitialized = true;
 	}
 
-	void CheckToOpen() {
+	void CheckToOpen(SMarketStatus &marketStatus) {
 		if (!pendingToOpen || isProcessed)
 			return;
 
 		datetime currentTime = dtime.Timestamp();
-		SMarketStatus marketStatus = getMarketStatus(symbol);
 
 		if (retryAfter > 0 && currentTime < retryAfter)
 			return;
@@ -234,12 +233,11 @@ public:
 		Open();
 	}
 
-	void CheckToClose() {
+	void CheckToClose(SMarketStatus &marketStatus) {
 		if (!pendingToClose)
 			return;
 
 		datetime currentTime = dtime.Timestamp();
-		SMarketStatus marketStatus = getMarketStatus(symbol);
 
 		if (retryAfter > 0 && currentTime < retryAfter)
 			return;

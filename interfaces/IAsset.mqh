@@ -12,12 +12,9 @@ interface IAsset {
 	void OnStartMinute();
 	void OnStartHour();
 	void OnStartDay();
-	void OnStartWeek();
-	void OnStartMonth();
 
 	void OnOpenOrder(EOrder &order);
 	void OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason);
-	void OnEndWeek();
 	void OnDeinit();
 
 	void SetSymbol(string assetSymbol);

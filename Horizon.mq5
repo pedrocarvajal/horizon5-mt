@@ -3,6 +3,7 @@
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 input group "General Settings";
+input int TickIntervalTime = 60;
 input ENUM_ORDER_TYPE_FILLING FillingMode = ORDER_FILLING_IOC; // [1] > Order filling mode
 input bool EnableTests = false; // [1] > Enable test on init
 
@@ -11,19 +12,17 @@ input bool EnableOrderHistoryReport = false; // [1] > Enable order history repor
 input bool EnableSnapshotHistoryReport = false; // [1] > Enable snapshot history report on tester
 
 input group "Risk management";
-input bool EquityAtRiskCompounded = true; // [1] > Equity at risk compounded
+input bool EquityAtRiskCompounded = false; // [1] > Equity at risk compounded
 input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
 #include <Trade/Trade.mqh>
-#include "services/SEDateTime/SEDateTime.mqh"
-
-#include "helpers/HIsLiveTrading.mqh"
-#include "helpers/HGetPipSize.mqh"
-#include "helpers/HGetPipValue.mqh"
-
-#include "constants/time.mqh"
 
 #include "configs/Assets.mqh"
+#include "constants/time.mqh"
+#include "helpers/HGetPipSize.mqh"
+#include "helpers/HGetPipValue.mqh"
+#include "helpers/HIsLiveTrading.mqh"
+#include "services/SEDateTime/SEDateTime.mqh"
 #include "services/SEDb/SEDbTest.mqh"
 
 SEDateTime dtime;
@@ -31,13 +30,10 @@ SELogger hlogger;
 
 int lastCheckedDay = -1;
 int lastCheckedHour = -1;
-int lastCheckedMonth = -1;
-int lastCheckedWeek = -1;
-int lastStartWeekYday = -1;
-int lastEndWeekYday = -1;
+int lastCheckedMinute = -1;
 
 int OnInit() {
-	EventSetTimer(1);
+	EventSetTimer(TickIntervalTime);
 
 	// Variables
 	dtime = SEDateTime();
@@ -50,8 +46,8 @@ int OnInit() {
 
 	if (isLiveTrading())
 		executeAllTests = true;
-	else
-	if (EnableTests)
+
+	else if (EnableTests)
 		executeAllTests = true;
 
 	if (executeAllTests)
@@ -60,8 +56,6 @@ int OnInit() {
 
 	lastCheckedDay = dtime.Today().dayOfYear;
 	lastCheckedHour = dtime.Today().hour;
-	lastCheckedMonth = dtime.Today().month;
-	lastCheckedWeek = dtime.Now().dayOfWeek;
 
 	// Initialize assets
 	int assetCount = ArraySize(assets);
@@ -161,76 +155,26 @@ void OnDeinit(const int reason) {
 void OnTimer() {
 	SDateTime now = dtime.Now();
 
+	bool isStartDay = (now.dayOfYear != lastCheckedDay);
+	bool isStartHour = (now.hour != lastCheckedHour);
+	bool isStartMinute = (now.minute != lastCheckedMinute);
+
+	if (isStartDay) lastCheckedDay = now.dayOfYear;
+	if (isStartHour) lastCheckedHour = now.hour;
+	if (isStartMinute) lastCheckedMinute = now.minute;
+
 	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].OnTimer();
-	}
 
-	// Start of week (Monday) - executed FIRST
-	if (now.dayOfWeek == 1 && lastStartWeekYday != now.dayOfYear) {
-		for (int i = 0; i < ArraySize(assets); i++) {
-			assets[i].OnStartWeek();
-		}
-
-		lastStartWeekYday = now.dayOfYear;
-	}
-
-	// End of week (Friday 23:00 or later) - executed BEFORE daily/hourly triggers
-	if (now.dayOfWeek == 5 && now.hour >= 23 &&
-	    lastEndWeekYday != now.dayOfYear) {
-		for (int i = 0; i < ArraySize(assets); i++) {
-			assets[i].OnEndWeek();
-		}
-
-		lastEndWeekYday = now.dayOfYear;
-	}
-
-	// Start of new day
-	if (now.dayOfYear != lastCheckedDay) {
-		lastCheckedDay = now.dayOfYear;
-
-		for (int i = 0; i < ArraySize(assets); i++) {
+		if (isStartDay) {
 			assets[i].CleanupClosedOrders();
-		}
-
-		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].OnStartDay();
 		}
-	}
 
-	// Start of new hour
-	if (now.hour != lastCheckedHour) {
-		lastCheckedHour = now.hour;
+		if (isStartHour) assets[i].OnStartHour();
+		if (isStartMinute) assets[i].OnStartMinute();
 
-		for (int i = 0; i < ArraySize(assets); i++) {
-			assets[i].OnStartHour();
-		}
-	}
-
-	// Start of new month
-	if (now.month != lastCheckedMonth) {
-		lastCheckedMonth = now.month;
-
-		for (int i = 0; i < ArraySize(assets); i++) {
-			assets[i].OnStartMonth();
-		}
-	}
-
-	// Start of new minute
-	static int lastCheckedMinute = -1;
-	if (now.minute != lastCheckedMinute) {
-		lastCheckedMinute = now.minute;
-
-		for (int i = 0; i < ArraySize(assets); i++) {
-			assets[i].OnStartMinute();
-		}
-	}
-
-	// Per-tick processing
-	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].OnTick();
-	}
-
-	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].ProcessOrders();
 	}
 }

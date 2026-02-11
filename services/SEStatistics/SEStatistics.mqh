@@ -54,7 +54,13 @@ private:
 	double winRate;
 	double recoveryFactor;
 
-	int monthsInBacktest;
+	int getMonthsElapsed() {
+		SDateTime start = dtime.FromTimestamp(startTime);
+		SDateTime now = dtime.Now();
+		int months = (now.year - start.year) * 12 + (now.month - start.month);
+		return MathMax(months, 0);
+	}
+
 	SSOrderHistory ordersHistory[];
 	EOrder lastClosedOrders[];
 	SSStatisticsSnapshot snapshots[];
@@ -364,7 +370,7 @@ public:
 	double GetCAGR() {
 		double currentNav = (ArraySize(nav) >
 				     0) ? nav[ArraySize(nav) - 1] : initialBalance;
-		return calculateCAGR(initialBalance, currentNav, monthsInBacktest);
+		return calculateCAGR(initialBalance, currentNav, getMonthsElapsed());
 	}
 
 	double GetStability() {
@@ -411,7 +417,7 @@ public:
 
 		double qPerformance = calculateMetricQuality(
 			performanceInPercentage,
-			qualityThresholds.expectedTotalReturnPctByMonth * monthsInBacktest,
+			qualityThresholds.expectedTotalReturnPctByMonth * getMonthsElapsed(),
 			qualityThresholds.minTotalReturnPct,
 			true);
 
@@ -577,18 +583,6 @@ public:
 
 	void OnStartHour() {
 		// No hourly processing required for statistics
-	}
-
-	void OnStartMonth(bool saveSnapshot = false) {
-		monthsInBacktest++;
-		processPendingOrders();
-
-		if (saveSnapshot)
-			snapshot();
-	}
-
-	void OnStartWeek() {
-		// No weekly processing required for statistics
 	}
 
 	void SetQualityThresholds(SQualityThresholds &thresholds) {

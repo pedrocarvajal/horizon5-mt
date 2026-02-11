@@ -12,12 +12,9 @@ interface IStrategy {
 	void OnStartMinute();
 	void OnStartHour();
 	void OnStartDay();
-	void OnStartWeek();
-	void OnStartMonth();
 
 	void OnOpenOrder(EOrder &order);
 	void OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason);
-	void OnEndWeek();
 	void OnDeinit();
 
 	void SetAsset(SEAsset *assetReference);
