@@ -15,9 +15,15 @@ private:
 
 	string reportsDir;
 	string reportName;
+	string reportSymbol;
+	string strategyName;
+	string strategyPrefix;
 
 public:
-	SEReportOfSnapshotHistory(string symbol, string customReportName) {
+	SEReportOfSnapshotHistory(string symbol, string name, string prefix, string customReportName) {
+		reportSymbol = symbol;
+		strategyName = name;
+		strategyPrefix = prefix;
 		initialize(GetReportsPath(symbol), customReportName);
 	}
 
@@ -74,6 +80,9 @@ private:
 		JSON::Object *obj = new JSON::Object();
 		obj.setProperty("timestamp", (long)snapshot.timestamp);
 		obj.setProperty("id", snapshot.id);
+		obj.setProperty("symbol", reportSymbol);
+		obj.setProperty("strategy_name", strategyName);
+		obj.setProperty("strategy_prefix", strategyPrefix);
 
 		double lastNav = (ArraySize(snapshot.nav) > 0) ? snapshot.nav[ArraySize(snapshot.nav) - 1] : 0.0;
 		double lastPerformance = (ArraySize(snapshot.performance) > 0) ? snapshot.performance[ArraySize(snapshot.performance) - 1] : 0.0;
