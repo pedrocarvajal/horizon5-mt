@@ -16,7 +16,7 @@ class SEAsset;
 #include "../services/SEStatistics/SEStatistics.mqh"
 #include "../services/SELotSize/SELotSize.mqh"
 #include "../services/SEReportOfOrderHistory/SEReportOfOrderHistory.mqh"
-#include "../services/SEReportOfSnapshotHistory/SEReportOfSnapshotHistory.mqh"
+#include "../services/SEReportOfStrategySnapshots/SEReportOfStrategySnapshots.mqh"
 #include "../services/SEOrderPersistence/SEOrderPersistence.mqh"
 
 #define ORDER_TYPE_ANY    -1
@@ -38,7 +38,7 @@ private:
 	SEStatistics *statistics;
 	SELotSize *lotSize;
 	SEReportOfOrderHistory *orderHistoryReporter;
-	SEReportOfSnapshotHistory *snapshotHistoryReporter;
+	SEReportOfStrategySnapshots *strategySnapshotsReporter;
 	SEOrderPersistence *orderPersistence;
 
 	void filterOrders(
@@ -203,7 +203,7 @@ public:
 
 		if (EnableSnapshotHistoryReport) {
 			string reportName = StringFormat("%s_%s_Snapshots", symbol, prefix);
-			snapshotHistoryReporter = new SEReportOfSnapshotHistory(symbol, name, prefix, reportName);
+			strategySnapshotsReporter = new SEReportOfStrategySnapshots(symbol, name, prefix, reportName);
 		}
 
 		initializeDefaultThresholds();
@@ -235,8 +235,8 @@ public:
 	}
 
 	virtual void OnStartDay() {
-		if (CheckPointer(snapshotHistoryReporter) != POINTER_INVALID)
-			snapshotHistoryReporter.AddSnapshot(statistics.GetDailySnapshot());
+		if (CheckPointer(strategySnapshotsReporter) != POINTER_INVALID)
+			strategySnapshotsReporter.AddSnapshot(statistics.GetDailySnapshot());
 
 		statistics.OnStartDay(orders);
 		countOrdersOfToday = 0;
@@ -275,16 +275,16 @@ public:
 		));
 	}
 
-	void ExportSnapshotHistory() {
-		if (CheckPointer(snapshotHistoryReporter) == POINTER_INVALID)
+	void ExportStrategySnapshots() {
+		if (CheckPointer(strategySnapshotsReporter) == POINTER_INVALID)
 			return;
 
-		snapshotHistoryReporter.AddSnapshot(statistics.GetDailySnapshot());
-		snapshotHistoryReporter.Export();
+		strategySnapshotsReporter.AddSnapshot(statistics.GetDailySnapshot());
+		strategySnapshotsReporter.Export();
 
 		logger.info(StringFormat(
 			"Snapshot history exported with %d snapshots",
-			snapshotHistoryReporter.GetSnapshotCount()
+			strategySnapshotsReporter.GetSnapshotCount()
 		));
 	}
 
@@ -298,8 +298,8 @@ public:
 		if (CheckPointer(orderHistoryReporter) == POINTER_DYNAMIC)
 			delete orderHistoryReporter;
 
-		if (CheckPointer(snapshotHistoryReporter) == POINTER_DYNAMIC)
-			delete snapshotHistoryReporter;
+		if (CheckPointer(strategySnapshotsReporter) == POINTER_DYNAMIC)
+			delete strategySnapshotsReporter;
 
 		if (CheckPointer(orderPersistence) == POINTER_DYNAMIC)
 			delete orderPersistence;
