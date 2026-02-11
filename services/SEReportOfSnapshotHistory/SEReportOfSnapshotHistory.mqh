@@ -3,12 +3,9 @@
 
 #include "../../structs/SSStatisticsSnapshot.mqh"
 #include "../../structs/SSOrderHistory.mqh"
+#include "../../helpers/HGetReportsPath.mqh"
 #include "../SELogger/SELogger.mqh"
-#include "../SEDateTime/SEDateTime.mqh"
-#include "../SEDateTime/structs/SDateTime.mqh"
 #include "../SEDb/SEDb.mqh"
-
-extern SEDateTime dtime;
 
 class SEReportOfSnapshotHistory {
 private:
@@ -18,23 +15,10 @@ private:
 
 	string reportsDir;
 	string reportName;
-	bool useCommonFiles;
 
 public:
-	SEReportOfSnapshotHistory() {
-		initialize(
-			StringFormat("/Reports/%s/%lld", _Symbol, (long)dtime.Timestamp()),
-			"Snapshots",
-			false
-		);
-	}
-
-	SEReportOfSnapshotHistory(string customDir, bool useCommonFolder = false, string customReportName = "Snapshots") {
-		initialize(
-			customDir,
-			customReportName,
-			useCommonFolder
-		);
+	SEReportOfSnapshotHistory(string symbol, string customReportName) {
+		initialize(GetReportsPath(symbol), customReportName);
 	}
 
 	void AddSnapshot(const SSStatisticsSnapshot &snapshot) {
@@ -68,30 +52,20 @@ public:
 		string convertedDir = reportsDir;
 		StringReplace(convertedDir, "/", pathSeparator);
 
-		if (useCommonFiles) {
-			return StringFormat("%s%sFiles%s",
-				TerminalInfoString(TERMINAL_COMMONDATA_PATH),
-				pathSeparator,
-				convertedDir
-			);
-		} else {
-			return StringFormat("%s%sMQL5%sFiles%s",
-				TerminalInfoString(TERMINAL_DATA_PATH),
-				pathSeparator,
-				pathSeparator,
-				convertedDir
-			);
-		}
+		return StringFormat("%s%sFiles%s",
+			TerminalInfoString(TERMINAL_COMMONDATA_PATH),
+			pathSeparator,
+			convertedDir
+		);
 	}
 
 private:
-	void initialize(string directory, string name, bool useCommon) {
+	void initialize(string directory, string name) {
 		logger.SetPrefix("SnapshotHistoryReporter");
 		reportsDir = directory;
 		reportName = name;
-		useCommonFiles = useCommon;
 
-		database.Initialize(directory, useCommon);
+		database.Initialize(directory, true);
 		snapshotsCollection = database.Collection(name);
 		snapshotsCollection.SetAutoFlush(false);
 	}
