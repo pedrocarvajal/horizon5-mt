@@ -197,11 +197,16 @@ public:
 		lotSize = new SELotSize(symbol);
 
 		if (EnableOrderHistoryReport || EnableSnapshotHistoryReport) {
+			static ulong reportSeed = 0;
+
+			if (reportSeed == 0)
+				reportSeed = GetTickCount64();
+
 			string reportsDir = StringFormat(
 				"/Reports/%s/%lld_%llu",
 				symbol,
 				(long)dtime.Timestamp(),
-				GetTickCount64()
+				reportSeed
 			);
 
 			if (EnableOrderHistoryReport) {
