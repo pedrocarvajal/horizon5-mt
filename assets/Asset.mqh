@@ -5,14 +5,14 @@
 #include "../helpers/HStringToNumber.mqh"
 #include "../interfaces/IAsset.mqh"
 #include "../services/SELogger/SELogger.mqh"
-#include "../services/SEReportOfMarketHistory/SEReportOfMarketHistory.mqh"
+#include "../services/SEReportOfMarketSnapshots/SEReportOfMarketSnapshots.mqh"
 #include "../strategies/Strategy.mqh"
 
 class SEAsset:
 public IAsset {
 private:
 	SELogger logger;
-	SEReportOfMarketHistory *marketHistoryReporter;
+	SEReportOfMarketSnapshots *marketSnapshotsReporter;
 
 	string name;
 	double weight;
@@ -32,8 +32,8 @@ public:
 	}
 
 	~SEAsset() {
-		if (CheckPointer(marketHistoryReporter) == POINTER_DYNAMIC)
-			delete marketHistoryReporter;
+		if (CheckPointer(marketSnapshotsReporter) == POINTER_DYNAMIC)
+			delete marketSnapshotsReporter;
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			if (CheckPointer(strategies[i]) != POINTER_DYNAMIC)
@@ -81,7 +81,7 @@ public:
 
 		if (EnableMarketHistoryReport) {
 			string marketReportName = StringFormat("%s_MARKET_Snapshots", symbol);
-			marketHistoryReporter = new SEReportOfMarketHistory(symbol, marketReportName);
+			marketSnapshotsReporter = new SEReportOfMarketSnapshots(symbol, marketReportName);
 		}
 
 		logger.info(StringFormat(
@@ -126,13 +126,14 @@ public:
 	}
 
 	virtual void OnStartDay() {
-		if (CheckPointer(marketHistoryReporter) != POINTER_INVALID) {
+		if (CheckPointer(marketSnapshotsReporter) != POINTER_INVALID) {
 			SSMarketSnapshot marketSnapshot;
 			marketSnapshot.timestamp = dtime.Timestamp();
 			marketSnapshot.bid = SymbolInfoDouble(symbol, SYMBOL_BID);
 			marketSnapshot.ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
 			marketSnapshot.spread = marketSnapshot.ask - marketSnapshot.bid;
-			marketHistoryReporter.AddSnapshot(marketSnapshot);
+
+			marketSnapshotsReporter.AddSnapshot(marketSnapshot);
 		}
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
@@ -282,21 +283,21 @@ public:
 		}
 	}
 
-	void ExportSnapshotHistory() {
+	void ExportStrategySnapshots() {
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].ExportSnapshotHistory();
+			strategies[i].ExportStrategySnapshots();
 		}
 	}
 
-	void ExportMarketHistory() {
-		if (CheckPointer(marketHistoryReporter) == POINTER_INVALID)
+	void ExportMarketSnapshots() {
+		if (CheckPointer(marketSnapshotsReporter) == POINTER_INVALID)
 			return;
 
-		marketHistoryReporter.Export();
+		marketSnapshotsReporter.Export();
 
 		logger.info(StringFormat(
 			"Market history exported with %d snapshots",
-			marketHistoryReporter.GetSnapshotCount()
+			marketSnapshotsReporter.GetSnapshotCount()
 		));
 	}
 

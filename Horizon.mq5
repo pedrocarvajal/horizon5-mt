@@ -426,11 +426,11 @@ double OnTester() {
 	}
 
 	for (int i = 0; i < ArraySize(assets); i++) {
-		assets[i].ExportSnapshotHistory();
+		assets[i].ExportStrategySnapshots();
 	}
 
 	for (int i = 0; i < ArraySize(assets); i++) {
-		assets[i].ExportMarketHistory();
+		assets[i].ExportMarketSnapshots();
 	}
 
 	return quality;
