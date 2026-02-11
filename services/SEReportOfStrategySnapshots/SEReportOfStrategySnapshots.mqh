@@ -1,5 +1,5 @@
-#ifndef __SE_REPORT_OF_SNAPSHOT_HISTORY_MQH__
-#define __SE_REPORT_OF_SNAPSHOT_HISTORY_MQH__
+#ifndef __SE_REPORT_OF_STRATEGY_SNAPSHOTS_MQH__
+#define __SE_REPORT_OF_STRATEGY_SNAPSHOTS_MQH__
 
 #include "../../structs/SSStatisticsSnapshot.mqh"
 #include "../../structs/SSOrderHistory.mqh"
@@ -7,7 +7,7 @@
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 
-class SEReportOfSnapshotHistory {
+class SEReportOfStrategySnapshots {
 private:
 	SELogger logger;
 	SEDb database;
@@ -20,7 +20,7 @@ private:
 	string strategyPrefix;
 
 public:
-	SEReportOfSnapshotHistory(string symbol, string name, string prefix, string customReportName) {
+	SEReportOfStrategySnapshots(string symbol, string name, string prefix, string customReportName) {
 		reportSymbol = symbol;
 		strategyName = name;
 		strategyPrefix = prefix;
@@ -67,7 +67,7 @@ public:
 
 private:
 	void initialize(string directory, string name) {
-		logger.SetPrefix("SnapshotHistoryReporter");
+		logger.SetPrefix("StrategySnapshotsReporter");
 		reportsDir = directory;
 		reportName = name;
 
@@ -83,6 +83,7 @@ private:
 		obj.setProperty("symbol", reportSymbol);
 		obj.setProperty("strategy_name", strategyName);
 		obj.setProperty("strategy_prefix", strategyPrefix);
+		obj.setProperty("level", "strategy");
 
 		double lastNav = (ArraySize(snapshot.nav) > 0) ? snapshot.nav[ArraySize(snapshot.nav) - 1] : 0.0;
 		double lastPerformance = (ArraySize(snapshot.performance) > 0) ? snapshot.performance[ArraySize(snapshot.performance) - 1] : 0.0;
