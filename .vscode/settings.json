@@ -15,9 +15,15 @@
   "editor.formatOnType": false,
   "editor.formatOnPaste": false,
   "[cpp]": {
-    "editor.defaultFormatter": null
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false,
+    "editor.formatOnType": false,
+    "editor.formatOnPaste": false
   },
   "[c]": {
-    "editor.defaultFormatter": null
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false,
+    "editor.formatOnType": false,
+    "editor.formatOnPaste": false
   }
 }

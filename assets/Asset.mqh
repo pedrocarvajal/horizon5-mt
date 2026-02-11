@@ -121,18 +121,6 @@ public:
 		}
 	}
 
-	virtual void OnStartWeek() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnStartWeek();
-		}
-	}
-
-	virtual void OnStartMonth() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnStartMonth();
-		}
-	}
-
 	virtual void OnOpenOrder(EOrder &order) {
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			if (order.GetSource() == strategies[i].GetPrefix()) {
@@ -148,12 +136,6 @@ public:
 				strategies[i].OnCloseOrder(order, reason);
 				break;
 			}
-		}
-	}
-
-	virtual void OnEndWeek() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnEndWeek();
 		}
 	}
 
