@@ -1,10 +1,16 @@
 {
+  "files.associations": {
+    "*.mqh": "cpp",
+    "*.mq5": "cpp"
+  },
   "cSpell.words": ["hlogger"],
   "files.autoSave": "onFocusChange",
   "C_Cpp.files.exclude": {
     "**/*.mq5": true,
     "**/*.mqh": true
   },
+  "C_Cpp.errorSquiggles": "disabled",
+  "C_Cpp.intelliSenseEngine": "disabled",
   "editor.formatOnSave": false,
   "editor.formatOnType": false,
   "editor.formatOnPaste": false,
@@ -14,12 +20,4 @@
   "[c]": {
     "editor.defaultFormatter": null
   }
-  // "achilleshr.runonsave": {
-  //   "commands": [
-  //     {
-  //       "match": "\\.(mqh|mq5)$",
-  //       "cmd": "cd ${workspaceFolder} && make deploy"
-  //     }
-  //   ]
-  // }
 }
