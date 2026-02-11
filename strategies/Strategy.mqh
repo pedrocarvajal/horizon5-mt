@@ -196,28 +196,14 @@ public:
 		statistics = new SEStatistics(symbol, name, prefix, balance);
 		lotSize = new SELotSize(symbol);
 
-		if (EnableOrderHistoryReport || EnableSnapshotHistoryReport) {
-			static ulong reportSeed = 0;
+		if (EnableOrderHistoryReport) {
+			string reportName = StringFormat("%s_Orders", prefix);
+			orderHistoryReporter = new SEReportOfOrderHistory(symbol, reportName);
+		}
 
-			if (reportSeed == 0)
-				reportSeed = GetTickCount64();
-
-			string reportsDir = StringFormat(
-				"/Reports/%s/%lld_%llu",
-				symbol,
-				(long)dtime.Timestamp(),
-				reportSeed
-			);
-
-			if (EnableOrderHistoryReport) {
-				string reportName = StringFormat("%s_Orders", prefix);
-				orderHistoryReporter = new SEReportOfOrderHistory(reportsDir, true, reportName);
-			}
-
-			if (EnableSnapshotHistoryReport) {
-				string reportName = StringFormat("%s_Snapshots", prefix);
-				snapshotHistoryReporter = new SEReportOfSnapshotHistory(reportsDir, true, reportName);
-			}
+		if (EnableSnapshotHistoryReport) {
+			string reportName = StringFormat("%s_Snapshots", prefix);
+			snapshotHistoryReporter = new SEReportOfSnapshotHistory(symbol, reportName);
 		}
 
 		initializeDefaultThresholds();
