@@ -203,7 +203,7 @@ public:
 
 		if (EnableSnapshotHistoryReport) {
 			string reportName = StringFormat("%s_%s_Snapshots", symbol, prefix);
-			snapshotHistoryReporter = new SEReportOfSnapshotHistory(symbol, reportName);
+			snapshotHistoryReporter = new SEReportOfSnapshotHistory(symbol, name, prefix, reportName);
 		}
 
 		initializeDefaultThresholds();
