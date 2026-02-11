@@ -10,6 +10,7 @@ input bool EnableTests = false; // [1] > Enable test on init
 input group "Reporting";
 input bool EnableOrderHistoryReport = false; // [1] > Enable order history report on tester
 input bool EnableSnapshotHistoryReport = false; // [1] > Enable snapshot history report on tester
+input bool EnableMarketHistoryReport = false; // [1] > Enable market history report on tester
 
 input group "Risk management";
 input bool EquityAtRiskCompounded = false; // [1] > Equity at risk compounded
@@ -426,6 +427,10 @@ double OnTester() {
 
 	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].ExportSnapshotHistory();
+	}
+
+	for (int i = 0; i < ArraySize(assets); i++) {
+		assets[i].ExportMarketHistory();
 	}
 
 	return quality;

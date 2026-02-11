@@ -2,12 +2,9 @@
 #define __SE_REPORT_OF_ORDER_HISTORY_MQH__
 
 #include "../../structs/SSOrderHistory.mqh"
+#include "../../helpers/HGetReportsPath.mqh"
 #include "../SELogger/SELogger.mqh"
-#include "../SEDateTime/SEDateTime.mqh"
-#include "../SEDateTime/structs/SDateTime.mqh"
 #include "../SEDb/SEDb.mqh"
-
-extern SEDateTime dtime;
 
 class SEReportOfOrderHistory {
 private:
@@ -17,15 +14,13 @@ private:
 
 	string reportsDir;
 	string reportName;
-	bool useCommonFiles;
 
-	void initialize(string directory, string name, bool useCommon) {
+	void initialize(string directory, string name) {
 		logger.SetPrefix("OrderHistoryReporter");
 		reportsDir = directory;
 		reportName = name;
-		useCommonFiles = useCommon;
 
-		database.Initialize(directory, useCommon);
+		database.Initialize(directory, true);
 		ordersCollection = database.Collection(name);
 		ordersCollection.SetAutoFlush(false);
 	}
@@ -57,16 +52,8 @@ private:
 	}
 
 public:
-	SEReportOfOrderHistory() {
-		initialize(
-			StringFormat("/Reports/%s/%lld", _Symbol, (long)dtime.Timestamp()),
-			"Orders",
-			false
-		);
-	}
-
-	SEReportOfOrderHistory(string customDir, bool useCommonFolder = false, string customReportName = "Orders") {
-		initialize(customDir, customReportName, useCommonFolder);
+	SEReportOfOrderHistory(string symbol, string customReportName) {
+		initialize(GetReportsPath(symbol), customReportName);
 	}
 
 	void AddOrderSnapshot(const SSOrderHistory &snapshot) {
@@ -99,20 +86,11 @@ public:
 		string convertedDir = reportsDir;
 		StringReplace(convertedDir, "/", pathSeparator);
 
-		if (useCommonFiles) {
-			return StringFormat("%s%sFiles%s",
-				TerminalInfoString(TERMINAL_COMMONDATA_PATH),
-				pathSeparator,
-				convertedDir
-			);
-		} else {
-			return StringFormat("%s%sMQL5%sFiles%s",
-				TerminalInfoString(TERMINAL_DATA_PATH),
-				pathSeparator,
-				pathSeparator,
-				convertedDir
-			);
-		}
+		return StringFormat("%s%sFiles%s",
+			TerminalInfoString(TERMINAL_COMMONDATA_PATH),
+			pathSeparator,
+			convertedDir
+		);
 	}
 };
 

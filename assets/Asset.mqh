@@ -5,12 +5,14 @@
 #include "../helpers/HStringToNumber.mqh"
 #include "../interfaces/IAsset.mqh"
 #include "../services/SELogger/SELogger.mqh"
+#include "../services/SEReportOfMarketHistory/SEReportOfMarketHistory.mqh"
 #include "../strategies/Strategy.mqh"
 
 class SEAsset:
 public IAsset {
 private:
 	SELogger logger;
+	SEReportOfMarketHistory *marketHistoryReporter;
 
 	string name;
 	double weight;
@@ -30,6 +32,9 @@ public:
 	}
 
 	~SEAsset() {
+		if (CheckPointer(marketHistoryReporter) == POINTER_DYNAMIC)
+			delete marketHistoryReporter;
+
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			if (CheckPointer(strategies[i]) != POINTER_DYNAMIC)
 				continue;
@@ -74,6 +79,11 @@ public:
 			}
 		}
 
+		if (EnableMarketHistoryReport) {
+			string marketReportName = StringFormat("%s_Market", name);
+			marketHistoryReporter = new SEReportOfMarketHistory(symbol, marketReportName);
+		}
+
 		logger.info(StringFormat(
 			"%s initialized | symbol: %s | strategies: %d | weight: %.4f | balance: %.2f",
 			name,
@@ -116,6 +126,15 @@ public:
 	}
 
 	virtual void OnStartDay() {
+		if (CheckPointer(marketHistoryReporter) != POINTER_INVALID) {
+			SSMarketSnapshot marketSnapshot;
+			marketSnapshot.timestamp = dtime.Timestamp();
+			marketSnapshot.bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+			marketSnapshot.ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+			marketSnapshot.spread = marketSnapshot.ask - marketSnapshot.bid;
+			marketHistoryReporter.AddSnapshot(marketSnapshot);
+		}
+
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartDay();
 		}
@@ -267,6 +286,18 @@ public:
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].ExportSnapshotHistory();
 		}
+	}
+
+	void ExportMarketHistory() {
+		if (CheckPointer(marketHistoryReporter) == POINTER_INVALID)
+			return;
+
+		marketHistoryReporter.Export();
+
+		logger.info(StringFormat(
+			"Market history exported with %d snapshots",
+			marketHistoryReporter.GetSnapshotCount()
+		));
 	}
 
 	void SetName(string newName) {
