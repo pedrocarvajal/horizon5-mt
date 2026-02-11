@@ -3,7 +3,7 @@
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 input group "General Settings";
-input int TickIntervalTime = 60;
+input int TickIntervalTime = 60; // [1] > Tick interval (1 = 1 second by tick)
 input ENUM_ORDER_TYPE_FILLING FillingMode = ORDER_FILLING_IOC; // [1] > Order filling mode
 input bool EnableTests = false; // [1] > Enable test on init
 
