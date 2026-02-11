@@ -2,6 +2,7 @@
 #define __SE_DB_COLLECTION_MQH__
 
 #include "../../libraries/json/index.mqh"
+#include "../../helpers/HGenerateUuid.mqh"
 #include "../SELogger/SELogger.mqh"
 #include "SEDbQuery.mqh"
 
@@ -13,11 +14,8 @@ private:
 	int fileFlags;
 	bool autoFlush;
 	JSON::Object *documents[];
-	int idCounter;
-
 	string GenerateId() {
-		idCounter++;
-		return StringFormat("%lld_%d", (long)TimeCurrent(), idCounter);
+		return GenerateUuid();
 	}
 
 	int FindIndexByKeyValue(string key, string value) {
@@ -71,7 +69,6 @@ public:
 		filePath = "";
 		fileFlags = FILE_TXT | FILE_ANSI;
 		autoFlush = true;
-		idCounter = 0;
 		logger.SetPrefix("SEDbCollection");
 	}
 

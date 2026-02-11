@@ -1,12 +1,12 @@
-#ifndef __SE_REPORT_OF_MARKET_HISTORY_MQH__
-#define __SE_REPORT_OF_MARKET_HISTORY_MQH__
+#ifndef __SE_REPORT_OF_MARKET_SNAPSHOTS_MQH__
+#define __SE_REPORT_OF_MARKET_SNAPSHOTS_MQH__
 
 #include "../../structs/SSMarketSnapshot.mqh"
 #include "../../helpers/HGetReportsPath.mqh"
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 
-class SEReportOfMarketHistory {
+class SEReportOfMarketSnapshots {
 private:
 	SELogger logger;
 	SEDb database;
@@ -14,9 +14,11 @@ private:
 
 	string reportsDir;
 	string reportName;
+	string reportSymbol;
 
 public:
-	SEReportOfMarketHistory(string symbol, string customReportName) {
+	SEReportOfMarketSnapshots(string symbol, string customReportName) {
+		reportSymbol = symbol;
 		initialize(GetReportsPath(symbol), customReportName);
 	}
 
@@ -60,7 +62,7 @@ public:
 
 private:
 	void initialize(string directory, string name) {
-		logger.SetPrefix("MarketHistoryReporter");
+		logger.SetPrefix("MarketSnapshotsReporter");
 		reportsDir = directory;
 		reportName = name;
 
@@ -72,6 +74,8 @@ private:
 	JSON::Object *snapshotToJson(const SSMarketSnapshot &snapshot) {
 		JSON::Object *obj = new JSON::Object();
 		obj.setProperty("timestamp", (long)snapshot.timestamp);
+		obj.setProperty("symbol", reportSymbol);
+		obj.setProperty("level", "symbol");
 		obj.setProperty("bid", snapshot.bid);
 		obj.setProperty("ask", snapshot.ask);
 		obj.setProperty("spread", snapshot.spread);
