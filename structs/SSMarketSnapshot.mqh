@@ -6,7 +6,7 @@ struct SSMarketSnapshot {
 	double bid;
 	double ask;
 	double spread;
-	double rollingReturn;
+	double performance;
 	double momentum;
 	double drawdown;
 };
