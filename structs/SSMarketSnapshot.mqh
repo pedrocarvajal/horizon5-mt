@@ -9,6 +9,7 @@ struct SSMarketSnapshot {
 	double performance;
 	double momentum;
 	double drawdown;
+	double volatility;
 };
 
 #endif
