@@ -5,6 +5,9 @@
 #include "../helpers/HStringToNumber.mqh"
 #include "../interfaces/IAsset.mqh"
 #include "../services/SELogger/SELogger.mqh"
+#include "../helpers/sqx/RollingReturn.mqh"
+#include "../helpers/sqx/Momentum.mqh"
+#include "../helpers/sqx/DrawdownFromPeak.mqh"
 #include "../services/SEReportOfMarketSnapshots/SEReportOfMarketSnapshots.mqh"
 #include "../strategies/Strategy.mqh"
 
@@ -132,6 +135,9 @@ public:
 			marketSnapshot.bid = SymbolInfoDouble(symbol, SYMBOL_BID);
 			marketSnapshot.ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
 			marketSnapshot.spread = marketSnapshot.ask - marketSnapshot.bid;
+			marketSnapshot.rollingReturn = RollingReturn(symbol, PERIOD_D1, 90, 0);
+			marketSnapshot.momentum = Momentum(symbol, PERIOD_D1, 90, 0);
+			marketSnapshot.drawdown = DrawdownFromPeak(symbol, PERIOD_D1, 90, 0);
 
 			marketSnapshotsReporter.AddSnapshot(marketSnapshot);
 		}
