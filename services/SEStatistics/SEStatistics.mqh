@@ -189,6 +189,8 @@ private:
 		snapshotData.maxExposureInLots = maxExposureInLots;
 		snapshotData.maxExposureInPercentage = maxExposureInPercentage;
 
+		snapshotData.dailyPerformance = dailyPerformance;
+
 		return snapshotData;
 	}
 

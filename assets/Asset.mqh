@@ -9,6 +9,7 @@
 #include "../helpers/sqx/Momentum.mqh"
 #include "../helpers/sqx/DrawdownFromPeak.mqh"
 #include "../helpers/sqx/Volatility.mqh"
+#include "../helpers/sqx/DailyPerformance.mqh"
 #include "../services/SEReportOfMarketSnapshots/SEReportOfMarketSnapshots.mqh"
 #include "../strategies/Strategy.mqh"
 
@@ -140,6 +141,7 @@ public:
 			marketSnapshot.momentum = Momentum(symbol, PERIOD_D1, 90, 0);
 			marketSnapshot.drawdown = DrawdownFromPeak(symbol, PERIOD_D1, 90, 0);
 			marketSnapshot.volatility = Volatility(symbol, PERIOD_D1, 90, 0);
+			marketSnapshot.dailyPerformance = DailyPerformance(symbol, PERIOD_D1, 0);
 
 			marketSnapshotsReporter.AddSnapshot(marketSnapshot);
 		}

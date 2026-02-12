@@ -114,6 +114,8 @@ private:
 		obj.setProperty("max_exposure_in_lots", snapshot.maxExposureInLots);
 		obj.setProperty("max_exposure_in_percentage", snapshot.maxExposureInPercentage);
 
+		obj.setProperty("daily_performance", snapshot.dailyPerformance);
+
 		return obj;
 	}
 };
