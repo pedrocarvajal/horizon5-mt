@@ -135,7 +135,7 @@ public:
 			marketSnapshot.bid = SymbolInfoDouble(symbol, SYMBOL_BID);
 			marketSnapshot.ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
 			marketSnapshot.spread = marketSnapshot.ask - marketSnapshot.bid;
-			marketSnapshot.rollingReturn = RollingReturn(symbol, PERIOD_D1, 90, 0);
+			marketSnapshot.performance = RollingReturn(symbol, PERIOD_D1, 90, 0);
 			marketSnapshot.momentum = Momentum(symbol, PERIOD_D1, 90, 0);
 			marketSnapshot.drawdown = DrawdownFromPeak(symbol, PERIOD_D1, 90, 0);
 

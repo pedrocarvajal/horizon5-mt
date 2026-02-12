@@ -79,7 +79,7 @@ private:
 		obj.setProperty("bid", snapshot.bid);
 		obj.setProperty("ask", snapshot.ask);
 		obj.setProperty("spread", snapshot.spread);
-		obj.setProperty("rolling_return", snapshot.rollingReturn);
+		obj.setProperty("performance", snapshot.performance);
 		obj.setProperty("momentum", snapshot.momentum);
 		obj.setProperty("drawdown", snapshot.drawdown);
 
