@@ -75,7 +75,7 @@ private:
 		JSON::Object *obj = new JSON::Object();
 		obj.setProperty("timestamp", (long)snapshot.timestamp);
 		obj.setProperty("symbol", reportSymbol);
-		obj.setProperty("level", "symbol");
+		obj.setProperty("level", "market");
 		obj.setProperty("bid", snapshot.bid);
 		obj.setProperty("ask", snapshot.ask);
 		obj.setProperty("spread", snapshot.spread);
