@@ -6,7 +6,6 @@
 #include "../interfaces/IAsset.mqh"
 #include "../services/SELogger/SELogger.mqh"
 #include "../helpers/sqx/RollingReturn.mqh"
-#include "../helpers/sqx/Momentum.mqh"
 #include "../helpers/sqx/DrawdownFromPeak.mqh"
 #include "../helpers/sqx/Volatility.mqh"
 #include "../helpers/sqx/DailyPerformance.mqh"
@@ -138,7 +137,6 @@ public:
 			marketSnapshot.ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
 			marketSnapshot.spread = marketSnapshot.ask - marketSnapshot.bid;
 			marketSnapshot.performance = RollingReturn(symbol, PERIOD_D1, 90, 0);
-			marketSnapshot.momentum = Momentum(symbol, PERIOD_D1, 90, 0);
 			marketSnapshot.drawdown = DrawdownFromPeak(symbol, PERIOD_D1, 90, 0);
 			marketSnapshot.volatility = Volatility(symbol, PERIOD_D1, 90, 0);
 			marketSnapshot.dailyPerformance = DailyPerformance(symbol, PERIOD_D1, 0);
