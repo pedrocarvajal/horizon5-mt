@@ -83,6 +83,7 @@ private:
 		obj.setProperty("momentum", snapshot.momentum);
 		obj.setProperty("drawdown", snapshot.drawdown);
 		obj.setProperty("volatility", snapshot.volatility);
+		obj.setProperty("daily_performance", snapshot.dailyPerformance);
 
 		return obj;
 	}
