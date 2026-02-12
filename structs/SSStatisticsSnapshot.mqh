@@ -31,6 +31,8 @@ struct SSStatisticsSnapshot {
 	double maxExposureInLots;
 	double maxExposureInPercentage;
 
+	double dailyPerformance;
+
 	SSOrderHistory orders[];
 };
 
