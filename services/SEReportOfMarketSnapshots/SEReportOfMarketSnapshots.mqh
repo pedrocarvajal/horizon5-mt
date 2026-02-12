@@ -80,7 +80,6 @@ private:
 		obj.setProperty("ask", snapshot.ask);
 		obj.setProperty("spread", snapshot.spread);
 		obj.setProperty("performance", snapshot.performance);
-		obj.setProperty("momentum", snapshot.momentum);
 		obj.setProperty("drawdown", snapshot.drawdown);
 		obj.setProperty("volatility", snapshot.volatility);
 		obj.setProperty("daily_performance", snapshot.dailyPerformance);
