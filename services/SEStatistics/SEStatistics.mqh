@@ -189,7 +189,10 @@ private:
 		snapshotData.maxExposureInLots = maxExposureInLots;
 		snapshotData.maxExposureInPercentage = maxExposureInPercentage;
 
-		snapshotData.dailyPerformance = dailyPerformance;
+		if (ArraySize(nav) > 1 && nav[ArraySize(nav) - 2] != 0.0)
+			snapshotData.dailyPerformance = dailyPerformance / nav[ArraySize(nav) - 2];
+		else
+			snapshotData.dailyPerformance = 0.0;
 
 		return snapshotData;
 	}
