@@ -5,10 +5,12 @@
 #include "../helpers/HStringToNumber.mqh"
 #include "../interfaces/IAsset.mqh"
 #include "../services/SELogger/SELogger.mqh"
-#include "../helpers/sqx/RollingReturn.mqh"
-#include "../helpers/sqx/DrawdownFromPeak.mqh"
-#include "../helpers/sqx/Volatility.mqh"
+#include "../indicators/INRollingReturn.mqh"
+#include "../indicators/INDrawdownFromPeak.mqh"
+#include "../indicators/INVolatility.mqh"
+#include "../indicators/INMaxDrawdownInWindow.mqh"
 #include "../services/SEReportOfMarketSnapshots/SEReportOfMarketSnapshots.mqh"
+#include "../services/SEStrategyAllocator/SEStrategyAllocator.mqh"
 #include "../strategies/Strategy.mqh"
 
 class SEAsset:
@@ -16,11 +18,79 @@ public IAsset {
 private:
 	SELogger logger;
 	SEReportOfMarketSnapshots *marketSnapshotsReporter;
+	SEStrategyAllocator *allocator;
 
 	string name;
 	double weight;
-	bool enabled;
+	bool isEnabled;
 	double balance;
+
+	void runAllocator() {
+		if (CheckPointer(allocator) == POINTER_INVALID)
+			return;
+
+		int strategyCount = ArraySize(strategies);
+
+		double dailyPerformances[];
+		ArrayResize(dailyPerformances, strategyCount);
+
+		for (int i = 0; i < strategyCount; i++) {
+			dailyPerformances[i] = strategies[i].GetStatistics().GetDailyPerformancePercent();
+		}
+
+		double rollingReturn = RollingReturn(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
+		double rollingVolatility = Volatility(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
+		double rollingDrawdown = MaxDrawdownInWindow(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
+
+		allocator.OnStartDay(
+			rollingReturn,
+			rollingVolatility,
+			rollingDrawdown,
+			dailyPerformances
+		);
+
+		if (!allocator.IsWarmupComplete())
+			return;
+
+		string activeStrategyPrefixes[];
+		allocator.GetActiveStrategies(activeStrategyPrefixes);
+
+		int activeCount = ArraySize(activeStrategyPrefixes);
+		double balancePerActive = (activeCount > 0) ? balance / activeCount : 0;
+
+		for (int i = 0; i < strategyCount; i++) {
+			bool shouldBeActive = false;
+
+			for (int j = 0; j < activeCount; j++) {
+				if (strategies[i].GetPrefix() == activeStrategyPrefixes[j]) {
+					shouldBeActive = true;
+					break;
+				}
+			}
+
+			double previousBalance = strategies[i].GetBalance();
+			double newBalance = shouldBeActive ? balancePerActive : 0;
+
+			if (previousBalance != newBalance) {
+				strategies[i].SetBalance(newBalance);
+
+				if (newBalance > 0) {
+					logger.info(StringFormat(
+						"%s allocated: %.2f (was %.2f)",
+						strategies[i].GetPrefix(),
+						newBalance,
+						previousBalance
+					));
+				} else {
+					logger.info(StringFormat(
+						"%s deallocated (was %.2f)",
+						strategies[i].GetPrefix(),
+						previousBalance
+					));
+				}
+			}
+		}
+	}
 
 	SSMarketSnapshot BuildMarketSnapshot() {
 		SSMarketSnapshot snapshot;
@@ -28,9 +98,9 @@ private:
 		snapshot.bid = SymbolInfoDouble(symbol, SYMBOL_BID);
 		snapshot.ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
 		snapshot.spread = snapshot.ask - snapshot.bid;
-		snapshot.rolling_performance = RollingReturn(symbol, PERIOD_D1, 90, 0);
-		snapshot.rolling_drawdown = DrawdownFromPeak(symbol, PERIOD_D1, 90, 0);
-		snapshot.rolling_volatility = Volatility(symbol, PERIOD_D1, 90, 0);
+		snapshot.rollingPerformance = RollingReturn(symbol, PERIOD_D1, 90, 0);
+		snapshot.rollingDrawdown = DrawdownFromPeak(symbol, PERIOD_D1, 90, 0);
+		snapshot.rollingVolatility = Volatility(symbol, PERIOD_D1, 90, 0);
 		return snapshot;
 	}
 
@@ -43,12 +113,15 @@ public:
 	SEAsset() {
 		logger.SetPrefix("SEAsset");
 		weight = 0;
-		enabled = false;
+		isEnabled = false;
 	}
 
 	~SEAsset() {
 		if (CheckPointer(marketSnapshotsReporter) == POINTER_DYNAMIC)
 			delete marketSnapshotsReporter;
+
+		if (CheckPointer(allocator) == POINTER_DYNAMIC)
+			delete allocator;
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			if (CheckPointer(strategies[i]) != POINTER_DYNAMIC)
@@ -61,7 +134,7 @@ public:
 	virtual int OnInit() {
 		int strategyCount = ArraySize(strategies);
 
-		if (!enabled) {
+		if (!isEnabled) {
 			logger.info(StringFormat(
 				"Asset skipped (disabled): %s",
 				name
@@ -97,6 +170,14 @@ public:
 		if (EnableMarketHistoryReport) {
 			string marketReportName = StringFormat("%s_MARKET_Snapshots", symbol);
 			marketSnapshotsReporter = new SEReportOfMarketSnapshots(symbol, marketReportName);
+		}
+
+		if (EnableStrategyAllocator) {
+			allocator = new SEStrategyAllocator(AllocatorRollingWindow, AllocatorNormalizationWindow, AllocatorKNeighbors, AllocatorMaxActiveStrategies, AllocatorScoreThreshold, AllocatorForwardWindow);
+
+			for (int i = 0; i < strategyCount; i++) {
+				allocator.RegisterStrategy(strategies[i].GetPrefix());
+			}
 		}
 
 		logger.info(StringFormat(
@@ -141,6 +222,8 @@ public:
 	}
 
 	virtual void OnStartDay() {
+		runAllocator();
+
 		if (CheckPointer(marketSnapshotsReporter) != POINTER_INVALID)
 			marketSnapshotsReporter.AddSnapshot(BuildMarketSnapshot());
 
@@ -318,7 +401,7 @@ public:
 	}
 
 	bool IsEnabled() {
-		return enabled;
+		return isEnabled;
 	}
 
 	void SetBalance(double newBalance) {
@@ -326,7 +409,7 @@ public:
 	}
 
 	void SetEnabled(bool newEnabled) {
-		enabled = newEnabled;
+		isEnabled = newEnabled;
 	}
 
 	void SetName(string newName) {

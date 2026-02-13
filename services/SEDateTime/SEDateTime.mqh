@@ -8,7 +8,7 @@ private:
 	SDateTime current;
 	SDateTime today;
 
-	SDateTime FromMqlDateTime(MqlDateTime &mql, datetime ts) {
+	SDateTime fromMqlDateTime(MqlDateTime &mql, datetime ts) {
 		SDateTime result;
 
 		result.year = mql.year;
@@ -33,7 +33,7 @@ public:
 	SDateTime FromTimestamp(datetime ts) {
 		MqlDateTime mql;
 		TimeToStruct(ts, mql);
-		return FromMqlDateTime(mql, ts);
+		return fromMqlDateTime(mql, ts);
 	}
 
 	datetime Timestamp() {
@@ -45,7 +45,7 @@ public:
 		MqlDateTime mql;
 
 		TimeToStruct(ts, mql);
-		current = FromMqlDateTime(mql, ts);
+		current = fromMqlDateTime(mql, ts);
 
 		return current;
 	}
@@ -60,7 +60,7 @@ public:
 		mql.min = 0;
 		mql.sec = 0;
 
-		today = FromMqlDateTime(mql, StructToTime(mql));
+		today = fromMqlDateTime(mql, StructToTime(mql));
 
 		return today;
 	}
