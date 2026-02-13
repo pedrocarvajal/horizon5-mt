@@ -297,6 +297,18 @@ public:
 			return false;
 		}
 
+		int modelNormalizedCount = (int)model.getNumber("normalizedCount");
+		int modelMaxCandidateCount = (int)model.getNumber("maxCandidateCount");
+
+		if (modelNormalizedCount < 1 || modelMaxCandidateCount < 1) {
+			logger.error(StringFormat(
+				"Invalid model: normalizedCount=%d, maxCandidateCount=%d. Model was trained with insufficient data.",
+				modelNormalizedCount,
+				modelMaxCandidateCount
+			));
+			return false;
+		}
+
 		outRollingWindowDays = (int)model.getNumber("rollingWindowDays");
 		outNormalizationWindow = (int)model.getNumber("normalizationWindow");
 		outKNeighbors = (int)model.getNumber("kNeighbors");
