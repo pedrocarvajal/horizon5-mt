@@ -79,10 +79,9 @@ private:
 		obj.setProperty("bid", snapshot.bid);
 		obj.setProperty("ask", snapshot.ask);
 		obj.setProperty("spread", snapshot.spread);
-		obj.setProperty("performance", snapshot.performance);
-		obj.setProperty("drawdown", snapshot.drawdown);
-		obj.setProperty("volatility", snapshot.volatility);
-		obj.setProperty("daily_performance", snapshot.dailyPerformance);
+		obj.setProperty("rolling_performance", snapshot.rolling_performance);
+		obj.setProperty("rolling_drawdown", snapshot.rolling_drawdown);
+		obj.setProperty("rolling_volatility", snapshot.rolling_volatility);
 
 		return obj;
 	}

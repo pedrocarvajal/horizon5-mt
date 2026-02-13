@@ -17,12 +17,14 @@ interface IAsset {
 	void OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason);
 	void OnDeinit();
 
-	void SetSymbol(string assetSymbol);
-	void SetName(string assetName);
-	void SetBalance(double assetBalance);
+	double CalculateQualityProduct();
+	void PerformStatistics();
 
 	int GetStrategyCount();
-	double CalculateQualityProduct();
+
+	void SetBalance(double assetBalance);
+	void SetName(string assetName);
+	void SetSymbol(string assetSymbol);
 };
 
 #endif

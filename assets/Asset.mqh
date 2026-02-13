@@ -8,7 +8,6 @@
 #include "../helpers/sqx/RollingReturn.mqh"
 #include "../helpers/sqx/DrawdownFromPeak.mqh"
 #include "../helpers/sqx/Volatility.mqh"
-#include "../helpers/sqx/DailyPerformance.mqh"
 #include "../services/SEReportOfMarketSnapshots/SEReportOfMarketSnapshots.mqh"
 #include "../strategies/Strategy.mqh"
 
@@ -22,6 +21,18 @@ private:
 	double weight;
 	bool enabled;
 	double balance;
+
+	SSMarketSnapshot BuildMarketSnapshot() {
+		SSMarketSnapshot snapshot;
+		snapshot.timestamp = dtime.Timestamp();
+		snapshot.bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+		snapshot.ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+		snapshot.spread = snapshot.ask - snapshot.bid;
+		snapshot.rolling_performance = RollingReturn(symbol, PERIOD_D1, 90, 0);
+		snapshot.rolling_drawdown = DrawdownFromPeak(symbol, PERIOD_D1, 90, 0);
+		snapshot.rolling_volatility = Volatility(symbol, PERIOD_D1, 90, 0);
+		return snapshot;
+	}
 
 protected:
 	string symbol;
@@ -130,19 +141,8 @@ public:
 	}
 
 	virtual void OnStartDay() {
-		if (CheckPointer(marketSnapshotsReporter) != POINTER_INVALID) {
-			SSMarketSnapshot marketSnapshot;
-			marketSnapshot.timestamp = dtime.Timestamp();
-			marketSnapshot.bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-			marketSnapshot.ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-			marketSnapshot.spread = marketSnapshot.ask - marketSnapshot.bid;
-			marketSnapshot.performance = RollingReturn(symbol, PERIOD_D1, 90, 0);
-			marketSnapshot.drawdown = DrawdownFromPeak(symbol, PERIOD_D1, 90, 0);
-			marketSnapshot.volatility = Volatility(symbol, PERIOD_D1, 90, 0);
-			marketSnapshot.dailyPerformance = DailyPerformance(symbol, PERIOD_D1, 0);
-
-			marketSnapshotsReporter.AddSnapshot(marketSnapshot);
-		}
+		if (CheckPointer(marketSnapshotsReporter) != POINTER_INVALID)
+			marketSnapshotsReporter.AddSnapshot(BuildMarketSnapshot());
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartDay();
@@ -189,16 +189,10 @@ public:
 		strategies[ArraySize(strategies) - 1] = strategy;
 	}
 
-	int GetStrategyCount() {
-		return ArraySize(strategies);
-	}
-
 	double CalculateQualityProduct() {
 		double quality = 1.0;
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].GetStatistics().OnForceEnd();
-
 			double strategyQuality =
 				strategies[i].GetStatistics().GetQuality().quality;
 
@@ -212,6 +206,50 @@ public:
 		}
 
 		return quality;
+	}
+
+	void CleanupClosedOrders() {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].CleanupClosedOrders();
+		}
+	}
+
+	void ExportMarketSnapshots() {
+		if (CheckPointer(marketSnapshotsReporter) == POINTER_INVALID)
+			return;
+
+		marketSnapshotsReporter.Export();
+
+		logger.info(StringFormat(
+			"Market history exported with %d snapshots",
+			marketSnapshotsReporter.GetSnapshotCount()
+		));
+	}
+
+	void ExportOrderHistory() {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].ExportOrderHistory();
+		}
+	}
+
+	void ExportStrategySnapshots() {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].ExportStrategySnapshots();
+		}
+	}
+
+	bool FindOrderById(string id, int &strategyIndex, int &orderIndex) {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			int idx = strategies[i].FindOrderIndexById(id);
+
+			if (idx != -1) {
+				strategyIndex = i;
+				orderIndex = idx;
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	bool FindOrderByOrderId(
@@ -250,18 +288,16 @@ public:
 		return false;
 	}
 
-	bool FindOrderById(string id, int &strategyIndex, int &orderIndex) {
+	void PerformStatistics() {
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			int idx = strategies[i].FindOrderIndexById(id);
-
-			if (idx != -1) {
-				strategyIndex = i;
-				orderIndex = idx;
-				return true;
-			}
+			strategies[i].GetStatistics().OnForceEnd();
 		}
+	}
 
-		return false;
+	void ProcessOrders() {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].ProcessOrders();
+		}
 	}
 
 	SEStrategy * GetStrategyByPrefix(string strategyPrefix) {
@@ -273,60 +309,8 @@ public:
 		return NULL;
 	}
 
-	void ProcessOrders() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].ProcessOrders();
-		}
-	}
-
-	void CleanupClosedOrders() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].CleanupClosedOrders();
-		}
-	}
-
-	void ExportOrderHistory() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].ExportOrderHistory();
-		}
-	}
-
-	void ExportStrategySnapshots() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].ExportStrategySnapshots();
-		}
-	}
-
-	void ExportMarketSnapshots() {
-		if (CheckPointer(marketSnapshotsReporter) == POINTER_INVALID)
-			return;
-
-		marketSnapshotsReporter.Export();
-
-		logger.info(StringFormat(
-			"Market history exported with %d snapshots",
-			marketSnapshotsReporter.GetSnapshotCount()
-		));
-	}
-
-	void SetName(string newName) {
-		name = newName;
-	}
-
-	void SetEnabled(bool newEnabled) {
-		enabled = newEnabled;
-	}
-
-	void SetSymbol(string newSymbol) {
-		symbol = newSymbol;
-	}
-
-	void SetWeight(double newWeight) {
-		weight = newWeight;
-	}
-
-	void SetBalance(double newBalance) {
-		balance = newBalance;
+	int GetStrategyCount() {
+		return ArraySize(strategies);
 	}
 
 	string GetSymbol() {
@@ -335,6 +319,26 @@ public:
 
 	bool IsEnabled() {
 		return enabled;
+	}
+
+	void SetBalance(double newBalance) {
+		balance = newBalance;
+	}
+
+	void SetEnabled(bool newEnabled) {
+		enabled = newEnabled;
+	}
+
+	void SetName(string newName) {
+		name = newName;
+	}
+
+	void SetSymbol(string newSymbol) {
+		symbol = newSymbol;
+	}
+
+	void SetWeight(double newWeight) {
+		weight = newWeight;
 	}
 };
 
