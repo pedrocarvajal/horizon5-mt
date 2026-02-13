@@ -63,6 +63,23 @@ public:
 			return false;
 		}
 
+		if (normalizedCount < 1) {
+			logger.error(StringFormat(
+				"Cannot save model: no normalized features (totalDays=%d, normalizationWindow=%d). Training backtest must be longer than normalization window.",
+				totalDays,
+				normalizationWindow
+			));
+			return false;
+		}
+
+		if (maxCandidateCount < 1) {
+			logger.error(StringFormat(
+				"Cannot save model: no KNN candidates (maxCandidateCount=%d). Training backtest must be longer than normalization window + forward window.",
+				maxCandidateCount
+			));
+			return false;
+		}
+
 		collection.SetAutoFlush(false);
 		collection.DeleteOne("type", "allocator_model");
 
