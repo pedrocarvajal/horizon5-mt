@@ -9,14 +9,14 @@ private:
 	SELogger logger;
 	string basePath;
 	bool useCommonFiles;
-	bool initialized;
+	bool isInitialized;
 	SEDbCollection *collections[];
 
 public:
 	SEDb() {
 		basePath = "";
 		useCommonFiles = false;
-		initialized = false;
+		isInitialized = false;
 		logger.SetPrefix("SEDb");
 	}
 
@@ -24,7 +24,7 @@ public:
 		long accountNumber = AccountInfoInteger(ACCOUNT_LOGIN);
 		basePath = StringFormat("%lld/%s", accountNumber, databasePath);
 		useCommonFiles = commonFiles;
-		initialized = true;
+		isInitialized = true;
 		logger.SetPrefix(StringFormat("SEDb[%s]", basePath));
 	}
 
@@ -40,7 +40,7 @@ public:
 	}
 
 	SEDbCollection *Collection(string collectionName) {
-		if (!initialized) {
+		if (!isInitialized) {
 			logger.error("Database not initialized");
 			return NULL;
 		}
@@ -63,7 +63,7 @@ public:
 	}
 
 	bool Drop(string collectionName) {
-		if (!initialized) {
+		if (!isInitialized) {
 			logger.error("Database not initialized");
 			return false;
 		}

@@ -116,7 +116,7 @@ public:
 	}
 
 private:
-	void Snapshot() {
+	void buildSnapshot() {
 		snapshot.orderId = GetId();
 		snapshot.symbol = symbol;
 		snapshot.strategyName = source;
@@ -139,7 +139,7 @@ private:
 		snapshot.profitInDollars = profitInDollars;
 	}
 
-	void RefreshId() {
+	void refreshId() {
 		string uuid = "";
 		for (int i = 0; i < 8; i++) {
 			uuid += IntegerToString(MathRand() % 10);
@@ -147,7 +147,7 @@ private:
 		id = StringFormat("%s_%s", source, uuid);
 	}
 
-	bool ValidateMinimumVolume() {
+	bool validateMinimumVolume() {
 		double minLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
 		double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
 		double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
@@ -270,7 +270,7 @@ public:
 			return;
 		}
 
-		if (!ValidateMinimumVolume()) {
+		if (!validateMinimumVolume()) {
 			logger.info(StringFormat("[%s] Order cancelled - Volume does not meet minimum requirements", GetId()));
 			Cancel();
 			return;
@@ -366,8 +366,8 @@ public:
 	}
 
 	void OnOpen(const MqlTradeResult &result) {
-		if (result.retcode != 0 && result.retcode != 10009 &&
-		    result.retcode != 10010) {
+		if (result.retcode != 0 && result.retcode != TRADE_RETCODE_DONE &&
+		    result.retcode != TRADE_RETCODE_DONE_PARTIAL) {
 			retryCount++;
 			logger.error(StringFormat(
 				"[%s] Error opening order: %d, retry %d/%d",
@@ -424,7 +424,7 @@ public:
 			status = ORDER_STATUS_OPEN;
 		}
 
-		Snapshot();
+		buildSnapshot();
 
 		if (CheckPointer(persistence) != POINTER_INVALID)
 			persistence.SaveOrder(this);
@@ -447,7 +447,7 @@ public:
 		}
 
 		orderCloseReason = reason;
-		Snapshot();
+		buildSnapshot();
 
 		if (reason == DEAL_REASON_TP)
 			logger.info(StringFormat("[%s] Order closed by Take Profit", GetId()));
@@ -491,7 +491,7 @@ public:
 
 	string GetId() {
 		if (id == "")
-			RefreshId();
+			refreshId();
 
 		return id;
 	}
