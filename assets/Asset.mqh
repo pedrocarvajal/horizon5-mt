@@ -13,6 +13,8 @@
 #include "../services/SEStrategyAllocator/SEStrategyAllocator.mqh"
 #include "../strategies/Strategy.mqh"
 
+extern SEDateTime dtime;
+
 class SEAsset:
 public IAsset {
 private:
@@ -25,37 +27,20 @@ private:
 	bool isEnabled;
 	double balance;
 
-	void runAllocator() {
-		if (CheckPointer(allocator) == POINTER_INVALID)
-			return;
+	SEStrategy *strategies[];
 
+	void collectDailyPerformances(double &dailyPerformances[]) {
 		int strategyCount = ArraySize(strategies);
-
-		double dailyPerformances[];
 		ArrayResize(dailyPerformances, strategyCount);
 
 		for (int i = 0; i < strategyCount; i++) {
 			dailyPerformances[i] = strategies[i].GetStatistics().GetDailyPerformancePercent();
 		}
+	}
 
-		double rollingReturn = RollingReturn(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
-		double rollingVolatility = Volatility(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
-		double rollingDrawdown = MaxDrawdownInWindow(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
-
-		allocator.OnStartDay(
-			rollingReturn,
-			rollingVolatility,
-			rollingDrawdown,
-			dailyPerformances
-		);
-
-		if (!allocator.IsWarmupComplete())
-			return;
-
-		string activeStrategyPrefixes[];
-		allocator.GetActiveStrategies(activeStrategyPrefixes);
-
+	void redistributeBalances(string &activeStrategyPrefixes[]) {
 		int activeCount = ArraySize(activeStrategyPrefixes);
+		int strategyCount = ArraySize(strategies);
 		double balancePerActive = (activeCount > 0) ? balance / activeCount : 0;
 
 		for (int i = 0; i < strategyCount; i++) {
@@ -92,6 +77,32 @@ private:
 		}
 	}
 
+	void runAllocator() {
+		if (CheckPointer(allocator) == POINTER_INVALID)
+			return;
+
+		double dailyPerformances[];
+		collectDailyPerformances(dailyPerformances);
+
+		double rollingReturn = RollingReturn(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
+		double rollingVolatility = Volatility(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
+		double rollingDrawdown = MaxDrawdownInWindow(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
+
+		allocator.OnStartDay(
+			rollingReturn,
+			rollingVolatility,
+			rollingDrawdown,
+			dailyPerformances
+		);
+
+		if (!allocator.IsWarmupComplete())
+			return;
+
+		string activeStrategyPrefixes[];
+		allocator.GetActiveStrategies(activeStrategyPrefixes);
+		redistributeBalances(activeStrategyPrefixes);
+	}
+
 	SSMarketSnapshot BuildMarketSnapshot() {
 		SSMarketSnapshot snapshot;
 		snapshot.timestamp = dtime.Timestamp();
@@ -108,8 +119,6 @@ protected:
 	string symbol;
 
 public:
-	SEStrategy * strategies[];
-
 	SEAsset() {
 		logger.SetPrefix("SEAsset");
 		weight = 0;
@@ -180,7 +189,7 @@ public:
 			}
 
 			if (AllocatorMode == ALLOCATOR_MODE_INFERENCE) {
-				string collectionName = StringFormat("%s_allocator", symbol);
+				string collectionName = StringFormat("%s_Allocator", symbol);
 
 				if (!allocator.LoadModel(AllocatorModelPath, collectionName)) {
 					logger.error("Failed to load allocator model");
@@ -310,7 +319,7 @@ public:
 		if (CheckPointer(allocator) == POINTER_INVALID)
 			return;
 
-		string collectionName = StringFormat("%s_allocator", symbol);
+		string collectionName = StringFormat("%s_Allocator", symbol);
 		allocator.SaveModel(AllocatorModelPath, collectionName);
 	}
 
