@@ -418,6 +418,13 @@ public:
 		return NULL;
 	}
 
+	SEStrategy * GetStrategyAtIndex(int index) {
+		if (index < 0 || index >= ArraySize(strategies))
+			return NULL;
+
+		return strategies[index];
+	}
+
 	int GetStrategyCount() {
 		return ArraySize(strategies);
 	}
