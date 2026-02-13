@@ -41,7 +41,7 @@ private:
 	SEReportOfStrategySnapshots *strategySnapshotsReporter;
 	SEOrderPersistence *orderPersistence;
 
-	void filterOrders(
+	void FilterOrders(
 		EOrder& resultOrders[],
 		ENUM_ORDER_TYPE side,
 		ENUM_ORDER_STATUSES status,
@@ -68,7 +68,7 @@ private:
 		}
 	}
 
-	void initializeDefaultThresholds() {
+	void InitializeDefaultThresholds() {
 		SQualityThresholds thresholds;
 
 		thresholds.optimizationFormula = OPTIMIZATION_BY_PERFORMANCE;
@@ -88,6 +88,25 @@ private:
 		thresholds.minTrades = 5;
 
 		SetQualityThresholds(thresholds);
+	}
+
+	void InitializeServices() {
+		countOrdersOfToday = 0;
+		countOpenOrders = 0;
+		countClosedOrders = 0;
+		logger.SetPrefix(name);
+		statistics = new SEStatistics(symbol, name, prefix, balance);
+		lotSize = new SELotSize(symbol);
+
+		if (EnableOrderHistoryReport) {
+			string reportName = StringFormat("%s_%s_Orders", symbol, prefix);
+			orderHistoryReporter = new SEReportOfOrderHistory(symbol, reportName);
+		}
+
+		if (EnableSnapshotHistoryReport) {
+			string reportName = StringFormat("%s_%s_Snapshots", symbol, prefix);
+			strategySnapshotsReporter = new SEReportOfStrategySnapshots(symbol, name, prefix, reportName);
+		}
 	}
 
 	int RestoreOrders() {
@@ -128,16 +147,7 @@ private:
 		return totalRestored;
 	}
 
-protected:
-	SELogger logger;
-
-	string name;
-	string symbol;
-	string prefix;
-	ulong strategyMagicNumber;
-
-public:
-	virtual int OnInit() {
+	int ValidateConfiguration() {
 		if (name == "") {
 			logger.error("Name not defined for strategy");
 
@@ -189,24 +199,25 @@ public:
 			return INIT_FAILED;
 		}
 
-		countOrdersOfToday = 0;
-		countOpenOrders = 0;
-		countClosedOrders = 0;
-		logger.SetPrefix(name);
-		statistics = new SEStatistics(symbol, name, prefix, balance);
-		lotSize = new SELotSize(symbol);
+		return INIT_SUCCEEDED;
+	}
 
-		if (EnableOrderHistoryReport) {
-			string reportName = StringFormat("%s_%s_Orders", symbol, prefix);
-			orderHistoryReporter = new SEReportOfOrderHistory(symbol, reportName);
-		}
+protected:
+	SELogger logger;
 
-		if (EnableSnapshotHistoryReport) {
-			string reportName = StringFormat("%s_%s_Snapshots", symbol, prefix);
-			strategySnapshotsReporter = new SEReportOfStrategySnapshots(symbol, name, prefix, reportName);
-		}
+	string name;
+	string symbol;
+	string prefix;
+	ulong strategyMagicNumber;
 
-		initializeDefaultThresholds();
+public:
+	virtual int OnInit() {
+		int validationResult = ValidateConfiguration();
+		if (validationResult != INIT_SUCCEEDED)
+			return validationResult;
+
+		InitializeServices();
+		InitializeDefaultThresholds();
 
 		if (isLiveTrading()) {
 			orderPersistence = new SEOrderPersistence();
@@ -263,6 +274,57 @@ public:
 		ArrayResize(orders, 0);
 	}
 
+	virtual ~SEStrategy() {
+		if (CheckPointer(statistics) == POINTER_DYNAMIC)
+			delete statistics;
+
+		if (CheckPointer(lotSize) == POINTER_DYNAMIC)
+			delete lotSize;
+
+		if (CheckPointer(orderHistoryReporter) == POINTER_DYNAMIC)
+			delete orderHistoryReporter;
+
+		if (CheckPointer(strategySnapshotsReporter) == POINTER_DYNAMIC)
+			delete strategySnapshotsReporter;
+
+		if (CheckPointer(orderPersistence) == POINTER_DYNAMIC)
+			delete orderPersistence;
+	}
+
+	void AddOrder(EOrder &order) {
+		order.SetPersistence(orderPersistence);
+		ArrayResize(orders, ArraySize(orders) + 1);
+		orders[ArraySize(orders) - 1] = order;
+	}
+
+	void CleanupClosedOrders() {
+		int writeIndex = 0;
+
+		for (int i = 0; i < ArraySize(orders); i++) {
+			if (
+				orders[i].GetStatus() == ORDER_STATUS_CLOSED ||
+				orders[i].GetStatus() == ORDER_STATUS_CANCELLED
+			) {
+				orders[i].OnDeinit();
+			} else {
+				if (writeIndex != i)
+					orders[writeIndex] = orders[i];
+				writeIndex++;
+			}
+		}
+
+		ArrayResize(orders, writeIndex);
+	}
+
+	void CloseAllActiveOrders() {
+		for (int i = 0; i < ArraySize(orders); i++) {
+			if (orders[i].GetStatus() == ORDER_STATUS_OPEN)
+				orders[i].Close();
+			else if (orders[i].GetStatus() == ORDER_STATUS_PENDING)
+				orders[i].Cancel();
+		}
+	}
+
 	void ExportOrderHistory() {
 		if (CheckPointer(orderHistoryReporter) == POINTER_INVALID)
 			return;
@@ -288,21 +350,31 @@ public:
 		));
 	}
 
-	virtual ~SEStrategy() {
-		if (CheckPointer(statistics) == POINTER_DYNAMIC)
-			delete statistics;
+	int FindOrderIndexById(string id) {
+		for (int i = 0; i < ArraySize(orders); i++) {
+			if (orders[i].GetId() == id)
+				return i;
+		}
 
-		if (CheckPointer(lotSize) == POINTER_DYNAMIC)
-			delete lotSize;
+		return -1;
+	}
 
-		if (CheckPointer(orderHistoryReporter) == POINTER_DYNAMIC)
-			delete orderHistoryReporter;
+	int FindOrderIndexByOrderId(ulong orderId) {
+		for (int i = 0; i < ArraySize(orders); i++) {
+			if (orders[i].GetOrderId() == orderId)
+				return i;
+		}
 
-		if (CheckPointer(strategySnapshotsReporter) == POINTER_DYNAMIC)
-			delete strategySnapshotsReporter;
+		return -1;
+	}
 
-		if (CheckPointer(orderPersistence) == POINTER_DYNAMIC)
-			delete orderPersistence;
+	int FindOrderIndexByPositionId(ulong positionId) {
+		for (int i = 0; i < ArraySize(orders); i++) {
+			if (orders[i].GetPositionId() == positionId)
+				return i;
+		}
+
+		return -1;
 	}
 
 	EOrder * OpenNewOrder(
@@ -313,7 +385,7 @@ public:
 		double takeProfit = 0,
 		double stopLoss = 0
 	) {
-		EOrder *order = new EOrder(strategyMagicNumber, symbol);
+		EOrder order(strategyMagicNumber, symbol);
 		double askPrice = SymbolInfoDouble(symbol, SYMBOL_ASK);
 		double bidPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
 		double currentPrice = (side == ORDER_TYPE_BUY) ? askPrice : bidPrice;
@@ -335,82 +407,11 @@ public:
 			order.SetTakeProfit(takeProfit);
 
 		order.GetId();
-		AddOrder(*order);
+		AddOrder(order);
 		countOrdersOfToday++;
 		countOpenOrders++;
 
-		return order;
-	}
-
-	void GetOpenOrders(
-		EOrder& resultOrders[],
-		ENUM_ORDER_TYPE side = ORDER_TYPE_ANY,
-		ENUM_ORDER_STATUSES status = ORDER_STATUS_ANY
-	) {
-		filterOrders(
-			resultOrders,
-			side,
-			status,
-			ORDER_STATUS_OPEN,
-			ORDER_STATUS_PENDING
-		);
-	}
-
-	bool HasActiveOrders() {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetStatus() == ORDER_STATUS_OPEN ||
-			    orders[i].GetStatus() == ORDER_STATUS_PENDING)
-				return true;
-		}
-
-		return false;
-	}
-
-	void CloseAllActiveOrders() {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetStatus() == ORDER_STATUS_OPEN)
-				orders[i].Close();
-			else if (orders[i].GetStatus() == ORDER_STATUS_PENDING)
-				orders[i].Cancel();
-		}
-	}
-
-	int GetOrdersCount() {
-		return ArraySize(orders);
-	}
-
-	EOrder * GetOrderAtIndex(int index) {
-		if (index < 0 || index >= ArraySize(orders))
-			return NULL;
-
-		return GetPointer(orders[index]);
-	}
-
-	int FindOrderIndexByOrderId(ulong orderId) {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetOrderId() == orderId)
-				return i;
-		}
-
-		return -1;
-	}
-
-	int FindOrderIndexByPositionId(ulong positionId) {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetPositionId() == positionId)
-				return i;
-		}
-
-		return -1;
-	}
-
-	int FindOrderIndexById(string id) {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetId() == id)
-				return i;
-		}
-
-		return -1;
+		return GetOrderAtIndex(GetOrdersCount() - 1);
 	}
 
 	void ProcessOrders() {
@@ -428,41 +429,16 @@ public:
 		}
 	}
 
-	void CleanupClosedOrders() {
-		int writeIndex = 0;
-
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (
-				orders[i].GetStatus() == ORDER_STATUS_CLOSED ||
-				orders[i].GetStatus() == ORDER_STATUS_CANCELLED
-			) {
-				orders[i].OnDeinit();
-			} else {
-				if (writeIndex != i)
-					orders[writeIndex] = orders[i];
-				writeIndex++;
-			}
-		}
-
-		ArrayResize(orders, writeIndex);
-	}
-
-	void AddOrder(EOrder &order) {
-		order.SetPersistence(orderPersistence);
-		ArrayResize(orders, ArraySize(orders) + 1);
-		orders[ArraySize(orders) - 1] = order;
-	}
-
-	int GetCountOrdersOfToday() {
-		return countOrdersOfToday;
+	int GetCountClosedOrders() {
+		return countClosedOrders;
 	}
 
 	int GetCountOpenOrders() {
 		return countOpenOrders;
 	}
 
-	int GetCountClosedOrders() {
-		return countClosedOrders;
+	int GetCountOrdersOfToday() {
+		return countOrdersOfToday;
 	}
 
 	double GetLotSizeByStopLoss(double stopLossDistance) {
@@ -477,28 +453,59 @@ public:
 		return strategyMagicNumber;
 	}
 
-	string GetPrefix() {
-		return prefix;
-	}
-
 	string GetName() {
 		return name;
 	}
 
-	string GetSymbol() {
-		return symbol;
+	void GetOpenOrders(
+		EOrder& resultOrders[],
+		ENUM_ORDER_TYPE side = ORDER_TYPE_ANY,
+		ENUM_ORDER_STATUSES status = ORDER_STATUS_ANY
+	) {
+		FilterOrders(
+			resultOrders,
+			side,
+			status,
+			ORDER_STATUS_OPEN,
+			ORDER_STATUS_PENDING
+		);
+	}
+
+	EOrder * GetOrderAtIndex(int index) {
+		if (index < 0 || index >= ArraySize(orders))
+			return NULL;
+
+		return GetPointer(orders[index]);
+	}
+
+	int GetOrdersCount() {
+		return ArraySize(orders);
+	}
+
+	string GetPrefix() {
+		return prefix;
 	}
 
 	SEStatistics * GetStatistics() {
 		return statistics;
 	}
 
-	void SetAsset(SEAsset *assetReference) {
-		asset = assetReference;
+	string GetSymbol() {
+		return symbol;
 	}
 
-	virtual void SetWeight(double newWeight) {
-		weight = newWeight;
+	bool HasActiveOrders() {
+		for (int i = 0; i < ArraySize(orders); i++) {
+			if (orders[i].GetStatus() == ORDER_STATUS_OPEN ||
+			    orders[i].GetStatus() == ORDER_STATUS_PENDING)
+				return true;
+		}
+
+		return false;
+	}
+
+	void SetAsset(SEAsset *assetReference) {
+		asset = assetReference;
 	}
 
 	virtual void SetBalance(double newBalance) {
@@ -513,16 +520,20 @@ public:
 		name = strategyName;
 	}
 
-	void SetSymbol(string strategySymbol) {
-		symbol = strategySymbol;
-	}
-
 	void SetPrefix(string strategyPrefix) {
 		prefix = strategyPrefix;
 	}
 
 	virtual void SetQualityThresholds(SQualityThresholds& thresholds) {
 		statistics.SetQualityThresholds(thresholds);
+	}
+
+	void SetSymbol(string strategySymbol) {
+		symbol = strategySymbol;
+	}
+
+	virtual void SetWeight(double newWeight) {
+		weight = newWeight;
 	}
 };
 

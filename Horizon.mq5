@@ -395,6 +395,7 @@ double OnTester() {
 	double quality = 1.0;
 
 	for (int i = 0; i < ArraySize(assets); i++) {
+		assets[i].PerformStatistics();
 		double assetQuality = assets[i].CalculateQualityProduct();
 
 		if (assetQuality == 0)
