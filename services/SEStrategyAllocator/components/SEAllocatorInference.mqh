@@ -12,9 +12,9 @@ private:
 	int kNeighbors;
 	int maxActiveStrategies;
 	int forwardWindow;
-	int trainingDays;
 	int normalizationWindow;
 	int maxCandidateCount;
+	int performanceDaysCount;
 	double epsilon;
 	double scoreThreshold;
 
@@ -126,7 +126,7 @@ private:
 
 				double forwardPerformanceSum = 0.0;
 				int forwardCount = 0;
-				int forwardEnd = MathMin(originalDayIndex + forwardWindow, trainingDays);
+				int forwardEnd = MathMin(originalDayIndex + forwardWindow, performanceDaysCount);
 
 				for (int fw = originalDayIndex; fw < forwardEnd; fw++) {
 					forwardPerformanceSum += strategyPerformanceHistory[performanceIndex(fw, s)];
@@ -225,8 +225,9 @@ private:
 
 public:
 	SEAllocatorInference() {
-		logger.SetPrefix("SEAllocatorInference");
+		logger.SetPrefix("SEStrategyAllocatorInference");
 		epsilon = ALLOCATOR_EPSILON;
+		performanceDaysCount = 0;
 	}
 
 	void ComputeActivations(double &normalizedFeatures[], int normalizedCount, string &activeStrategies[]) {
@@ -254,7 +255,6 @@ public:
 		int &outMaxActiveStrategies,
 		double &outScoreThreshold,
 		int &outForwardWindow,
-		int &outTrainingDays,
 		int &outMaxCandidateCount,
 		int &outStrategyCount,
 		string &outStrategyPrefixes[],
@@ -303,7 +303,6 @@ public:
 		outMaxActiveStrategies = (int)model.getNumber("maxActiveStrategies");
 		outScoreThreshold = model.getNumber("scoreThreshold");
 		outForwardWindow = (int)model.getNumber("forwardWindow");
-		outTrainingDays = (int)model.getNumber("trainingDays");
 		outMaxCandidateCount = (int)model.getNumber("maxCandidateCount");
 		outStrategyCount = (int)model.getNumber("strategyCount");
 		outTotalDays = (int)model.getNumber("totalDays");
@@ -313,7 +312,6 @@ public:
 		maxActiveStrategies = outMaxActiveStrategies;
 		scoreThreshold = outScoreThreshold;
 		forwardWindow = outForwardWindow;
-		trainingDays = outTrainingDays;
 		normalizationWindow = outNormalizationWindow;
 		maxCandidateCount = outMaxCandidateCount;
 		strategyCount = outStrategyCount;
@@ -356,6 +354,7 @@ public:
 
 		int performanceSize = performanceArray.getLength();
 		ArrayResize(strategyPerformanceHistory, performanceSize);
+		performanceDaysCount = (strategyCount > 0) ? performanceSize / strategyCount : 0;
 
 		for (int i = 0; i < performanceSize; i++) {
 			strategyPerformanceHistory[i] = performanceArray.getNumber(i);
@@ -385,12 +384,12 @@ public:
 		));
 
 		logger.info(StringFormat(
-			"Model arrays: features=%d performance=%d normalized=%d | params: norm=%d training=%d candidates=%d k=%d forward=%d",
+			"Model arrays: features=%d performance=%d (days=%d) normalized=%d | params: norm=%d candidates=%d k=%d forward=%d",
 			ArraySize(outFeatureHistory),
 			ArraySize(strategyPerformanceHistory),
+			performanceDaysCount,
 			ArraySize(outNormalizedFeatures),
 			outNormalizationWindow,
-			outTrainingDays,
 			outMaxCandidateCount,
 			outKNeighbors,
 			outForwardWindow

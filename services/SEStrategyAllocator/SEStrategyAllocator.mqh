@@ -18,7 +18,6 @@ private:
 	int maxActiveStrategies;
 	double scoreThreshold;
 	int forwardWindow;
-	int trainingDays;
 
 	int strategyCount;
 	string strategyPrefixes[];
@@ -107,8 +106,7 @@ public:
 		int neighbors,
 		int maxActive,
 		double threshold,
-		int forward,
-		int training
+		int forward
 	) {
 		logger.SetPrefix("SEStrategyAllocator");
 
@@ -119,32 +117,29 @@ public:
 		maxActiveStrategies = maxActive;
 		scoreThreshold = threshold;
 		forwardWindow = forward;
-		trainingDays = training;
 
 		totalDays = 0;
 		normalizedCount = 0;
 		strategyCount = 0;
-		maxCandidateCount = trainingDays - normalizationWindow - forwardWindow;
+		maxCandidateCount = 0;
 
 		trainer = NULL;
 		inference = NULL;
 
 		if (mode == ALLOCATOR_MODE_TRAIN)
-			trainer = new SEAllocatorTrainer(trainingDays);
+			trainer = new SEAllocatorTrainer();
 		else
 			inference = new SEAllocatorInference();
 
 		logger.info(StringFormat(
-			"Initialized | mode=%s rolling=%d norm=%d k=%d maxActive=%d threshold=%.4f forward=%d training=%d candidates=%d",
+			"Initialized | mode=%s rolling=%d norm=%d k=%d maxActive=%d threshold=%.4f forward=%d",
 			mode == ALLOCATOR_MODE_TRAIN ? "TRAIN" : "INFERENCE",
 			rollingWindowDays,
 			normalizationWindow,
 			kNeighbors,
 			maxActiveStrategies,
 			scoreThreshold,
-			forwardWindow,
-			trainingDays,
-			maxCandidateCount
+			forwardWindow
 		));
 	}
 
@@ -168,7 +163,7 @@ public:
 		if (mode == ALLOCATOR_MODE_TRAIN)
 			return false;
 
-		return totalDays > trainingDays;
+		return true;
 	}
 
 	void OnStartDay(
@@ -184,7 +179,7 @@ public:
 		featureHistory[featureIndex(totalDays, 1)] = rollingVolatility;
 		featureHistory[featureIndex(totalDays, 2)] = rollingDrawdown;
 
-		if (mode == ALLOCATOR_MODE_TRAIN && totalDays < trainingDays)
+		if (mode == ALLOCATOR_MODE_TRAIN)
 			trainer.CollectPerformance(totalDays, strategyCount, dailyPerformances);
 
 		totalDays++;
@@ -197,49 +192,10 @@ public:
 			rollingDrawdown
 		));
 
-		if (totalDays <= normalizationWindow) {
-			logger.debug(StringFormat(
-				"Collecting features: %d/%d days (%.1f%%)",
-				totalDays,
-				trainingDays,
-				(double)totalDays / trainingDays * 100.0
-			));
-
+		if (totalDays <= normalizationWindow)
 			return;
-		}
 
 		normalizeLatestFeatures();
-
-		if (totalDays <= trainingDays) {
-			logger.debug(StringFormat(
-				"Training: %d/%d days (%.1f%%)",
-				totalDays,
-				trainingDays,
-				(double)totalDays / trainingDays * 100.0
-			));
-
-			return;
-		}
-
-		if (totalDays == trainingDays + 1) {
-			logger.info(StringFormat(
-				"Training complete | %d days | %d candidates | k=%d",
-				trainingDays,
-				maxCandidateCount,
-				kNeighbors
-			));
-
-			if (mode == ALLOCATOR_MODE_INFERENCE) {
-				logger.info(StringFormat(
-					"Inference starting | totalDays=%d normCount=%d featureSize=%d normSize=%d candidates=%d",
-					totalDays,
-					normalizedCount,
-					ArraySize(featureHistory),
-					ArraySize(normalizedFeatures),
-					maxCandidateCount
-				));
-			}
-		}
 
 		if (mode == ALLOCATOR_MODE_TRAIN)
 			return;
@@ -270,6 +226,8 @@ public:
 	}
 
 	bool SaveModel(string databasePath, string collectionName) {
+		maxCandidateCount = totalDays - normalizationWindow - forwardWindow;
+
 		return trainer.SaveModel(
 			databasePath,
 			collectionName,
@@ -299,7 +257,6 @@ public:
 			maxActiveStrategies,
 			scoreThreshold,
 			forwardWindow,
-			trainingDays,
 			maxCandidateCount,
 			strategyCount,
 			strategyPrefixes,
