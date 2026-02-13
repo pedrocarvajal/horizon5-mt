@@ -16,6 +16,7 @@ private:
 	double epsilon;
 	double scoreThreshold;
 	int forwardWindow;
+	int trainingDays;
 
 	int strategyCount;
 	string strategyPrefixes[];
@@ -27,6 +28,7 @@ private:
 	int normalizedCount;
 	double normalizedFeatures[];
 
+	int maxCandidateCount;
 	string activeStrategies[];
 
 	int featureIndex(int day, int feature) {
@@ -115,20 +117,15 @@ private:
 
 	void computeActivations() {
 		int todayNormIndex = normalizedCount - 1;
+		int candidateCount = maxCandidateCount;
 
-		if (todayNormIndex < forwardWindow + 1) {
-			logger.debug(StringFormat(
-				"KNN skipped: not enough normalized days (%d/%d)",
-				todayNormIndex,
-				forwardWindow + 2
-			));
-
+		if (candidateCount < 1) {
+			logger.debug("KNN skipped: no training candidates available");
 			return;
 		}
 
 		double distances[];
 		int distanceIndices[];
-		int candidateCount = todayNormIndex - forwardWindow;
 		ArrayResize(distances, candidateCount);
 		ArrayResize(distanceIndices, candidateCount);
 
@@ -148,8 +145,9 @@ private:
 		}
 
 		logger.debug(StringFormat(
-			"KNN: %d neighbors, distances [%.4f..%.4f]",
+			"KNN: %d neighbors from %d candidates, distances [%.4f..%.4f]",
 			neighborsCount,
+			candidateCount,
 			distances[0],
 			distances[neighborsCount - 1]
 		));
@@ -169,7 +167,7 @@ private:
 
 				double forwardPerformanceSum = 0.0;
 				int forwardCount = 0;
-				int forwardEnd = MathMin(originalDayIndex + forwardWindow, totalDays);
+				int forwardEnd = MathMin(originalDayIndex + forwardWindow, trainingDays);
 
 				for (int fw = originalDayIndex; fw < forwardEnd; fw++) {
 					forwardPerformanceSum += strategyPerformanceHistory[performanceIndex(fw, s)];
@@ -271,7 +269,8 @@ public:
 		int neighbors,
 		int maxActive,
 		double threshold,
-		int forward
+		int forward,
+		int training
 	) {
 		logger.SetPrefix("SEStrategyAllocator");
 
@@ -282,19 +281,23 @@ public:
 		epsilon = 0.0001;
 		scoreThreshold = threshold;
 		forwardWindow = forward;
+		trainingDays = training;
 
 		totalDays = 0;
 		normalizedCount = 0;
 		strategyCount = 0;
+		maxCandidateCount = trainingDays - normalizationWindow - forwardWindow;
 
 		logger.info(StringFormat(
-			"Initialized | rolling=%d norm=%d k=%d maxActive=%d threshold=%.4f forward=%d",
+			"Initialized | rolling=%d norm=%d k=%d maxActive=%d threshold=%.4f forward=%d training=%d candidates=%d",
 			rollingWindowDays,
 			normalizationWindow,
 			kNeighbors,
 			maxActiveStrategies,
 			scoreThreshold,
-			forwardWindow
+			forwardWindow,
+			trainingDays,
+			maxCandidateCount
 		));
 	}
 
@@ -307,7 +310,7 @@ public:
 	}
 
 	bool IsWarmupComplete() {
-		return totalDays > normalizationWindow + forwardWindow + 1;
+		return totalDays > trainingDays;
 	}
 
 	void OnStartDay(
@@ -323,15 +326,17 @@ public:
 		featureHistory[featureIndex(totalDays, 1)] = rollingVolatility;
 		featureHistory[featureIndex(totalDays, 2)] = rollingDrawdown;
 
-		int newPerfSize = (totalDays + 1) * strategyCount;
-		ArrayResize(strategyPerformanceHistory, newPerfSize);
+		if (totalDays < trainingDays) {
+			int newPerfSize = (totalDays + 1) * strategyCount;
+			ArrayResize(strategyPerformanceHistory, newPerfSize);
 
-		for (int s = 0; s < strategyCount; s++) {
-			double performance = (s < ArraySize(dailyPerformances))
-				? dailyPerformances[s]
-				: 0.0;
+			for (int s = 0; s < strategyCount; s++) {
+				double performance = (s < ArraySize(dailyPerformances))
+					? dailyPerformances[s]
+					: 0.0;
 
-			strategyPerformanceHistory[performanceIndex(totalDays, s)] = performance;
+				strategyPerformanceHistory[performanceIndex(totalDays, s)] = performance;
+			}
 		}
 
 		totalDays++;
@@ -346,16 +351,37 @@ public:
 
 		if (totalDays <= normalizationWindow) {
 			logger.debug(StringFormat(
-				"Warmup: %d/%d days collected (%.1f%%)",
+				"Collecting features: %d/%d days (%.1f%%)",
 				totalDays,
-				normalizationWindow + forwardWindow + 2,
-				(double)totalDays / (normalizationWindow + forwardWindow + 2) * 100.0
+				trainingDays,
+				(double)totalDays / trainingDays * 100.0
 			));
 
 			return;
 		}
 
 		normalizeLatestFeatures();
+
+		if (totalDays <= trainingDays) {
+			logger.debug(StringFormat(
+				"Training: %d/%d days (%.1f%%)",
+				totalDays,
+				trainingDays,
+				(double)totalDays / trainingDays * 100.0
+			));
+
+			return;
+		}
+
+		if (totalDays == trainingDays + 1) {
+			logger.info(StringFormat(
+				"Training complete | %d days | %d candidates | k=%d",
+				trainingDays,
+				maxCandidateCount,
+				kNeighbors
+			));
+		}
+
 		computeActivations();
 	}
 

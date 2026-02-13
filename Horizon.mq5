@@ -22,6 +22,7 @@ input int AllocatorKNeighbors = 20; // [1] > Number of KNN neighbors
 input int AllocatorMaxActiveStrategies = 10; // [1] > Maximum active strategies
 input double AllocatorScoreThreshold = 0.001; // [1] > Minimum score to activate strategy
 input int AllocatorForwardWindow = 4; // [1] > Forward performance window (days)
+input int AllocatorTrainingDays = 700; // [1] > Training period before allocation starts (days)
 
 #include <Trade/Trade.mqh>
 
