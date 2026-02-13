@@ -173,7 +173,7 @@ public:
 		}
 
 		if (EnableStrategyAllocator) {
-			allocator = new SEStrategyAllocator(AllocatorRollingWindow, AllocatorNormalizationWindow, AllocatorKNeighbors, AllocatorMaxActiveStrategies, AllocatorScoreThreshold, AllocatorForwardWindow);
+			allocator = new SEStrategyAllocator(AllocatorRollingWindow, AllocatorNormalizationWindow, AllocatorKNeighbors, AllocatorMaxActiveStrategies, AllocatorScoreThreshold, AllocatorForwardWindow, AllocatorTrainingDays);
 
 			for (int i = 0; i < strategyCount; i++) {
 				allocator.RegisterStrategy(strategies[i].GetPrefix());
