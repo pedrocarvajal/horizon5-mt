@@ -385,6 +385,11 @@ public:
 		double takeProfit = 0,
 		double stopLoss = 0
 	) {
+		if (balance <= 0) {
+			logger.debug("New order blocked - no balance allocated");
+			return NULL;
+		}
+
 		EOrder order(strategyMagicNumber, symbol);
 		double askPrice = SymbolInfoDouble(symbol, SYMBOL_ASK);
 		double bidPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
@@ -429,6 +434,10 @@ public:
 		}
 	}
 
+	double GetBalance() {
+		return balance;
+	}
+
 	int GetCountClosedOrders() {
 		return countClosedOrders;
 	}
@@ -442,9 +451,12 @@ public:
 	}
 
 	double GetLotSizeByStopLoss(double stopLossDistance) {
+		if (balance <= 0)
+			return 0;
+
 		double nav = EquityAtRiskCompounded
 			? statistics.GetNav()
-			: statistics.GetInitialBalance();
+			: balance;
 
 		return lotSize.CalculateByStopLoss(nav, stopLossDistance, EquityAtRisk / 100.0);
 	}
@@ -492,6 +504,10 @@ public:
 
 	string GetSymbol() {
 		return symbol;
+	}
+
+	double GetWeight() {
+		return weight;
 	}
 
 	bool HasActiveOrders() {

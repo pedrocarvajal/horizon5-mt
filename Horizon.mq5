@@ -14,6 +14,15 @@ input group "Risk management";
 input bool EquityAtRiskCompounded = false; // [1] > Equity at risk compounded
 input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
+input group "Strategy Allocator";
+input bool EnableStrategyAllocator = false; // [1] > Enable KNN strategy allocator
+input int AllocatorRollingWindow = 150; // [1] > Rolling window for feature computation (days)
+input int AllocatorNormalizationWindow = 365; // [1] > Normalization window for z-score (days)
+input int AllocatorKNeighbors = 20; // [1] > Number of KNN neighbors
+input int AllocatorMaxActiveStrategies = 10; // [1] > Maximum active strategies
+input double AllocatorScoreThreshold = 0.001; // [1] > Minimum score to activate strategy
+input int AllocatorForwardWindow = 4; // [1] > Forward performance window (days)
+
 #include <Trade/Trade.mqh>
 
 #include "configs/Assets.mqh"
@@ -227,21 +236,21 @@ void OnTradeTransaction(
 		ulong magic = HistoryDealGetInteger(transaction.deal, DEAL_MAGIC);
 		string dealSymbol = HistoryDealGetString(transaction.deal, DEAL_SYMBOL);
 
-		bool validMagic = false;
+		bool isValidMagic = false;
 
 		for (int i = 0; i < ArraySize(assets); i++) {
 			for (int j = 0; j < ArraySize(assets[i].strategies); j++) {
 				if (magic == assets[i].strategies[j].GetMagicNumber()) {
-					validMagic = true;
+					isValidMagic = true;
 					break;
 				}
 			}
 
-			if (validMagic)
+			if (isValidMagic)
 				break;
 		}
 
-		if (!validMagic && magic != 0)
+		if (!isValidMagic && magic != 0)
 			return;
 
 		if (transaction.type == TRADE_TRANSACTION_DEAL_ADD) {
@@ -299,7 +308,7 @@ void OnTradeTransaction(
 
 				int strategyIndex = -1;
 				int orderIndex = -1;
-				bool found = false;
+				bool isFound = false;
 
 				for (int i = 0; i < ArraySize(assets); i++) {
 					if (
@@ -322,14 +331,14 @@ void OnTradeTransaction(
 								netProfit
 							));
 
-							found = true;
+							isFound = true;
 						}
 
 						break;
 					}
 				}
 
-				if (!found) {
+				if (!isFound) {
 					hlogger.warning(StringFormat(
 						"OnTradeTransaction: Order not found with positionId=%llu",
 						positionId
@@ -338,7 +347,7 @@ void OnTradeTransaction(
 			} else if (entry == DEAL_ENTRY_IN) {
 				int strategyIndex = -1;
 				int orderIndex = -1;
-				bool found = false;
+				bool isFound = false;
 
 				for (int i = 0; i < ArraySize(assets); i++) {
 					if (
@@ -359,7 +368,7 @@ void OnTradeTransaction(
 								openResult.deal = dealId;
 								openResult.order = orderId;
 								openResult.price = HistoryDealGetDouble(dealId, DEAL_PRICE);
-								openResult.retcode = 10009;
+								openResult.retcode = TRADE_RETCODE_DONE;
 								order.OnOpen(openResult);
 							}
 
@@ -373,14 +382,14 @@ void OnTradeTransaction(
 								positionId
 							));
 
-							found = true;
+							isFound = true;
 						}
 
 						break;
 					}
 				}
 
-				if (!found) {
+				if (!isFound) {
 					hlogger.warning(StringFormat(
 						"OnTradeTransaction: Order not found with orderId=%llu",
 						orderId

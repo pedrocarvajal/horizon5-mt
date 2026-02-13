@@ -34,12 +34,12 @@ public:
 		if (ordersCollection == NULL)
 			return false;
 
-		bool deleted = ordersCollection.DeleteOne("_id", orderId);
+		bool isDeleted = ordersCollection.DeleteOne("_id", orderId);
 
-		if (deleted)
+		if (isDeleted)
 			logger.info(StringFormat("Order deleted from database: %s", orderId));
 
-		return deleted;
+		return isDeleted;
 	}
 
 	int LoadOrders(EOrder &restoredOrders[]) {

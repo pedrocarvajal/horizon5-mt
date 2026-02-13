@@ -3,6 +3,7 @@
 
 #include "../services/SEDateTime/SEDateTime.mqh"
 #include "../structs/SMarketStatus.mqh"
+#include "../constants/time.mqh"
 
 extern SEDateTime dtime;
 
@@ -58,8 +59,8 @@ SMarketStatus getMarketStatus(string checkSymbol, int safetyMarginMinutes = 1) {
 					return status;
 				}
 			} else {
-				int secondsUntilMidnight = 86400 - currentSeconds;
-				int secondsFromPreviousDays = (dayOffset - 1) * 86400;
+				int secondsUntilMidnight = SECONDS_IN_24_HOURS - currentSeconds;
+				int secondsFromPreviousDays = (dayOffset - 1) * SECONDS_IN_24_HOURS;
 				status.opensInSeconds = secondsUntilMidnight + secondsFromPreviousDays + startSeconds;
 				return status;
 			}
@@ -68,7 +69,7 @@ SMarketStatus getMarketStatus(string checkSymbol, int safetyMarginMinutes = 1) {
 		}
 	}
 
-	status.opensInSeconds = 86400;
+	status.opensInSeconds = SECONDS_IN_24_HOURS;
 	return status;
 }
 

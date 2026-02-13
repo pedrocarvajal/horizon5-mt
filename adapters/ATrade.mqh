@@ -4,6 +4,8 @@
 #include <Trade/Trade.mqh>
 #include "../services/SELogger/SELogger.mqh"
 
+#define SLIPPAGE_POINTS 5
+
 class ATrade {
 private:
 	SELogger logger;
@@ -11,7 +13,7 @@ private:
 	ulong orderId;
 	ulong positionId;
 
-	ENUM_ORDER_TYPE_FILLING GetFillingMode(string symbol) {
+	ENUM_ORDER_TYPE_FILLING getFillingMode(string symbol) {
 		long fillingModes = SymbolInfoInteger(symbol, SYMBOL_FILLING_MODE);
 
 		if ((fillingModes & SYMBOL_FILLING_FOK) == SYMBOL_FILLING_FOK)
@@ -179,9 +181,9 @@ public:
 			(isMarketOrder) ? TRADE_ACTION_DEAL : TRADE_ACTION_PENDING;
 		request.symbol = symbol;
 		request.volume = Volume(symbol, lot);
-		request.deviation = 5;
+		request.deviation = SLIPPAGE_POINTS;
 		request.magic = magicNumber;
-		request.type_filling = GetFillingMode(symbol);
+		request.type_filling = getFillingMode(symbol);
 		request.price = (isMarketOrder) ? currentPrice : openAtPrice;
 
 		if (stopLoss > 0)
