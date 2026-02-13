@@ -195,6 +195,10 @@ public:
 					logger.error("Failed to load allocator model");
 					return INIT_FAILED;
 				}
+
+				for (int i = 0; i < strategyCount; i++) {
+					strategies[i].SetBalance(0);
+				}
 			}
 		}
 
