@@ -5,8 +5,6 @@
 input group "General Settings";
 input int TickIntervalTime = 60; // [1] > Tick interval (1 = 1 second by tick)
 input ENUM_ORDER_TYPE_FILLING FillingMode = ORDER_FILLING_IOC; // [1] > Order filling mode
-input bool EnableTests = false; // [1] > Enable test on init
-
 input group "Reporting";
 input bool EnableOrderHistoryReport = false; // [1] > Enable order history report on tester
 input bool EnableSnapshotHistoryReport = false; // [1] > Enable snapshot history report on tester
@@ -24,8 +22,6 @@ input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 #include "helpers/HGetPipValue.mqh"
 #include "helpers/HIsLiveTrading.mqh"
 #include "services/SEDateTime/SEDateTime.mqh"
-#include "services/SEDb/SEDbTest.mqh"
-
 SEDateTime dtime;
 SELogger hlogger;
 
@@ -38,22 +34,8 @@ int OnInit() {
 
 	// Variables
 	dtime = SEDateTime();
-	SEDbTest seDbTest;
 
 	hlogger.SetPrefix("Horizon");
-
-	// Tests executions
-	bool executeAllTests = false;
-
-	if (isLiveTrading())
-		executeAllTests = true;
-
-	else if (EnableTests)
-		executeAllTests = true;
-
-	if (executeAllTests)
-		if (!seDbTest.Run())
-			return INIT_FAILED;
 
 	lastCheckedDay = dtime.Today().dayOfYear;
 	lastCheckedHour = dtime.Today().hour;
