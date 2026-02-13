@@ -12,13 +12,13 @@ private:
 	string name;
 	string filePath;
 	int fileFlags;
-	bool autoFlush;
+	bool shouldAutoFlush;
 	JSON::Object *documents[];
 	string GenerateId() {
 		return GenerateUuid();
 	}
 
-	int FindIndexByKeyValue(string key, string value) {
+	int findIndexByKeyValue(string key, string value) {
 		int size = ArraySize(documents);
 
 		for (int i = 0; i < size; i++) {
@@ -47,7 +47,7 @@ private:
 		FolderCreate(directory, commonFlag);
 	}
 
-	void RemoveAtIndex(int index) {
+	void removeAtIndex(int index) {
 		int size = ArraySize(documents);
 
 		if (index < 0 || index >= size)
@@ -68,7 +68,7 @@ public:
 		name = "";
 		filePath = "";
 		fileFlags = FILE_TXT | FILE_ANSI;
-		autoFlush = true;
+		shouldAutoFlush = true;
 		logger.SetPrefix("SEDbCollection");
 	}
 
@@ -99,7 +99,7 @@ public:
 	}
 
 	void SetAutoFlush(bool enabled) {
-		autoFlush = enabled;
+		shouldAutoFlush = enabled;
 	}
 
 	bool Load() {
@@ -183,14 +183,14 @@ public:
 		ArrayResize(documents, size + 1);
 		documents[size] = stored;
 
-		if (autoFlush)
+		if (shouldAutoFlush)
 			Flush();
 
 		return true;
 	}
 
 	JSON::Object *FindOne(string key, string value) {
-		int index = FindIndexByKeyValue(key, value);
+		int index = findIndexByKeyValue(key, value);
 
 		if (index == -1)
 			return NULL;
@@ -220,7 +220,7 @@ public:
 		if (newData == NULL)
 			return false;
 
-		int index = FindIndexByKeyValue(key, value);
+		int index = findIndexByKeyValue(key, value);
 		if (index == -1)
 			return false;
 
@@ -245,20 +245,20 @@ public:
 			}
 		}
 
-		if (autoFlush)
+		if (shouldAutoFlush)
 			Flush();
 
 		return true;
 	}
 
 	bool DeleteOne(string key, string value) {
-		int index = FindIndexByKeyValue(key, value);
+		int index = findIndexByKeyValue(key, value);
 		if (index == -1)
 			return false;
 
-		RemoveAtIndex(index);
+		removeAtIndex(index);
 
-		if (autoFlush)
+		if (shouldAutoFlush)
 			Flush();
 
 		return true;

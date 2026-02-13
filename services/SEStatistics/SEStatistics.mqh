@@ -372,6 +372,13 @@ public:
 		maxExposureInPercentage = 0.0;
 	}
 
+	double GetDailyPerformancePercent() {
+		if (ArraySize(nav) > 1 && nav[ArraySize(nav) - 2] != 0.0)
+			return dailyPerformance / nav[ArraySize(nav) - 2];
+
+		return 0.0;
+	}
+
 	double GetCAGR() {
 		double currentNav = (ArraySize(nav) >
 				     0) ? nav[ArraySize(nav) - 1] : initialBalance;
