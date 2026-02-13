@@ -173,10 +173,19 @@ public:
 		}
 
 		if (EnableStrategyAllocator) {
-			allocator = new SEStrategyAllocator(AllocatorRollingWindow, AllocatorNormalizationWindow, AllocatorKNeighbors, AllocatorMaxActiveStrategies, AllocatorScoreThreshold, AllocatorForwardWindow, AllocatorTrainingDays);
+			allocator = new SEStrategyAllocator(AllocatorMode, AllocatorRollingWindow, AllocatorNormalizationWindow, AllocatorKNeighbors, AllocatorMaxActiveStrategies, AllocatorScoreThreshold, AllocatorForwardWindow, AllocatorTrainingDays);
 
 			for (int i = 0; i < strategyCount; i++) {
 				allocator.RegisterStrategy(strategies[i].GetPrefix());
+			}
+
+			if (AllocatorMode == ALLOCATOR_MODE_INFERENCE) {
+				string collectionName = StringFormat("%s_allocator", symbol);
+
+				if (!allocator.LoadModel(AllocatorModelPath, collectionName)) {
+					logger.error("Failed to load allocator model");
+					return INIT_FAILED;
+				}
 			}
 		}
 
@@ -295,6 +304,14 @@ public:
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].CleanupClosedOrders();
 		}
+	}
+
+	void ExportAllocatorModel() {
+		if (CheckPointer(allocator) == POINTER_INVALID)
+			return;
+
+		string collectionName = StringFormat("%s_allocator", symbol);
+		allocator.SaveModel(AllocatorModelPath, collectionName);
 	}
 
 	void ExportMarketSnapshots() {
