@@ -61,14 +61,14 @@ private:
 
 				if (newBalance > 0) {
 					logger.info(StringFormat(
-						"%s allocated: %.2f (was %.2f)",
+						"(SEStrategyAllocator) %s allocated: %.2f (was %.2f)",
 						strategies[i].GetPrefix(),
 						newBalance,
 						previousBalance
 					));
 				} else {
 					logger.info(StringFormat(
-						"%s deallocated (was %.2f)",
+						"(SEStrategyAllocator) %s deallocated (was %.2f)",
 						strategies[i].GetPrefix(),
 						previousBalance
 					));
@@ -182,7 +182,7 @@ public:
 		}
 
 		if (EnableStrategyAllocator) {
-			allocator = new SEStrategyAllocator(AllocatorMode, AllocatorRollingWindow, AllocatorNormalizationWindow, AllocatorKNeighbors, AllocatorMaxActiveStrategies, AllocatorScoreThreshold, AllocatorForwardWindow, AllocatorTrainingDays);
+			allocator = new SEStrategyAllocator(AllocatorMode, AllocatorRollingWindow, AllocatorNormalizationWindow, AllocatorKNeighbors, AllocatorMaxActiveStrategies, AllocatorScoreThreshold, AllocatorForwardWindow);
 
 			for (int i = 0; i < strategyCount; i++) {
 				allocator.RegisterStrategy(strategies[i].GetPrefix());
