@@ -8,7 +8,6 @@
 class SEAllocatorTrainer {
 private:
 	SELogger logger;
-	int trainingDays;
 	int strategyCount;
 	double strategyPerformanceHistory[];
 
@@ -17,9 +16,8 @@ private:
 	}
 
 public:
-	SEAllocatorTrainer(int training) {
-		logger.SetPrefix("SEAllocatorTrainer");
-		trainingDays = training;
+	SEAllocatorTrainer() {
+		logger.SetPrefix("SEStrategyAllocatorTrainer");
 		strategyCount = 0;
 	}
 
@@ -77,7 +75,6 @@ public:
 		model.setProperty("maxActiveStrategies", maxActiveStrategies);
 		model.setProperty("scoreThreshold", scoreThreshold);
 		model.setProperty("forwardWindow", forwardWindow);
-		model.setProperty("trainingDays", trainingDays);
 		model.setProperty("maxCandidateCount", maxCandidateCount);
 		model.setProperty("strategyCount", totalStrategyCount);
 		model.setProperty("totalDays", totalDays);
