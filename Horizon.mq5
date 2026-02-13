@@ -2,6 +2,8 @@
 #property version "1.00"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
+#include "enums/EAllocatorMode.mqh"
+
 input group "General Settings";
 input int TickIntervalTime = 60; // [1] > Tick interval (1 = 1 second by tick)
 input ENUM_ORDER_TYPE_FILLING FillingMode = ORDER_FILLING_IOC; // [1] > Order filling mode
@@ -16,6 +18,8 @@ input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
 input group "Strategy Allocator";
 input bool EnableStrategyAllocator = false; // [1] > Enable KNN strategy allocator
+input ENUM_ALLOCATOR_MODE AllocatorMode = ALLOCATOR_MODE_TRAIN; // [1] > Allocator mode (Train = collect data, Inference = use model)
+input string AllocatorModelPath = "Models"; // [1] > Model directory path (in common files)
 input int AllocatorRollingWindow = 150; // [1] > Rolling window for feature computation (days)
 input int AllocatorNormalizationWindow = 365; // [1] > Normalization window for z-score (days)
 input int AllocatorKNeighbors = 20; // [1] > Number of KNN neighbors
@@ -424,6 +428,12 @@ double OnTester() {
 
 	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].ExportMarketSnapshots();
+	}
+
+	if (EnableStrategyAllocator && AllocatorMode == ALLOCATOR_MODE_TRAIN) {
+		for (int i = 0; i < ArraySize(assets); i++) {
+			assets[i].ExportAllocatorModel();
+		}
 	}
 
 	return quality;
