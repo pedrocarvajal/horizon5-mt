@@ -1,6 +1,8 @@
 #ifndef __SE_STRATEGY_ALLOCATOR_MQH__
 #define __SE_STRATEGY_ALLOCATOR_MQH__
 
+#include "../../enums/EAllocatorMode.mqh"
+#include "../SEDb/SEDb.mqh"
 #include "../SELogger/SELogger.mqh"
 
 #define ALLOCATOR_FEATURE_COUNT 3
@@ -8,6 +10,7 @@
 class SEStrategyAllocator {
 private:
 	SELogger logger;
+	ENUM_ALLOCATOR_MODE mode;
 
 	int rollingWindowDays;
 	int normalizationWindow;
@@ -264,6 +267,7 @@ private:
 
 public:
 	SEStrategyAllocator(
+		ENUM_ALLOCATOR_MODE allocatorMode,
 		int rollingWindow,
 		int normWindow,
 		int neighbors,
@@ -274,6 +278,7 @@ public:
 	) {
 		logger.SetPrefix("SEStrategyAllocator");
 
+		mode = allocatorMode;
 		rollingWindowDays = rollingWindow;
 		normalizationWindow = normWindow;
 		kNeighbors = neighbors;
@@ -289,7 +294,8 @@ public:
 		maxCandidateCount = trainingDays - normalizationWindow - forwardWindow;
 
 		logger.info(StringFormat(
-			"Initialized | rolling=%d norm=%d k=%d maxActive=%d threshold=%.4f forward=%d training=%d candidates=%d",
+			"Initialized | mode=%s rolling=%d norm=%d k=%d maxActive=%d threshold=%.4f forward=%d training=%d candidates=%d",
+			mode == ALLOCATOR_MODE_TRAIN ? "TRAIN" : "INFERENCE",
 			rollingWindowDays,
 			normalizationWindow,
 			kNeighbors,
@@ -310,6 +316,9 @@ public:
 	}
 
 	bool IsWarmupComplete() {
+		if (mode == ALLOCATOR_MODE_TRAIN)
+			return false;
+
 		return totalDays > trainingDays;
 	}
 
@@ -326,7 +335,7 @@ public:
 		featureHistory[featureIndex(totalDays, 1)] = rollingVolatility;
 		featureHistory[featureIndex(totalDays, 2)] = rollingDrawdown;
 
-		if (totalDays < trainingDays) {
+		if (mode == ALLOCATOR_MODE_TRAIN && totalDays < trainingDays) {
 			int newPerfSize = (totalDays + 1) * strategyCount;
 			ArrayResize(strategyPerformanceHistory, newPerfSize);
 
@@ -382,6 +391,9 @@ public:
 			));
 		}
 
+		if (mode == ALLOCATOR_MODE_TRAIN)
+			return;
+
 		computeActivations();
 	}
 
@@ -395,6 +407,163 @@ public:
 			prefix,
 			strategyCount
 		));
+	}
+
+	bool SaveModel(string databasePath, string collectionName) {
+		SEDb database;
+		database.Initialize(databasePath, true);
+
+		SEDbCollection *collection = database.Collection(collectionName);
+		collection.SetAutoFlush(false);
+		collection.DeleteOne("type", "allocator_model");
+
+		JSON::Object *model = new JSON::Object();
+		model.setProperty("type", "allocator_model");
+		model.setProperty("version", 1);
+		model.setProperty("rollingWindowDays", rollingWindowDays);
+		model.setProperty("normalizationWindow", normalizationWindow);
+		model.setProperty("kNeighbors", kNeighbors);
+		model.setProperty("maxActiveStrategies", maxActiveStrategies);
+		model.setProperty("scoreThreshold", scoreThreshold);
+		model.setProperty("forwardWindow", forwardWindow);
+		model.setProperty("trainingDays", trainingDays);
+		model.setProperty("maxCandidateCount", maxCandidateCount);
+		model.setProperty("strategyCount", strategyCount);
+		model.setProperty("totalDays", totalDays);
+		model.setProperty("normalizedCount", normalizedCount);
+
+		JSON::Array *prefixes = new JSON::Array();
+
+		for (int i = 0; i < strategyCount; i++) {
+			prefixes.add(strategyPrefixes[i]);
+		}
+
+		model.setProperty("strategyPrefixes", prefixes);
+
+		JSON::Array *features = new JSON::Array();
+
+		for (int i = 0; i < ArraySize(featureHistory); i++) {
+			features.add(featureHistory[i]);
+		}
+
+		model.setProperty("featureHistory", features);
+
+		JSON::Array *performance = new JSON::Array();
+
+		for (int i = 0; i < ArraySize(strategyPerformanceHistory); i++) {
+			performance.add(strategyPerformanceHistory[i]);
+		}
+
+		model.setProperty("strategyPerformanceHistory", performance);
+
+		JSON::Array *normalized = new JSON::Array();
+
+		for (int i = 0; i < ArraySize(normalizedFeatures); i++) {
+			normalized.add(normalizedFeatures[i]);
+		}
+
+		model.setProperty("normalizedFeatures", normalized);
+
+		collection.InsertOne(model);
+		collection.Flush();
+
+		delete model;
+
+		logger.info(StringFormat(
+			"Model saved: %s/%s | days=%d normalized=%d strategies=%d",
+			databasePath,
+			collectionName,
+			totalDays,
+			normalizedCount,
+			strategyCount
+		));
+
+		return true;
+	}
+
+	bool LoadModel(string databasePath, string collectionName) {
+		SEDb database;
+		database.Initialize(databasePath, true);
+
+		SEDbCollection *collection = database.Collection(collectionName);
+
+		if (collection.Count() == 0) {
+			logger.error(StringFormat(
+				"No model found in %s/%s",
+				databasePath,
+				collectionName
+			));
+
+			return false;
+		}
+
+		JSON::Object *model = collection.FindOne("type", "allocator_model");
+
+		if (model == NULL) {
+			logger.error("No allocator model document found");
+			return false;
+		}
+
+		int version = (int)model.getNumber("version");
+
+		if (version != 1) {
+			logger.error(StringFormat("Unsupported model version: %d", version));
+			return false;
+		}
+
+		rollingWindowDays = (int)model.getNumber("rollingWindowDays");
+		normalizationWindow = (int)model.getNumber("normalizationWindow");
+		kNeighbors = (int)model.getNumber("kNeighbors");
+		maxActiveStrategies = (int)model.getNumber("maxActiveStrategies");
+		scoreThreshold = model.getNumber("scoreThreshold");
+		forwardWindow = (int)model.getNumber("forwardWindow");
+		trainingDays = (int)model.getNumber("trainingDays");
+		maxCandidateCount = (int)model.getNumber("maxCandidateCount");
+		strategyCount = (int)model.getNumber("strategyCount");
+		totalDays = (int)model.getNumber("totalDays");
+		normalizedCount = (int)model.getNumber("normalizedCount");
+
+		JSON::Array *prefixesArray = model.getArray("strategyPrefixes");
+		ArrayResize(strategyPrefixes, strategyCount);
+
+		for (int i = 0; i < strategyCount; i++) {
+			strategyPrefixes[i] = prefixesArray.getString(i);
+		}
+
+		JSON::Array *featuresArray = model.getArray("featureHistory");
+		int featureSize = featuresArray.getLength();
+		ArrayResize(featureHistory, featureSize);
+
+		for (int i = 0; i < featureSize; i++) {
+			featureHistory[i] = featuresArray.getNumber(i);
+		}
+
+		JSON::Array *performanceArray = model.getArray("strategyPerformanceHistory");
+		int performanceSize = performanceArray.getLength();
+		ArrayResize(strategyPerformanceHistory, performanceSize);
+
+		for (int i = 0; i < performanceSize; i++) {
+			strategyPerformanceHistory[i] = performanceArray.getNumber(i);
+		}
+
+		JSON::Array *normalizedArray = model.getArray("normalizedFeatures");
+		int normalizedSize = normalizedArray.getLength();
+		ArrayResize(normalizedFeatures, normalizedSize);
+
+		for (int i = 0; i < normalizedSize; i++) {
+			normalizedFeatures[i] = normalizedArray.getNumber(i);
+		}
+
+		logger.info(StringFormat(
+			"Model loaded: %s/%s | days=%d normalized=%d strategies=%d",
+			databasePath,
+			collectionName,
+			totalDays,
+			normalizedCount,
+			strategyCount
+		));
+
+		return true;
 	}
 };
 
