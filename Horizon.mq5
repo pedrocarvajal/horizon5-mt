@@ -92,11 +92,11 @@ int OnInit() {
 	string magicSources[];
 
 	for (int i = 0; i < assetCount; i++) {
-		for (int j = 0; j < ArraySize(assets[i].strategies); j++) {
-			ulong currentMagic = assets[i].strategies[j].GetMagicNumber();
+		for (int j = 0; j < assets[i].GetStrategyCount(); j++) {
+			ulong currentMagic = assets[i].GetStrategyAtIndex(j).GetMagicNumber();
 			string currentSource = StringFormat("%s/%s",
 				assets[i].GetSymbol(),
-				assets[i].strategies[j].GetPrefix());
+				assets[i].GetStrategyAtIndex(j).GetPrefix());
 
 			for (int k = 0; k < ArraySize(magicNumbers); k++) {
 				if (magicNumbers[k] == currentMagic) {
@@ -200,7 +200,7 @@ void OnTradeTransaction(
 						orderIndex
 					    )) {
 						EOrder *order =
-							assets[i].strategies[strategyIndex].GetOrderAtIndex(
+							assets[i].GetStrategyAtIndex(strategyIndex).GetOrderAtIndex(
 								orderIndex
 							);
 
@@ -219,7 +219,7 @@ void OnTradeTransaction(
 								DEAL_REASON_EXPERT
 							);
 
-							assets[i].strategies[strategyIndex].OnCloseOrder(
+							assets[i].GetStrategyAtIndex(strategyIndex).OnCloseOrder(
 								order,
 								DEAL_REASON_EXPERT
 							);
@@ -244,8 +244,8 @@ void OnTradeTransaction(
 		bool isValidMagic = false;
 
 		for (int i = 0; i < ArraySize(assets); i++) {
-			for (int j = 0; j < ArraySize(assets[i].strategies); j++) {
-				if (magic == assets[i].strategies[j].GetMagicNumber()) {
+			for (int j = 0; j < assets[i].GetStrategyCount(); j++) {
+				if (magic == assets[i].GetStrategyAtIndex(j).GetMagicNumber()) {
 					isValidMagic = true;
 					break;
 				}
@@ -322,13 +322,13 @@ void OnTradeTransaction(
 							orderIndex
 						)) {
 						EOrder *order =
-							assets[i].strategies[strategyIndex].GetOrderAtIndex(
+							assets[i].GetStrategyAtIndex(strategyIndex).GetOrderAtIndex(
 								orderIndex
 							);
 
 						if (order != NULL) {
 							order.OnClose(dealTime, dealPrice, netProfit, dealReason);
-							assets[i].strategies[strategyIndex].OnCloseOrder(order, dealReason);
+							assets[i].GetStrategyAtIndex(strategyIndex).OnCloseOrder(order, dealReason);
 
 							hlogger.info(StringFormat(
 								"OnTradeTransaction: Order closed with positionId=%llu, profit=%.2f",
@@ -362,7 +362,7 @@ void OnTradeTransaction(
 							orderIndex
 						)) {
 						EOrder *order =
-							assets[i].strategies[strategyIndex].GetOrderAtIndex(
+							assets[i].GetStrategyAtIndex(strategyIndex).GetOrderAtIndex(
 								orderIndex
 							);
 
@@ -377,7 +377,7 @@ void OnTradeTransaction(
 								order.OnOpen(openResult);
 							}
 
-							assets[i].strategies[strategyIndex].OnOpenOrder(
+							assets[i].GetStrategyAtIndex(strategyIndex).OnOpenOrder(
 								order
 							);
 
