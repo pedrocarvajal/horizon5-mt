@@ -1,7 +1,7 @@
 #ifndef __H_CALCULATE_CAGR_MQH__
 #define __H_CALCULATE_CAGR_MQH__
 
-double calculateCAGR(double initialValue, double finalValue, int months) {
+double CalculateCAGR(double initialValue, double finalValue, int months) {
 	if (months <= 0)
 		return 0.0;
 

@@ -30,14 +30,14 @@ public:
 	}
 
 	void Export() {
-		logger.debug(StringFormat(
+		logger.Debug(StringFormat(
 			"Exporting %d market snapshots to %s\\%s.json",
 			marketCollection.Count(), GetCurrentReportsPath(), reportName
 		));
 
 		marketCollection.Flush();
 
-		logger.info(StringFormat(
+		logger.Info(StringFormat(
 			"Market history saved - %s.json with %d snapshots",
 			reportName,
 			marketCollection.Count()

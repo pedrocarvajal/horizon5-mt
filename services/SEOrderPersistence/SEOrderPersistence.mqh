@@ -28,7 +28,7 @@ public:
 	}
 
 	bool DeleteOrder(string orderId) {
-		if (!isLiveTrading())
+		if (!IsLiveTrading())
 			return true;
 
 		if (ordersCollection == NULL)
@@ -37,20 +37,20 @@ public:
 		bool isDeleted = ordersCollection.DeleteOne("_id", orderId);
 
 		if (isDeleted)
-			logger.info(StringFormat("Order deleted from database: %s", orderId));
+			logger.Info(StringFormat("Order deleted from database: %s", orderId));
 
 		return isDeleted;
 	}
 
 	int LoadOrders(EOrder &restoredOrders[]) {
-		if (!isLiveTrading())
+		if (!IsLiveTrading())
 			return 0;
 
 		if (ordersCollection == NULL)
 			return 0;
 
 		int documentCount = ordersCollection.Count();
-		logger.info(StringFormat("Starting order restoration, found %d documents", documentCount));
+		logger.Info(StringFormat("Starting order restoration, found %d documents", documentCount));
 
 		if (documentCount == 0)
 			return 0;
@@ -74,14 +74,14 @@ public:
 
 		cleanupOrphanedOrders(idsToDelete);
 
-		logger.info("Order restoration completed");
-		logger.info(StringFormat("Documents found: %d", foundCount));
-		logger.info(StringFormat("Orders loaded: %d", loadedCount));
+		logger.Info("Order restoration completed");
+		logger.Info(StringFormat("Documents found: %d", foundCount));
+		logger.Info(StringFormat("Orders loaded: %d", loadedCount));
 		return loadedCount;
 	}
 
 	bool SaveOrder(EOrder &order) {
-		if (!isLiveTrading())
+		if (!IsLiveTrading())
 			return true;
 
 		if (ordersCollection == NULL)
@@ -99,7 +99,7 @@ public:
 		delete json;
 
 		if (result)
-			logger.info(StringFormat("Order saved to database: %s", order.GetId()));
+			logger.Info(StringFormat("Order saved to database: %s", order.GetId()));
 
 		return result;
 	}
@@ -109,7 +109,7 @@ private:
 		EOrder order;
 
 		if (!deserializeOrder(document, order)) {
-			logger.error(StringFormat(
+			logger.Error(StringFormat(
 				"CRITICAL ERROR: Failed to deserialize order document at index %d",
 				index
 			));
@@ -117,7 +117,7 @@ private:
 		}
 
 		if (!validateOrderExists(order)) {
-			logger.warning(StringFormat(
+			logger.Warning(StringFormat(
 				"Order no longer exists in MetaTrader, cleaning up: %s",
 				order.GetId()
 			));
@@ -131,7 +131,7 @@ private:
 		ArrayResize(restoredOrders, ArraySize(restoredOrders) + 1);
 		restoredOrders[ArraySize(restoredOrders) - 1] = order;
 
-		logger.info(StringFormat(
+		logger.Info(StringFormat(
 			"Order loaded successfully: %s (Status: %s)",
 			order.GetId(),
 			EnumToString(order.GetStatus())
@@ -148,7 +148,7 @@ private:
 
 	bool deserializeOrder(JSON::Object *json, EOrder &order) {
 		if (json == NULL || !json.hasValue("_id")) {
-			logger.error("Failed to deserialize order document");
+			logger.Error("Failed to deserialize order document");
 			return false;
 		}
 
@@ -221,7 +221,7 @@ private:
 	}
 
 	bool validateOrderExists(EOrder &order) {
-		if (!isLiveTrading())
+		if (!IsLiveTrading())
 			return true;
 
 		if (order.GetStatus() == ORDER_STATUS_PENDING && order.GetOrderId() > 0)

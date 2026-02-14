@@ -63,14 +63,14 @@ public:
 	}
 
 	void Export() {
-		logger.debug(StringFormat(
+		logger.Debug(StringFormat(
 			"Exporting %d orders to %s\\%s.json",
 			ordersCollection.Count(), GetCurrentReportsPath(), reportName
 		));
 
 		ordersCollection.Flush();
 
-		logger.info(StringFormat(
+		logger.Info(StringFormat(
 			"Order history saved - %s.json with %d orders",
 			reportName,
 			ordersCollection.Count()
