@@ -7,7 +7,7 @@
 
 class SEAllocatorInference {
 private:
-	SELogger logger;
+	SELogger * logger;
 
 	int kNeighbors;
 	int maxActiveStrategies;
@@ -224,8 +224,8 @@ private:
 	}
 
 public:
-	SEAllocatorInference() {
-		logger.SetPrefix("SEStrategyAllocatorInference");
+	SEAllocatorInference(SELogger * parentLogger) {
+		logger = parentLogger;
 		epsilon = ALLOCATOR_EPSILON;
 		performanceDaysCount = 0;
 	}
