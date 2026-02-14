@@ -53,7 +53,7 @@ private:
 		int candidateCount = maxCandidateCount;
 
 		if (candidateCount < 1) {
-			logger.debug("KNN skipped: no training candidates available");
+			logger.Debug("KNN skipped: no training candidates available");
 			return 0;
 		}
 
@@ -74,7 +74,7 @@ private:
 			weightSum += 1.0 / (distances[n] + epsilon);
 		}
 
-		logger.debug(StringFormat(
+		logger.Debug(StringFormat(
 			"KNN: %d neighbors from %d candidates, distances [%.4f..%.4f]",
 			neighborsCount,
 			candidateCount,
@@ -100,7 +100,7 @@ private:
 			);
 		}
 
-		logger.debug(topNeighborsLog);
+		logger.Debug(topNeighborsLog);
 
 		return neighborsCount;
 	}
@@ -148,7 +148,7 @@ private:
 			scoresLog += StringFormat("%s=%.6f", strategyPrefixes[s], strategyScores[s]);
 		}
 
-		logger.debug(scoresLog);
+		logger.Debug(scoresLog);
 	}
 
 	void selectActiveStrategies(double &strategyScores[], string &activeStrategies[]) {
@@ -188,7 +188,7 @@ private:
 			activeLog += activeStrategies[i];
 		}
 
-		logger.info(activeLog);
+		logger.Info(activeLog);
 	}
 
 	void sortDistances(double &dist[], int &indices[], int count) {
@@ -269,12 +269,12 @@ public:
 		SEDbCollection *collection = database.Collection(collectionName);
 
 		if (collection == NULL) {
-			logger.error(StringFormat("Failed to open collection %s/%s", databasePath, collectionName));
+			logger.Error(StringFormat("Failed to open collection %s/%s", databasePath, collectionName));
 			return false;
 		}
 
 		if (collection.Count() == 0) {
-			logger.error(StringFormat(
+			logger.Error(StringFormat(
 				"No model found in %s/%s",
 				databasePath,
 				collectionName
@@ -286,14 +286,14 @@ public:
 		JSON::Object *model = collection.FindOne("type", "allocator_model");
 
 		if (model == NULL) {
-			logger.error("No allocator model document found");
+			logger.Error("No allocator model document found");
 			return false;
 		}
 
 		int version = (int)model.getNumber("version");
 
 		if (version != 1) {
-			logger.error(StringFormat("Unsupported model version: %d", version));
+			logger.Error(StringFormat("Unsupported model version: %d", version));
 			return false;
 		}
 
@@ -301,7 +301,7 @@ public:
 		int modelMaxCandidateCount = (int)model.getNumber("maxCandidateCount");
 
 		if (modelNormalizedCount < 1 || modelMaxCandidateCount < 1) {
-			logger.error(StringFormat(
+			logger.Error(StringFormat(
 				"Invalid model: normalizedCount=%d, maxCandidateCount=%d. Model was trained with insufficient data.",
 				modelNormalizedCount,
 				modelMaxCandidateCount
@@ -331,7 +331,7 @@ public:
 		JSON::Array *prefixesArray = model.getArray("strategyPrefixes");
 
 		if (prefixesArray == NULL) {
-			logger.error("Missing strategyPrefixes in model");
+			logger.Error("Missing strategyPrefixes in model");
 			return false;
 		}
 
@@ -346,7 +346,7 @@ public:
 		JSON::Array *featuresArray = model.getArray("featureHistory");
 
 		if (featuresArray == NULL) {
-			logger.error("Missing featureHistory in model");
+			logger.Error("Missing featureHistory in model");
 			return false;
 		}
 
@@ -360,7 +360,7 @@ public:
 		JSON::Array *performanceArray = model.getArray("strategyPerformanceHistory");
 
 		if (performanceArray == NULL) {
-			logger.error("Missing strategyPerformanceHistory in model");
+			logger.Error("Missing strategyPerformanceHistory in model");
 			return false;
 		}
 
@@ -375,7 +375,7 @@ public:
 		JSON::Array *normalizedArray = model.getArray("normalizedFeatures");
 
 		if (normalizedArray == NULL) {
-			logger.error("Missing normalizedFeatures in model");
+			logger.Error("Missing normalizedFeatures in model");
 			return false;
 		}
 
@@ -386,7 +386,7 @@ public:
 			outNormalizedFeatures[i] = normalizedArray.getNumber(i);
 		}
 
-		logger.info(StringFormat(
+		logger.Info(StringFormat(
 			"Model loaded: %s/%s | days=%d normalized=%d strategies=%d",
 			databasePath,
 			collectionName,
@@ -395,7 +395,7 @@ public:
 			outStrategyCount
 		));
 
-		logger.info(StringFormat(
+		logger.Info(StringFormat(
 			"Model arrays: features=%d performance=%d (days=%d) normalized=%d | params: norm=%d candidates=%d k=%d forward=%d",
 			ArraySize(outFeatureHistory),
 			ArraySize(strategyPerformanceHistory),

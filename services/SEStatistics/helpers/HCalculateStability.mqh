@@ -3,11 +3,11 @@
 
 #include "HCalculateRSquared.mqh"
 
-double calculateStability(double &performance[], double totalProfit) {
+double CalculateStability(double &performance[], double totalProfit) {
 	if (ArraySize(performance) < 3)
 		return 0.0;
 
-	double rSquared = calculateRSquared(performance);
+	double rSquared = CalculateRSquared(performance);
 
 	if (totalProfit < 0)
 		return -1.0 * rSquared;
@@ -15,12 +15,12 @@ double calculateStability(double &performance[], double totalProfit) {
 	return rSquared;
 }
 
-double calculateStabilitySQ3(double &performance[], double totalProfit,
+double CalculateStabilitySQ3(double &performance[], double totalProfit,
 			     int totalTrades) {
 	if (ArraySize(performance) < 3)
 		return 0.0;
 
-	double rSquared = calculateRSquared(performance);
+	double rSquared = CalculateRSquared(performance);
 
 	if (totalProfit <= 0)
 		return 0.0;

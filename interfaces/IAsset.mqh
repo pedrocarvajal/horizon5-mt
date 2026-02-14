@@ -15,6 +15,7 @@ interface IAsset {
 
 	void OnOpenOrder(EOrder &order);
 	void OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason);
+	void OnEnd();
 	void OnDeinit();
 
 	double CalculateQualityProduct();

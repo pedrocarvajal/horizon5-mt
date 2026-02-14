@@ -15,6 +15,7 @@ interface IStrategy {
 
 	void OnOpenOrder(EOrder &order);
 	void OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason);
+	void OnEnd();
 	void OnDeinit();
 
 	void SetAsset(SEAsset *assetReference);

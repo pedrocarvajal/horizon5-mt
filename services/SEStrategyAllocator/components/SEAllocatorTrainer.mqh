@@ -59,12 +59,12 @@ public:
 		SEDbCollection *collection = database.Collection(collectionName);
 
 		if (collection == NULL) {
-			logger.error(StringFormat("Failed to open collection %s/%s", databasePath, collectionName));
+			logger.Error(StringFormat("Failed to open collection %s/%s", databasePath, collectionName));
 			return false;
 		}
 
 		if (normalizedCount < 1) {
-			logger.error(StringFormat(
+			logger.Error(StringFormat(
 				"Cannot save model: no normalized features (totalDays=%d, normalizationWindow=%d). Training backtest must be longer than normalization window.",
 				totalDays,
 				normalizationWindow
@@ -73,7 +73,7 @@ public:
 		}
 
 		if (maxCandidateCount < 1) {
-			logger.error(StringFormat(
+			logger.Error(StringFormat(
 				"Cannot save model: no KNN candidates (maxCandidateCount=%d). Training backtest must be longer than normalization window + forward window.",
 				maxCandidateCount
 			));
@@ -134,7 +134,7 @@ public:
 
 		delete model;
 
-		logger.info(StringFormat(
+		logger.Info(StringFormat(
 			"Model saved: %s/%s | days=%d normalized=%d strategies=%d",
 			databasePath,
 			collectionName,

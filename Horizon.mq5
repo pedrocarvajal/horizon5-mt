@@ -11,6 +11,7 @@ input group "Reporting";
 input bool EnableOrderHistoryReport = false; // [1] > Enable order history report on tester
 input bool EnableSnapshotHistoryReport = false; // [1] > Enable snapshot history report on tester
 input bool EnableMarketHistoryReport = false; // [1] > Enable market history report on tester
+input bool EnableDebugLogs = false; // [1] > Enable debug log persistence to files
 
 input group "Risk management";
 input bool EquityAtRiskCompounded = false; // [1] > Equity at risk compounded
@@ -58,7 +59,7 @@ int OnInit() {
 	int enabledAssetCount = 0;
 
 	if (assetCount == 0) {
-		hlogger.warning("No assets are defined.");
+		hlogger.Warning("No assets are defined.");
 		return INIT_FAILED;
 	}
 
@@ -68,8 +69,8 @@ int OnInit() {
 	}
 
 	if (enabledAssetCount == 0) {
-		hlogger.error("No assets are enabled.");
-		hlogger.error("Enable at least one asset to start.");
+		hlogger.Error("No assets are enabled.");
+		hlogger.Error("Enable at least one asset to start.");
 		return INIT_FAILED;
 	}
 
@@ -99,12 +100,12 @@ int OnInit() {
 
 			for (int k = 0; k < ArraySize(magicNumbers); k++) {
 				if (magicNumbers[k] == currentMagic) {
-					hlogger.error(StringFormat(
+					hlogger.Error(StringFormat(
 						"Duplicate magic number detected: %llu",
 						currentMagic
 					));
 
-					hlogger.error(StringFormat(
+					hlogger.Error(StringFormat(
 						"Conflict between: %s and %s",
 						magicSources[k],
 						currentSource
@@ -123,7 +124,7 @@ int OnInit() {
 	}
 
 	if (ArraySize(magicNumbers) == 0) {
-		hlogger.error(
+		hlogger.Error(
 			"No strategies enabled. Enable at least one strategy to start."
 		);
 
@@ -135,6 +136,12 @@ int OnInit() {
 
 void OnDeinit(const int reason) {
 	EventKillTimer();
+
+	if (reason != REASON_CHARTCHANGE && reason != REASON_PARAMETERS) {
+		for (int i = 0; i < ArraySize(assets); i++) {
+			assets[i].OnEnd();
+		}
+	}
 
 	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].OnDeinit();
@@ -223,7 +230,7 @@ void OnTradeTransaction(
 								DEAL_REASON_EXPERT
 							);
 
-							hlogger.debug(StringFormat(
+							hlogger.Debug(StringFormat(
 								"OnTradeTransaction: Order cancelled with orderId=%llu",
 								orderId
 							));
@@ -277,7 +284,7 @@ void OnTradeTransaction(
 			ulong orderId = transaction.order;
 			ulong dealId = transaction.deal;
 
-			hlogger.debug(StringFormat(
+			hlogger.Debug(StringFormat(
 				"OnTradeTransaction: comment=%s, positionId=%llu, orderId=%llu, dealId=%llu",
 				comment,
 				positionId,
@@ -285,7 +292,7 @@ void OnTradeTransaction(
 				dealId
 			));
 
-			hlogger.debug(StringFormat(
+			hlogger.Debug(StringFormat(
 				"OnTradeTransaction: entry=%d, reason=%d",
 				entry,
 				reason
@@ -304,7 +311,7 @@ void OnTradeTransaction(
 						DEAL_REASON
 					);
 
-				hlogger.debug(StringFormat(
+				hlogger.Debug(StringFormat(
 					"OnTradeTransaction: Closing order with dealId=%llu, positionId=%llu",
 					dealId,
 					positionId
@@ -329,7 +336,7 @@ void OnTradeTransaction(
 							order.OnClose(dealTime, dealPrice, netProfit, dealReason);
 							assets[i].GetStrategyAtIndex(strategyIndex).OnCloseOrder(order, dealReason);
 
-							hlogger.info(StringFormat(
+							hlogger.Info(StringFormat(
 								"OnTradeTransaction: Order closed with positionId=%llu, profit=%.2f",
 								positionId,
 								netProfit
@@ -343,7 +350,7 @@ void OnTradeTransaction(
 				}
 
 				if (!isFound) {
-					hlogger.warning(StringFormat(
+					hlogger.Warning(StringFormat(
 						"OnTradeTransaction: Order not found with positionId=%llu",
 						positionId
 					));
@@ -380,7 +387,7 @@ void OnTradeTransaction(
 								order
 							);
 
-							hlogger.debug(StringFormat(
+							hlogger.Debug(StringFormat(
 								"OnTradeTransaction: Updated order with dealId=%llu, positionId=%llu",
 								dealId,
 								positionId
@@ -394,7 +401,7 @@ void OnTradeTransaction(
 				}
 
 				if (!isFound) {
-					hlogger.warning(StringFormat(
+					hlogger.Warning(StringFormat(
 						"OnTradeTransaction: Order not found with orderId=%llu",
 						orderId
 					));
@@ -433,6 +440,10 @@ double OnTester() {
 		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].ExportAllocatorModel();
 		}
+	}
+
+	for (int i = 0; i < ArraySize(assets); i++) {
+		assets[i].OnEnd();
 	}
 
 	return quality;

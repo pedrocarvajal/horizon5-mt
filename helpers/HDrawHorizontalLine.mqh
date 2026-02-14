@@ -1,7 +1,7 @@
 #ifndef __H_DRAW_HORIZONTAL_LINE_MQH__
 #define __H_DRAW_HORIZONTAL_LINE_MQH__
 
-bool drawHorizontalLine(
+bool DrawHorizontalLine(
 	string name,
 	double price,
 	color lineColor = clrWhite,

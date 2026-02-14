@@ -1,7 +1,7 @@
 #ifndef __H_DRAW_RECTANGLE_MQH__
 #define __H_DRAW_RECTANGLE_MQH__
 
-bool drawRectangle(
+bool DrawRectangle(
 	string name,
 	datetime time1,
 	double price1,

@@ -1,7 +1,7 @@
 #ifndef __H_DRAW_VERTICAL_LINE_MQH__
 #define __H_DRAW_VERTICAL_LINE_MQH__
 
-bool drawVerticalLine(
+bool DrawVerticalLine(
 	string name,
 	datetime time,
 	color lineColor = clrWhite,
