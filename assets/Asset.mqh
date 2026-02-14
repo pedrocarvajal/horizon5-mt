@@ -275,9 +275,6 @@ public:
 	}
 
 	virtual void OnEnd() {
-		if (!EnableDebugLogs)
-			return;
-
 		int totalEntries = logger.GetEntryCount();
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
@@ -492,6 +489,17 @@ public:
 
 	void SetBalance(double newBalance) {
 		balance = newBalance;
+	}
+
+	void SetDebugLevel(ENUM_DEBUG_LEVEL level) {
+		logger.SetDebugLevel(level);
+
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].SetDebugLevel(level);
+		}
+
+		if (CheckPointer(allocator) != POINTER_INVALID)
+			allocator.SetDebugLevel(level);
 	}
 
 	void SetEnabled(bool newEnabled) {
