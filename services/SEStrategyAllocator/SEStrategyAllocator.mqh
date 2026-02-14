@@ -151,6 +151,10 @@ public:
 			delete inference;
 	}
 
+	void SetDebugLevel(ENUM_DEBUG_LEVEL level) {
+		logger.SetDebugLevel(level);
+	}
+
 	void GetLogEntries(string &result[]) {
 		logger.GetEntries(result);
 	}

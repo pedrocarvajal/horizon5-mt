@@ -1,17 +1,18 @@
-#property copyright "Horizon, by Pedro Carvajal"
+#property copyright "Horizon5, by Pedro Carvajal"
 #property version "1.00"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 #include "enums/EAllocatorMode.mqh"
+#include "enums/EDebugLevel.mqh"
 
 input group "General Settings";
 input int TickIntervalTime = 60; // [1] > Tick interval (1 = 1 second by tick)
 input ENUM_ORDER_TYPE_FILLING FillingMode = ORDER_FILLING_IOC; // [1] > Order filling mode
+input ENUM_DEBUG_LEVEL DebugLevel = DEBUG_LEVEL_ALL; // [1] > Debug log level
 input group "Reporting";
 input bool EnableOrderHistoryReport = false; // [1] > Enable order history report on tester
 input bool EnableSnapshotHistoryReport = false; // [1] > Enable snapshot history report on tester
 input bool EnableMarketHistoryReport = false; // [1] > Enable market history report on tester
-input bool EnableDebugLogs = false; // [1] > Enable debug log persistence to files
 
 input group "Risk management";
 input bool EquityAtRiskCompounded = false; // [1] > Equity at risk compounded
@@ -50,6 +51,7 @@ int OnInit() {
 	dtime = SEDateTime();
 
 	hlogger.SetPrefix("Horizon");
+	hlogger.SetDebugLevel(DebugLevel);
 
 	lastCheckedDay = dtime.Today().dayOfYear;
 	lastCheckedHour = dtime.Today().hour;
@@ -77,6 +79,8 @@ int OnInit() {
 	double weightPerAsset = 1.0 / enabledAssetCount;
 
 	for (int i = 0; i < assetCount; i++) {
+		assets[i].SetDebugLevel(DebugLevel);
+
 		if (assets[i].IsEnabled()) {
 			assets[i].SetWeight(weightPerAsset);
 			assets[i].SetBalance(AccountInfoDouble(ACCOUNT_BALANCE) * weightPerAsset);

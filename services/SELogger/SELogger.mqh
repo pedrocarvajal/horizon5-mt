@@ -1,15 +1,35 @@
 #ifndef __SE_LOGGER_MQH__
 #define __SE_LOGGER_MQH__
 
+#include "../../enums/EDebugLevel.mqh"
+
 class SELogger {
 private:
 	string prefix;
 	string entries[];
+	ENUM_DEBUG_LEVEL debugLevel;
+
+	bool shouldPrint(string level) {
+		if (debugLevel == DEBUG_LEVEL_NONE)
+			return false;
+
+		if (debugLevel == DEBUG_LEVEL_ERRORS || debugLevel == DEBUG_LEVEL_ERRORS_PERSIST)
+			return level == "ERROR" || level == "WARNING";
+
+		return true;
+	}
+
+	bool shouldPersist() {
+		return debugLevel == DEBUG_LEVEL_ERRORS_PERSIST || debugLevel == DEBUG_LEVEL_ALL_PERSIST;
+	}
 
 	void log(string level, string message) {
+		if (!shouldPrint(level))
+			return;
+
 		Print("[", level, "] ", prefix, ": ", message);
 
-		if (!EnableDebugLogs)
+		if (!shouldPersist())
 			return;
 
 		int size = ArraySize(entries);
@@ -20,14 +40,24 @@ private:
 public:
 	SELogger() {
 		prefix = "";
+		debugLevel = DEBUG_LEVEL_ALL;
 	}
 
 	SELogger(string newPrefix) {
 		prefix = newPrefix;
+		debugLevel = DEBUG_LEVEL_ALL;
 	}
 
 	void SetPrefix(string newPrefix) {
 		prefix = newPrefix;
+	}
+
+	void SetDebugLevel(ENUM_DEBUG_LEVEL level) {
+		debugLevel = level;
+	}
+
+	ENUM_DEBUG_LEVEL GetDebugLevel() {
+		return debugLevel;
 	}
 
 	int GetEntryCount() {

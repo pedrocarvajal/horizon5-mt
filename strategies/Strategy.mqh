@@ -162,13 +162,17 @@ public:
 		return closedOrderCount;
 	}
 
+	void SetDebugLevel(ENUM_DEBUG_LEVEL level) {
+		logger.SetDebugLevel(level);
+	}
+
 	void GetLogEntries(string &result[]) {
 		logger.GetEntries(result);
 	}
 
 	double GetLotSizeByStopLoss(double stopLossDistance) {
 		if (balance <= 0)
-			return 0;
+			return -1;
 
 		double nav = EquityAtRiskCompounded
 			? statistics.GetNav()
