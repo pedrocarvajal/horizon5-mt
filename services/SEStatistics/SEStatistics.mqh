@@ -322,20 +322,20 @@ public:
 	double GetCAGR() {
 		int lastIndex = ArraySize(nav) - 1;
 		double currentNav = (lastIndex >= 0) ? nav[lastIndex] : initialBalance;
-		return calculateCAGR(initialBalance, currentNav, getMonthsElapsed());
+		return CalculateCAGR(initialBalance, currentNav, getMonthsElapsed());
 	}
 
 	double GetStability() {
 		int lastIndex = ArraySize(performance) - 1;
 		double totalProfit = (lastIndex >= 0) ? performance[lastIndex] : 0;
-		return calculateStability(nav, totalProfit);
+		return CalculateStability(nav, totalProfit);
 	}
 
 	double GetStabilitySQ3() {
 		int lastIndex = ArraySize(performance) - 1;
 		double totalProfit = (lastIndex >= 0) ? performance[lastIndex] : 0;
 		int totalTrades = winningOrders + losingOrders;
-		return calculateStabilitySQ3(nav, totalProfit, totalTrades);
+		return CalculateStabilitySQ3(nav, totalProfit, totalTrades);
 	}
 
 	double GetInitialBalance() {
@@ -365,43 +365,43 @@ public:
 		double currentRecoveryFactor = GetRecoveryFactor();
 		double currentRSquared = GetR2(performance);
 
-		double qPerformance = calculateMetricQuality(
+		double qPerformance = CalculateMetricQuality(
 			performanceInPercentage,
 			qualityThresholds.expectedTotalReturnPctByMonth * getMonthsElapsed(),
 			qualityThresholds.minTotalReturnPct,
 			true);
 
-		double qDrawdown = calculateMetricQuality(
+		double qDrawdown = CalculateMetricQuality(
 			drawdownMaxInPercentage,
 			qualityThresholds.expectedMaxDrawdownPct,
 			qualityThresholds.maxMaxDrawdownPct,
 			false);
 
-		double qRiskReward = calculateMetricQuality(
+		double qRiskReward = CalculateMetricQuality(
 			riskRewardRatio,
 			qualityThresholds.expectedRiskRewardRatio,
 			qualityThresholds.minRiskRewardRatio,
 			true);
 
-		double qWinRate = calculateMetricQuality(
+		double qWinRate = CalculateMetricQuality(
 			winRate,
 			qualityThresholds.expectedWinRate,
 			qualityThresholds.minWinRate,
 			true);
 
-		double qRSquared = calculateMetricQuality(
+		double qRSquared = CalculateMetricQuality(
 			currentRSquared,
 			qualityThresholds.expectedRSquared,
 			qualityThresholds.minRSquared,
 			true);
 
-		double qTrades = calculateMetricQuality(
+		double qTrades = CalculateMetricQuality(
 			totalTrades,
 			qualityThresholds.expectedTrades,
 			qualityThresholds.minTrades,
 			true);
 
-		double qRecoveryFactor = calculateMetricQuality(
+		double qRecoveryFactor = CalculateMetricQuality(
 			currentRecoveryFactor,
 			qualityThresholds.expectedRecoveryFactor,
 			qualityThresholds.minRecoveryFactor,
@@ -446,7 +446,7 @@ public:
 	}
 
 	double GetR2(double &points[]) {
-		return calculateRSquared(points);
+		return CalculateRSquared(points);
 	}
 
 	double GetRecoveryFactor() {
@@ -459,7 +459,7 @@ public:
 	}
 
 	double GetSharpeRatio(double &perf[]) {
-		return calculateSharpeRatio(perf);
+		return CalculateSharpeRatio(perf);
 	}
 
 	void OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason, EOrder &strategyOrders[]) {

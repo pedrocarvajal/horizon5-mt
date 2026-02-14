@@ -24,7 +24,7 @@ public:
 			candles);
 
 		if (wasCopied <= 0) {
-			logger.error(StringFormat(
+			logger.Error(StringFormat(
 				"Failed to copy rates for %s",
 				symbol));
 			return -1;
