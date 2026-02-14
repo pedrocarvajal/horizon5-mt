@@ -127,9 +127,9 @@ public:
 		inference = NULL;
 
 		if (mode == ALLOCATOR_MODE_TRAIN)
-			trainer = new SEAllocatorTrainer();
+			trainer = new SEAllocatorTrainer(GetPointer(logger));
 		else
-			inference = new SEAllocatorInference();
+			inference = new SEAllocatorInference(GetPointer(logger));
 
 		logger.Info(StringFormat(
 			"Initialized | mode=%s rolling=%d norm=%d k=%d maxActive=%d threshold=%.4f forward=%d",

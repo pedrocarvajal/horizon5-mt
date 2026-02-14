@@ -7,7 +7,7 @@
 
 class SEAllocatorTrainer {
 private:
-	SELogger logger;
+	SELogger * logger;
 	int strategyCount;
 	double strategyPerformanceHistory[];
 
@@ -16,8 +16,8 @@ private:
 	}
 
 public:
-	SEAllocatorTrainer() {
-		logger.SetPrefix("SEStrategyAllocatorTrainer");
+	SEAllocatorTrainer(SELogger * parentLogger) {
+		logger = parentLogger;
 		strategyCount = 0;
 	}
 
