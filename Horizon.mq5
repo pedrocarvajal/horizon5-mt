@@ -24,9 +24,9 @@ input ENUM_ALLOCATOR_MODE AllocatorMode = ALLOCATOR_MODE_TRAIN; // [1] > Allocat
 input string AllocatorModelPath = "Models"; // [1] > Model directory path (in common files)
 input int AllocatorRollingWindow = 150; // [1] > Rolling window for feature computation (days)
 input int AllocatorNormalizationWindow = 365; // [1] > Normalization window for z-score (days)
-input int AllocatorKNeighbors = 20; // [1] > Number of KNN neighbors
-input int AllocatorMaxActiveStrategies = 10; // [1] > Maximum active strategies
-input double AllocatorScoreThreshold = 0.001; // [1] > Minimum score to activate strategy
+input int AllocatorKNeighbors = 40; // [1] > Number of KNN neighbors
+input int AllocatorMaxActiveStrategies = 2; // [1] > Maximum active strategies
+input double AllocatorScoreThreshold = 0.0; // [1] > Minimum score to activate strategy
 input int AllocatorForwardWindow = 4; // [1] > Forward performance window (days)
 
 #include <Trade/Trade.mqh>
