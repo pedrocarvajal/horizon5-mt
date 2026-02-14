@@ -251,9 +251,9 @@ public:
 		string collectionName,
 		int &outRollingWindowDays,
 		int &outNormalizationWindow,
-		int &outKNeighbors,
-		int &outMaxActiveStrategies,
-		double &outScoreThreshold,
+		int userKNeighbors,
+		int userMaxActiveStrategies,
+		double userScoreThreshold,
 		int &outForwardWindow,
 		int &outMaxCandidateCount,
 		int &outStrategyCount,
@@ -311,18 +311,15 @@ public:
 
 		outRollingWindowDays = (int)model.getNumber("rollingWindowDays");
 		outNormalizationWindow = (int)model.getNumber("normalizationWindow");
-		outKNeighbors = (int)model.getNumber("kNeighbors");
-		outMaxActiveStrategies = (int)model.getNumber("maxActiveStrategies");
-		outScoreThreshold = model.getNumber("scoreThreshold");
 		outForwardWindow = (int)model.getNumber("forwardWindow");
 		outMaxCandidateCount = (int)model.getNumber("maxCandidateCount");
 		outStrategyCount = (int)model.getNumber("strategyCount");
 		outTotalDays = (int)model.getNumber("totalDays");
 		outNormalizedCount = (int)model.getNumber("normalizedCount");
 
-		kNeighbors = outKNeighbors;
-		maxActiveStrategies = outMaxActiveStrategies;
-		scoreThreshold = outScoreThreshold;
+		kNeighbors = userKNeighbors;
+		maxActiveStrategies = userMaxActiveStrategies;
+		scoreThreshold = userScoreThreshold;
 		forwardWindow = outForwardWindow;
 		normalizationWindow = outNormalizationWindow;
 		maxCandidateCount = outMaxCandidateCount;
@@ -396,15 +393,17 @@ public:
 		));
 
 		logger.Info(StringFormat(
-			"Model arrays: features=%d performance=%d (days=%d) normalized=%d | params: norm=%d candidates=%d k=%d forward=%d",
+			"Model arrays: features=%d performance=%d (days=%d) normalized=%d | params: norm=%d candidates=%d k=%d maxActive=%d threshold=%.4f forward=%d",
 			ArraySize(outFeatureHistory),
 			ArraySize(strategyPerformanceHistory),
 			performanceDaysCount,
 			ArraySize(outNormalizedFeatures),
-			outNormalizationWindow,
-			outMaxCandidateCount,
-			outKNeighbors,
-			outForwardWindow
+			normalizationWindow,
+			maxCandidateCount,
+			kNeighbors,
+			maxActiveStrategies,
+			scoreThreshold,
+			forwardWindow
 		));
 
 		return true;
