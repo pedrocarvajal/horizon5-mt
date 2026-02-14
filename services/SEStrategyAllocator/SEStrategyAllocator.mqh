@@ -257,7 +257,7 @@ public:
 			return false;
 		}
 
-		return inference.LoadModel(
+		bool result = inference.LoadModel(
 			databasePath,
 			collectionName,
 			rollingWindowDays,
@@ -274,6 +274,20 @@ public:
 			featureHistory,
 			normalizedFeatures
 		);
+
+		if (result) {
+			logger.Info(StringFormat(
+				"Model overrides: rolling=%d norm=%d forward=%d | User params: k=%d maxActive=%d threshold=%.4f",
+				rollingWindowDays,
+				normalizationWindow,
+				forwardWindow,
+				kNeighbors,
+				maxActiveStrategies,
+				scoreThreshold
+			));
+		}
+
+		return result;
 	}
 };
 
