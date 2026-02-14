@@ -442,10 +442,6 @@ double OnTester() {
 		}
 	}
 
-	for (int i = 0; i < ArraySize(assets); i++) {
-		assets[i].OnEnd();
-	}
-
 	return quality;
 }
 
