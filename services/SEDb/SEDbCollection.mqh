@@ -3,18 +3,16 @@
 
 #include "../../libraries/json/index.mqh"
 #include "../../helpers/HGenerateUuid.mqh"
-#include "../SELogger/SELogger.mqh"
 #include "SEDbQuery.mqh"
 
 class SEDbCollection {
 private:
-	SELogger logger;
 	string name;
 	string filePath;
 	int fileFlags;
 	bool shouldAutoFlush;
 	JSON::Object *documents[];
-	string GenerateId() {
+	string generateId() {
 		return GenerateUuid();
 	}
 
@@ -69,7 +67,6 @@ public:
 		filePath = "";
 		fileFlags = FILE_TXT | FILE_ANSI;
 		shouldAutoFlush = true;
-		logger.SetPrefix("SEDbCollection");
 	}
 
 	void Initialize(string collectionName, string basePath, bool useCommonFiles) {
@@ -79,8 +76,6 @@ public:
 
 		if (useCommonFiles)
 			fileFlags |= FILE_COMMON;
-
-		logger.SetPrefix(StringFormat("SEDbCollection[%s]", collectionName));
 	}
 
 	~SEDbCollection() {
@@ -104,10 +99,8 @@ public:
 
 	bool Load() {
 		int handle = FileOpen(filePath, FILE_READ | fileFlags);
-		if (handle == INVALID_HANDLE) {
-			logger.debug(StringFormat("No existing file for collection '%s', starting empty", name));
+		if (handle == INVALID_HANDLE)
 			return false;
-		}
 
 		string jsonData = "";
 		while (!FileIsEnding(handle)) {
@@ -115,10 +108,8 @@ public:
 		}
 		FileClose(handle);
 
-		if (StringLen(jsonData) == 0) {
-			logger.debug(StringFormat("Empty file for collection '%s'", name));
+		if (StringLen(jsonData) == 0)
 			return true;
-		}
 
 		JSON::Array *array = new JSON::Array(jsonData);
 		int length = array.getLength();
@@ -136,7 +127,6 @@ public:
 		}
 
 		delete array;
-		logger.info(StringFormat("Loaded %d documents from '%s'", ArraySize(documents), name));
 		return true;
 	}
 
@@ -160,7 +150,7 @@ public:
 
 		int handle = FileOpen(filePath, FILE_WRITE | fileFlags);
 		if (handle == INVALID_HANDLE) {
-			logger.error(StringFormat("Cannot write collection '%s' - Error: %d", name, GetLastError()));
+			Print("[ERROR] SEDbCollection: Cannot write '", name, "' - Error: ", GetLastError());
 			return false;
 		}
 
@@ -177,7 +167,7 @@ public:
 		JSON::Object *stored = new JSON::Object(documentJson);
 
 		if (!stored.hasValue("_id"))
-			stored.setProperty("_id", GenerateId());
+			stored.setProperty("_id", generateId());
 
 		int size = ArraySize(documents);
 		ArrayResize(documents, size + 1);
@@ -283,7 +273,7 @@ public:
 			int error = GetLastError();
 
 			if (error != 5002 && error != 5019) {
-				logger.error(StringFormat("Cannot delete file '%s' - Error: %d", filePath, error));
+				Print("[ERROR] SEDbCollection: Cannot delete '", filePath, "' - Error: ", error);
 				return false;
 			}
 		}

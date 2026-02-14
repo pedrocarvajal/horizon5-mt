@@ -46,16 +46,16 @@ public:
 
 	bool CloseOrCancel(ulong ticket) {
 		if (IsPendingOrder(ticket)) {
-			logger.info(StringFormat("Canceling pending order: %llu", ticket));
+			logger.Info(StringFormat("Canceling pending order: %llu", ticket));
 			return Cancel(ticket);
 		}
 
 		if (IsOpenPosition(ticket)) {
-			logger.info(StringFormat("Closing open position: %llu", ticket));
+			logger.Info(StringFormat("Closing open position: %llu", ticket));
 			return Close(ticket);
 		}
 
-		logger.debug(StringFormat("Order/Position not found: %llu", ticket));
+		logger.Debug(StringFormat("Order/Position not found: %llu", ticket));
 		return false;
 	}
 
@@ -69,14 +69,14 @@ public:
 
 	bool Modify(double price = 0, double stopLoss = 0, double takeProfit = 0,
 		    ulong magicNumber = 0) {
-		logger.info(StringFormat("Modifying order, position_id=%d, order_id=%d",
+		logger.Info(StringFormat("Modifying order, position_id=%d, order_id=%d",
 			GetPositionId(), GetOrderId()));
 
 		if (stopLoss == 0 && takeProfit == 0)
 			return false;
 
 		if (!PositionSelectByTicket(GetPositionId())) {
-			logger.error(StringFormat("Error selecting position: %llu", GetPositionId()));
+			logger.Error(StringFormat("Error selecting position: %llu", GetPositionId()));
 			return false;
 		}
 
@@ -107,12 +107,12 @@ public:
 			     currentTp;
 
 		if (!OrderSend(request, result)) {
-			logger.error(StringFormat("Error sending order modification: %d", GetLastError()));
+			logger.Error(StringFormat("Error sending order modification: %d", GetLastError()));
 			return false;
 		}
 
 		if (result.retcode != TRADE_RETCODE_DONE) {
-			logger.error(StringFormat("Error modifying order: %d", result.retcode));
+			logger.Error(StringFormat("Error modifying order: %d", result.retcode));
 			return false;
 		}
 
@@ -196,21 +196,21 @@ public:
 				(int)SymbolInfoInteger(symbol,
 					SYMBOL_DIGITS));
 
-		logger.separator("Trade request");
-		logger.debug(StringFormat("Comment: %s", request.comment));
-		logger.debug(StringFormat("Action: %s", EnumToString(request.action)));
-		logger.debug(StringFormat("Symbol: %s", request.symbol));
-		logger.debug(StringFormat("Volume: %f", request.volume));
-		logger.debug(StringFormat("Deviation: %d", request.deviation));
-		logger.debug(StringFormat("Magic: %d", request.magic));
-		logger.debug(StringFormat("Type filling: %s",
+		logger.Separator("Trade request");
+		logger.Debug(StringFormat("Comment: %s", request.comment));
+		logger.Debug(StringFormat("Action: %s", EnumToString(request.action)));
+		logger.Debug(StringFormat("Symbol: %s", request.symbol));
+		logger.Debug(StringFormat("Volume: %f", request.volume));
+		logger.Debug(StringFormat("Deviation: %d", request.deviation));
+		logger.Debug(StringFormat("Magic: %d", request.magic));
+		logger.Debug(StringFormat("Type filling: %s",
 			EnumToString(request.type_filling)));
-		logger.debug(StringFormat("Price: %f", request.price));
-		logger.debug(StringFormat("Stop loss: %f", request.sl));
-		logger.debug(StringFormat("Take profit: %f", request.tp));
+		logger.Debug(StringFormat("Price: %f", request.price));
+		logger.Debug(StringFormat("Stop loss: %f", request.sl));
+		logger.Debug(StringFormat("Take profit: %f", request.tp));
 
 		if (!OrderSend(request, result)) {
-			logger.error(StringFormat("Error opening order: %d", GetLastError()));
+			logger.Error(StringFormat("Error opening order: %d", GetLastError()));
 			return result;
 		}
 
@@ -220,10 +220,10 @@ public:
 		if (GetDealId() > 0) {
 			HistoryDealSelect(GetDealId());
 			SetPositionId(HistoryDealGetInteger(GetDealId(), DEAL_POSITION_ID));
-			logger.info(StringFormat("Position ID found: %llu", GetPositionId()));
+			logger.Info(StringFormat("Position ID found: %llu", GetPositionId()));
 		}
 
-		logger.info(StringFormat(
+		logger.Info(StringFormat(
 			"Order opened, deal_id=%d, order_id=%d, position_id=%d",
 			GetDealId(), GetOrderId(), GetPositionId()));
 		return result;

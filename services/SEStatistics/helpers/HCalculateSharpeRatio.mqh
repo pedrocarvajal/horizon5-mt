@@ -3,7 +3,7 @@
 
 #define TRADING_HOURS_PER_YEAR 6048
 
-double calculateSharpeRatio(double &perf[]) {
+double CalculateSharpeRatio(double &perf[]) {
 	int n = ArraySize(perf);
 
 	if (n < 3)

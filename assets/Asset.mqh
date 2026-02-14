@@ -9,6 +9,8 @@
 #include "../indicators/INDrawdownFromPeak.mqh"
 #include "../indicators/INVolatility.mqh"
 #include "../indicators/INMaxDrawdownInWindow.mqh"
+#include "../helpers/HGetLogsPath.mqh"
+#include "../services/SEReportOfLogs/SEReportOfLogs.mqh"
 #include "../services/SEReportOfMarketSnapshots/SEReportOfMarketSnapshots.mqh"
 #include "../services/SEStrategyAllocator/SEStrategyAllocator.mqh"
 #include "../strategies/Strategy.mqh"
@@ -60,14 +62,14 @@ private:
 				strategies[i].SetBalance(newBalance);
 
 				if (newBalance > 0) {
-					logger.info(StringFormat(
+					logger.Info(StringFormat(
 						"(SEStrategyAllocator) %s allocated: %.2f (was %.2f)",
 						strategies[i].GetPrefix(),
 						newBalance,
 						previousBalance
 					));
 				} else {
-					logger.info(StringFormat(
+					logger.Info(StringFormat(
 						"(SEStrategyAllocator) %s deallocated (was %.2f)",
 						strategies[i].GetPrefix(),
 						previousBalance
@@ -144,7 +146,7 @@ public:
 		int strategyCount = ArraySize(strategies);
 
 		if (!isEnabled) {
-			logger.info(StringFormat(
+			logger.Info(StringFormat(
 				"Asset skipped (disabled): %s",
 				name
 			));
@@ -153,7 +155,7 @@ public:
 		}
 
 		if (strategyCount == 0) {
-			logger.error(StringFormat(
+			logger.Error(StringFormat(
 				"No strategies defined for enabled asset: %s",
 				name));
 			return INIT_FAILED;
@@ -169,7 +171,7 @@ public:
 			int result = strategies[i].OnInit();
 
 			if (result != INIT_SUCCEEDED) {
-				logger.error(StringFormat(
+				logger.Error(StringFormat(
 					"Strategy initialization failed: %s",
 					strategies[i].GetName()));
 				return INIT_FAILED;
@@ -192,7 +194,7 @@ public:
 				string collectionName = StringFormat("%s_Allocator", symbol);
 
 				if (!allocator.LoadModel(AllocatorModelPath, collectionName)) {
-					logger.error("Failed to load allocator model");
+					logger.Error("Failed to load allocator model");
 					return INIT_FAILED;
 				}
 
@@ -202,7 +204,7 @@ public:
 			}
 		}
 
-		logger.info(StringFormat(
+		logger.Info(StringFormat(
 			"%s initialized | symbol: %s | strategies: %d | weight: %.4f | balance: %.2f",
 			name,
 			symbol,
@@ -272,6 +274,53 @@ public:
 		}
 	}
 
+	virtual void OnEnd() {
+		if (!EnableDebugLogs)
+			return;
+
+		int totalEntries = logger.GetEntryCount();
+
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			string strategyEntries[];
+			strategies[i].GetLogEntries(strategyEntries);
+			totalEntries += ArraySize(strategyEntries);
+		}
+
+		if (CheckPointer(allocator) != POINTER_INVALID) {
+			string allocatorEntries[];
+			allocator.GetLogEntries(allocatorEntries);
+			totalEntries += ArraySize(allocatorEntries);
+		}
+
+		if (totalEntries == 0)
+			return;
+
+		SEReportOfLogs exporter;
+		exporter.Initialize(GetLogsPath(symbol));
+
+		string assetEntries[];
+		logger.GetEntries(assetEntries);
+		exporter.Export(StringFormat("%s_Asset", name), assetEntries);
+		logger.ClearEntries();
+
+		if (CheckPointer(allocator) != POINTER_INVALID) {
+			string allocatorLogEntries[];
+			allocator.GetLogEntries(allocatorLogEntries);
+			exporter.Export(StringFormat("%s_Allocator", name), allocatorLogEntries);
+		}
+
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			string strategyLogEntries[];
+			strategies[i].GetLogEntries(strategyLogEntries);
+			exporter.Export(
+				StringFormat("%s_%s_Strategy", name, strategies[i].GetPrefix()),
+				strategyLogEntries
+			);
+
+			strategies[i].OnEnd();
+		}
+	}
+
 	virtual void OnDeinit() {
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnDeinit();
@@ -333,7 +382,7 @@ public:
 
 		marketSnapshotsReporter.Export();
 
-		logger.info(StringFormat(
+		logger.Info(StringFormat(
 			"Market history exported with %d snapshots",
 			marketSnapshotsReporter.GetSnapshotCount()
 		));

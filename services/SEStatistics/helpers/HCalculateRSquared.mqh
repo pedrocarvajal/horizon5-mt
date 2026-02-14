@@ -1,7 +1,7 @@
 #ifndef __H_CALCULATE_R_SQUARED_MQH__
 #define __H_CALCULATE_R_SQUARED_MQH__
 
-double calculateRSquared(double &points[]) {
+double CalculateRSquared(double &points[]) {
 	if (ArraySize(points) < 3)
 		return 0;
 

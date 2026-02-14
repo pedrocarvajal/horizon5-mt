@@ -35,14 +35,14 @@ public:
 	}
 
 	void Export() {
-		logger.debug(StringFormat(
+		logger.Debug(StringFormat(
 			"Exporting %d snapshots to %s\\%s.json",
 			snapshotsCollection.Count(), GetCurrentReportsPath(), reportName
 		));
 
 		snapshotsCollection.Flush();
 
-		logger.info(StringFormat(
+		logger.Info(StringFormat(
 			"Snapshot history saved - %s.json with %d snapshots",
 			reportName,
 			snapshotsCollection.Count()

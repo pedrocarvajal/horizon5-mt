@@ -88,7 +88,7 @@ private:
 
 		normalizedCount++;
 
-		logger.debug(StringFormat(
+		logger.Debug(StringFormat(
 			"Norm window=[%d..%d] | mean=[%.4f,%.4f,%.4f] std=[%.4f,%.4f,%.4f] | z=[%.4f,%.4f,%.4f]",
 			windowStart,
 			totalDays - 1,
@@ -131,7 +131,7 @@ public:
 		else
 			inference = new SEAllocatorInference();
 
-		logger.info(StringFormat(
+		logger.Info(StringFormat(
 			"Initialized | mode=%s rolling=%d norm=%d k=%d maxActive=%d threshold=%.4f forward=%d",
 			mode == ALLOCATOR_MODE_TRAIN ? "TRAIN" : "INFERENCE",
 			rollingWindowDays,
@@ -151,19 +151,18 @@ public:
 			delete inference;
 	}
 
-	void GetActiveStrategies(string &result[]) {
-		ArrayResize(result, ArraySize(activeStrategies));
+	void GetLogEntries(string &result[]) {
+		logger.GetEntries(result);
+	}
 
-		for (int i = 0; i < ArraySize(activeStrategies); i++) {
-			result[i] = activeStrategies[i];
-		}
+	void GetActiveStrategies(string &result[]) {
+		int size = ArraySize(activeStrategies);
+		ArrayResize(result, size);
+		ArrayCopy(result, activeStrategies, 0, 0, size);
 	}
 
 	bool IsWarmupComplete() {
-		if (mode == ALLOCATOR_MODE_TRAIN)
-			return false;
-
-		return true;
+		return mode != ALLOCATOR_MODE_TRAIN;
 	}
 
 	void OnStartDay(
@@ -184,7 +183,7 @@ public:
 
 		totalDays++;
 
-		logger.debug(StringFormat(
+		logger.Debug(StringFormat(
 			"Day %d | Features: return=%.4f vol=%.4f dd=%.4f",
 			totalDays,
 			rollingReturn,
@@ -200,7 +199,7 @@ public:
 		if (mode == ALLOCATOR_MODE_TRAIN)
 			return;
 
-		logger.debug(StringFormat(
+		logger.Debug(StringFormat(
 			"Inference day %d | raw=[%.4f,%.4f,%.4f] | normIdx=%d candidateRange=[0..%d]",
 			totalDays,
 			featureHistory[featureIndex(totalDays - 1, 0)],
@@ -218,7 +217,7 @@ public:
 		strategyPrefixes[strategyCount] = prefix;
 		strategyCount++;
 
-		logger.debug(StringFormat(
+		logger.Debug(StringFormat(
 			"Registered strategy: %s (total: %d)",
 			prefix,
 			strategyCount
@@ -226,6 +225,11 @@ public:
 	}
 
 	bool SaveModel(string databasePath, string collectionName) {
+		if (mode != ALLOCATOR_MODE_TRAIN) {
+			logger.Error("SaveModel called in non-train mode");
+			return false;
+		}
+
 		maxCandidateCount = totalDays - normalizationWindow - forwardWindow;
 
 		return trainer.SaveModel(
@@ -248,7 +252,12 @@ public:
 	}
 
 	bool LoadModel(string databasePath, string collectionName) {
-		bool result = inference.LoadModel(
+		if (mode != ALLOCATOR_MODE_INFERENCE) {
+			logger.Error("LoadModel called in non-inference mode");
+			return false;
+		}
+
+		return inference.LoadModel(
 			databasePath,
 			collectionName,
 			rollingWindowDays,
@@ -265,8 +274,6 @@ public:
 			featureHistory,
 			normalizedFeatures
 		);
-
-		return result;
 	}
 };
 

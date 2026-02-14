@@ -1,12 +1,10 @@
 #ifndef __SE_DB_MQH__
 #define __SE_DB_MQH__
 
-#include "../SELogger/SELogger.mqh"
 #include "SEDbCollection.mqh"
 
 class SEDb {
 private:
-	SELogger logger;
 	string basePath;
 	bool useCommonFiles;
 	bool isInitialized;
@@ -17,7 +15,6 @@ public:
 		basePath = "";
 		useCommonFiles = false;
 		isInitialized = false;
-		logger.SetPrefix("SEDb");
 	}
 
 	void Initialize(string databasePath, bool commonFiles = false) {
@@ -25,7 +22,6 @@ public:
 		basePath = StringFormat("%lld/%s", accountNumber, databasePath);
 		useCommonFiles = commonFiles;
 		isInitialized = true;
-		logger.SetPrefix(StringFormat("SEDb[%s]", basePath));
 	}
 
 	~SEDb() {
@@ -41,7 +37,7 @@ public:
 
 	SEDbCollection *Collection(string collectionName) {
 		if (!isInitialized) {
-			logger.error("Database not initialized");
+			Print("[ERROR] SEDb: Database not initialized");
 			return NULL;
 		}
 
@@ -58,21 +54,18 @@ public:
 		ArrayResize(collections, size + 1);
 		collections[size] = collection;
 
-		logger.info(StringFormat("Collection '%s' ready (%d documents)", collectionName, collection.Count()));
 		return collection;
 	}
 
 	bool Drop(string collectionName) {
 		if (!isInitialized) {
-			logger.error("Database not initialized");
+			Print("[ERROR] SEDb: Database not initialized");
 			return false;
 		}
 
 		int index = FindCollectionIndex(collectionName);
-		if (index == -1) {
-			logger.warning(StringFormat("Collection '%s' not found", collectionName));
+		if (index == -1)
 			return false;
-		}
 
 		collections[index].DeleteFile();
 
@@ -85,7 +78,6 @@ public:
 		}
 		ArrayResize(collections, size - 1);
 
-		logger.info(StringFormat("Collection '%s' dropped", collectionName));
 		return true;
 	}
 

@@ -153,7 +153,7 @@ private:
 		double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
 
 		if (volume <= 0) {
-			logger.info(StringFormat(
+			logger.Info(StringFormat(
 				"[%s] Validation failed - Volume is zero or negative: %.5f",
 				GetId(),
 				volume
@@ -162,7 +162,7 @@ private:
 		}
 
 		if (volume < minLot) {
-			logger.info(StringFormat(
+			logger.Info(StringFormat(
 				"[%s] Validation failed - Volume %.5f is below minimum lot size: %.5f",
 				GetId(),
 				volume,
@@ -172,7 +172,7 @@ private:
 		}
 
 		if (volume > maxLot) {
-			logger.info(StringFormat(
+			logger.Info(StringFormat(
 				"[%s] Validation failed - Volume %.5f exceeds maximum lot size: %.5f",
 				GetId(),
 				volume,
@@ -183,7 +183,7 @@ private:
 
 		double normalizedVolume = MathFloor(volume / lotStep) * lotStep;
 		if (normalizedVolume < minLot) {
-			logger.info(StringFormat(
+			logger.Info(StringFormat(
 				"[%s] Validation failed - Normalized volume %.5f is below minimum after lot step adjustment",
 				GetId(),
 				normalizedVolume
@@ -197,7 +197,7 @@ private:
 public:
 	void OnInit() {
 		if (isInitialized) {
-			logger.info(StringFormat("[%s] Order already initialized", GetId()));
+			logger.Info(StringFormat("[%s] Order already initialized", GetId()));
 			return;
 		}
 
@@ -214,14 +214,14 @@ public:
 			return;
 
 		if (retryCount >= MAX_RETRY_COUNT) {
-			logger.warning(StringFormat("[%s] Max retry count reached, cancelling order", GetId()));
+			logger.Warning(StringFormat("[%s] Max retry count reached, cancelling order", GetId()));
 			Cancel();
 			return;
 		}
 
 		if (marketStatus.isClosed) {
 			retryAfter = currentTime + marketStatus.opensInSeconds;
-			logger.info(StringFormat(
+			logger.Info(StringFormat(
 				"[%s] Open pending: Market closed, will retry in %d seconds",
 				GetId(),
 				marketStatus.opensInSeconds
@@ -229,7 +229,7 @@ public:
 			return;
 		}
 
-		logger.info(StringFormat("[%s] Opening order, id: %s", GetId(), GetId()));
+		logger.Info(StringFormat("[%s] Opening order, id: %s", GetId(), GetId()));
 		Open();
 	}
 
@@ -243,14 +243,14 @@ public:
 			return;
 
 		if (retryCount >= MAX_RETRY_COUNT) {
-			logger.warning(StringFormat("[%s] Max retry count reached for close, giving up", GetId()));
+			logger.Warning(StringFormat("[%s] Max retry count reached for close, giving up", GetId()));
 			pendingToClose = false;
 			retryCount = 0;
 			return;
 		}
 
 		if (marketStatus.isClosed) {
-			logger.info(StringFormat(
+			logger.Info(StringFormat(
 				"[%s] Close pending: Market closed, will retry in %d seconds",
 				GetId(),
 				marketStatus.opensInSeconds
@@ -263,7 +263,7 @@ public:
 	}
 
 	void Open() {
-		SMarketStatus marketStatus = getMarketStatus(symbol);
+		SMarketStatus marketStatus = GetMarketStatus(symbol);
 
 		if (marketStatus.isClosed) {
 			retryAfter = dtime.Timestamp() + marketStatus.opensInSeconds;
@@ -271,7 +271,7 @@ public:
 		}
 
 		if (!validateMinimumVolume()) {
-			logger.info(StringFormat("[%s] Order cancelled - Volume does not meet minimum requirements", GetId()));
+			logger.Info(StringFormat("[%s] Order cancelled - Volume does not meet minimum requirements", GetId()));
 			Cancel();
 			return;
 		}
@@ -295,12 +295,12 @@ public:
 
 	void Close() {
 		if (status == ORDER_STATUS_OPEN) {
-			SMarketStatus marketStatus = getMarketStatus(symbol);
+			SMarketStatus marketStatus = GetMarketStatus(symbol);
 
 			if (marketStatus.isClosed) {
 				pendingToClose = true;
 				retryAfter = dtime.Timestamp() + marketStatus.opensInSeconds;
-				logger.info(StringFormat(
+				logger.Info(StringFormat(
 					"[%s] Close pending: Market closed, will retry in %d seconds",
 					GetId(),
 					marketStatus.opensInSeconds
@@ -308,7 +308,7 @@ public:
 				return;
 			}
 
-			logger.info(StringFormat(
+			logger.Info(StringFormat(
 				"[%s] Closing open position, position_id: %llu",
 				GetId(),
 				GetPositionId()
@@ -316,7 +316,7 @@ public:
 
 			if (!ATrade::Close(GetPositionId())) {
 				retryCount++;
-				logger.error(StringFormat(
+				logger.Error(StringFormat(
 					"[%s] Failed to close open position, retry %d/%d",
 					GetId(),
 					retryCount,
@@ -325,7 +325,7 @@ public:
 				return;
 			}
 
-			logger.info(StringFormat("[%s] Close order sent to broker, waiting for confirmation...", GetId()));
+			logger.Info(StringFormat("[%s] Close order sent to broker, waiting for confirmation...", GetId()));
 			status = ORDER_STATUS_CLOSING;
 			pendingToClose = false;
 			retryCount = 0;
@@ -334,13 +334,13 @@ public:
 
 		if (status == ORDER_STATUS_PENDING) {
 			if (GetOrderId() == 0) {
-				logger.info(StringFormat("[%s] Cannot cancel order: invalid orderId", GetId()));
+				logger.Info(StringFormat("[%s] Cannot cancel order: invalid orderId", GetId()));
 				Cancel();
 				return;
 			}
 
 			if (!OrderSelect(GetOrderId())) {
-				logger.info(StringFormat(
+				logger.Info(StringFormat(
 					"[%s] Order no longer exists (orderId: %llu), updating status to cancelled",
 					GetId(),
 					GetOrderId()
@@ -350,7 +350,7 @@ public:
 			}
 
 			if (!ATrade::Cancel(GetOrderId())) {
-				logger.error(StringFormat(
+				logger.Error(StringFormat(
 					"[%s] Failed to cancel pending order, orderId: %llu",
 					GetId(),
 					GetOrderId()
@@ -358,7 +358,7 @@ public:
 				return;
 			}
 
-			logger.info(StringFormat("[%s] Cancel order sent to broker, waiting for confirmation...", GetId()));
+			logger.Info(StringFormat("[%s] Cancel order sent to broker, waiting for confirmation...", GetId()));
 			status = ORDER_STATUS_CLOSING;
 			pendingToOpen = false;
 			return;
@@ -369,7 +369,7 @@ public:
 		if (result.retcode != 0 && result.retcode != TRADE_RETCODE_DONE &&
 		    result.retcode != TRADE_RETCODE_DONE_PARTIAL) {
 			retryCount++;
-			logger.error(StringFormat(
+			logger.Error(StringFormat(
 				"[%s] Error opening order: %d, retry %d/%d",
 				GetId(),
 				result.retcode,
@@ -399,21 +399,21 @@ public:
 
 		if (GetDealId() == 0) {
 			status = ORDER_STATUS_PENDING;
-			logger.info(StringFormat(
+			logger.Info(StringFormat(
 				"[%s] Order opened as pending, orderId: %llu",
 				GetId(),
 				GetOrderId()
 			));
 		} else {
 			if (wasPending) {
-				logger.info(StringFormat(
+				logger.Info(StringFormat(
 					"[%s] Pending order has opened, dealId: %llu, positionId: %llu",
 					GetId(),
 					GetDealId(),
 					GetPositionId()
 				));
 			} else {
-				logger.info(StringFormat(
+				logger.Info(StringFormat(
 					"[%s] Order opened immediately, dealId: %llu, positionId: %llu",
 					GetId(),
 					GetDealId(),
@@ -443,29 +443,29 @@ public:
 
 		if (profits == 0.0 && price == 0.0) {
 			status = ORDER_STATUS_CANCELLED;
-			logger.info(StringFormat("[%s] Order cancelled", GetId()));
+			logger.Info(StringFormat("[%s] Order cancelled", GetId()));
 		}
 
 		orderCloseReason = reason;
 		buildSnapshot();
 
 		if (reason == DEAL_REASON_TP)
-			logger.info(StringFormat("[%s] Order closed by Take Profit", GetId()));
+			logger.Info(StringFormat("[%s] Order closed by Take Profit", GetId()));
 
 		if (reason == DEAL_REASON_EXPERT)
-			logger.info(StringFormat("[%s] Order closed by Expert", GetId()));
+			logger.Info(StringFormat("[%s] Order closed by Expert", GetId()));
 
 		if (reason == DEAL_REASON_CLIENT)
-			logger.info(StringFormat("[%s] Order closed by Client", GetId()));
+			logger.Info(StringFormat("[%s] Order closed by Client", GetId()));
 
 		if (reason == DEAL_REASON_MOBILE)
-			logger.info(StringFormat("[%s] Order closed by Mobile", GetId()));
+			logger.Info(StringFormat("[%s] Order closed by Mobile", GetId()));
 
 		if (reason == DEAL_REASON_WEB)
-			logger.info(StringFormat("[%s] Order closed by Web", GetId()));
+			logger.Info(StringFormat("[%s] Order closed by Web", GetId()));
 
 		if (reason == DEAL_REASON_SL)
-			logger.info(StringFormat("[%s] Order closed by Stop Loss", GetId()));
+			logger.Info(StringFormat("[%s] Order closed by Stop Loss", GetId()));
 
 		if (status == ORDER_STATUS_CLOSED)
 			if (CheckPointer(persistence) != POINTER_INVALID)
@@ -606,11 +606,11 @@ public:
 
 		if (status == ORDER_STATUS_OPEN) {
 			if (!ATrade::ModifyTakeProfit(takeProfitPrice, magicNumber)) {
-				logger.error(StringFormat("[%s] Failed to modify take profit on open position", GetId()));
+				logger.Error(StringFormat("[%s] Failed to modify take profit on open position", GetId()));
 				return false;
 			}
 
-			logger.info(StringFormat(
+			logger.Info(StringFormat(
 				"[%s] Take profit modified to: %.*f",
 				GetId(),
 				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
@@ -629,11 +629,11 @@ public:
 
 		if (status == ORDER_STATUS_OPEN) {
 			if (!ATrade::ModifyStopLoss(stopLossPrice, magicNumber)) {
-				logger.error(StringFormat("[%s] Failed to modify stop loss on open position", GetId()));
+				logger.Error(StringFormat("[%s] Failed to modify stop loss on open position", GetId()));
 				return false;
 			}
 
-			logger.info(StringFormat(
+			logger.Info(StringFormat(
 				"[%s] Stop loss modified to: %.*f",
 				GetId(),
 				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
