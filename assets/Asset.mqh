@@ -144,21 +144,15 @@ public:
 
 	virtual int OnInit() {
 		int strategyCount = ArraySize(strategies);
+		isEnabled = strategyCount > 0;
 
 		if (!isEnabled) {
 			logger.Info(StringFormat(
-				"Asset skipped (disabled): %s",
+				"Asset skipped (no strategies enabled): %s",
 				name
 			));
 
 			return INIT_SUCCEEDED;
-		}
-
-		if (strategyCount == 0) {
-			logger.Error(StringFormat(
-				"No strategies defined for enabled asset: %s",
-				name));
-			return INIT_FAILED;
 		}
 
 		double weightPerStrategy = weight / strategyCount;
@@ -500,10 +494,6 @@ public:
 
 		if (CheckPointer(allocator) != POINTER_INVALID)
 			allocator.SetDebugLevel(level);
-	}
-
-	void SetEnabled(bool newEnabled) {
-		isEnabled = newEnabled;
 	}
 
 	void SetName(string newName) {
