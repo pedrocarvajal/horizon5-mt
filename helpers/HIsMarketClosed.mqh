@@ -7,7 +7,7 @@
 
 extern SEDateTime dtime;
 
-SMarketStatus GetMarketStatus(string checkSymbol, int safetyMarginMinutes = 1) {
+SMarketStatus GetMarketStatus(string checkSymbol, int safetyMarginMinutes = 0) {
 	SMarketStatus status;
 	status.isClosed = true;
 	status.opensInSeconds = 0;

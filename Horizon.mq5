@@ -25,7 +25,7 @@ input string AllocatorModelPath = "Models"; // [1] > Model directory path (in co
 input int AllocatorRollingWindow = 150; // [1] > Rolling window for feature computation (days)
 input int AllocatorNormalizationWindow = 365; // [1] > Normalization window for z-score (days)
 input int AllocatorKNeighbors = 40; // [1] > Number of KNN neighbors
-input int AllocatorMaxActiveStrategies = 2; // [1] > Maximum active strategies
+input int AllocatorMaxActiveStrategies = 1; // [1] > Maximum active strategies
 input double AllocatorScoreThreshold = 0.0; // [1] > Minimum score to activate strategy
 input int AllocatorForwardWindow = 4; // [1] > Forward performance window (days)
 
