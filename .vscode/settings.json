@@ -25,5 +25,6 @@
     "editor.formatOnSave": false,
     "editor.formatOnType": false,
     "editor.formatOnPaste": false
-  }
+  },
+  "clangd.enable": false
 }
