@@ -20,7 +20,7 @@ input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
 input group "WARRoom Integration";
 input bool EnableWARRoom = true; // [1] > Enable WARRoom API integration
-input string WARRoomUrl = "http://127.0.0.1:3001"; // [1] > WARRoom PostgREST API URL
+input string WARRoomUrl = "http://100.104.230.121:3001"; // [1] > WARRoom PostgREST API URL
 input string WARRoomApiKey = "REDACTED_JWT_TOKEN"; // [1] > WARRoom JWT API key (required)
 
 input group "Strategy Allocator";
@@ -201,7 +201,6 @@ void OnTimer() {
 		assets[i].OnTimer();
 
 		if (isStartDay) {
-			assets[i].CleanupClosedOrders();
 			assets[i].OnStartDay();
 		}
 

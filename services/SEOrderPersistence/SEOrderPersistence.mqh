@@ -27,24 +27,6 @@ public:
 		ordersCollection = database.Collection("orders");
 	}
 
-	bool DeleteOrder(string orderId) {
-		if (!IsLiveTrading()) {
-			return true;
-		}
-
-		if (ordersCollection == NULL) {
-			return false;
-		}
-
-		bool isDeleted = ordersCollection.DeleteOne("_id", orderId);
-
-		if (isDeleted) {
-			logger.Info(StringFormat("Order deleted from database: %s", orderId));
-		}
-
-		return isDeleted;
-	}
-
 	int LoadOrders(EOrder &restoredOrders[]) {
 		if (!IsLiveTrading()) {
 			return 0;
@@ -189,10 +171,16 @@ private:
 		order.takeProfitPrice = json.getNumber("take_profit_price");
 		order.stopLossPrice = json.getNumber("stop_loss_price");
 
+		order.closePrice = json.getNumber("close_price");
+		order.profitInDollars = json.getNumber("profit_in_dollars");
+		order.orderCloseReason = (ENUM_DEAL_REASON)(int)json.getNumber("order_close_reason");
+
 		SDateTime signalAt = dtime.FromTimestamp((datetime)json.getNumber("signal_at"));
 		SDateTime openAt = dtime.FromTimestamp((datetime)json.getNumber("open_at"));
+		SDateTime closeAt = dtime.FromTimestamp((datetime)json.getNumber("close_at"));
 		order.SetSignalAt(signalAt);
 		order.SetOpenAt(openAt);
+		order.closeAt = closeAt;
 
 		return true;
 	}
@@ -225,8 +213,13 @@ private:
 		json.setProperty("take_profit_price", order.GetTakeProfitPrice());
 		json.setProperty("stop_loss_price", order.GetStopLossPrice());
 
+		json.setProperty("close_price", order.GetClosePrice());
+		json.setProperty("profit_in_dollars", order.GetProfitInDollars());
+		json.setProperty("order_close_reason", (int)order.GetCloseReason());
+
 		json.setProperty("signal_at", (long)order.GetSignalAt().timestamp);
 		json.setProperty("open_at", (long)order.GetOpenAt().timestamp);
+		json.setProperty("close_at", (long)order.GetCloseAt().timestamp);
 		json.setProperty("saved_at", (long)dtime.Timestamp());
 
 		return json;
@@ -234,6 +227,10 @@ private:
 
 	bool validateOrderExists(EOrder &order) {
 		if (!IsLiveTrading()) {
+			return true;
+		}
+
+		if (order.GetStatus() == ORDER_STATUS_CLOSED || order.GetStatus() == ORDER_STATUS_CANCELLED) {
 			return true;
 		}
 

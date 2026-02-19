@@ -369,12 +369,6 @@ public:
 		return quality;
 	}
 
-	void CleanupClosedOrders() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].CleanupClosedOrders();
-		}
-	}
-
 	void ExportAllocatorModel() {
 		if (CheckPointer(allocator) == POINTER_INVALID) {
 			return;
@@ -543,6 +537,8 @@ public:
 				strategies[i].GetWeight(),
 				strategies[i].GetBalance()
 			);
+
+			strategies[i].SyncOrdersToWARRoom();
 		}
 	}
 
