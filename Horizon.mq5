@@ -20,8 +20,8 @@ input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
 input group "WARRoom Integration";
 input bool EnableWARRoom = true; // [1] > Enable WARRoom API integration
-input string WARRoomUrl = "http://localhost:3001"; // [1] > WARRoom PostgREST API URL
-input string WARRoomApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYXBpX2F1dGhlbnRpY2F0ZWQiLCJpc3MiOiJ3YXJyb29tIiwiZXhwIjoyMDg2ODUyOTYzfQ.hgELfoxpeTwj-FVnVQAnz3fjfNRbdypDuJC7fZH1Nfo"; // [1] > WARRoom JWT API key (required)
+input string WARRoomUrl = "http://127.0.0.1:3001"; // [1] > WARRoom PostgREST API URL
+input string WARRoomApiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYXBpX2F1dGhlbnRpY2F0ZWQiLCJpc3MiOiJ3YXJyb29tIiwiZXhwIjoyMDg2ODYwOTcwfQ.a-xfNkGP9D577oizy2ULaikTTkItpkeNfqTMI1ZRWcY"; // [1] > WARRoom JWT API key (required)
 
 input group "Strategy Allocator";
 input bool EnableStrategyAllocator = false; // [1] > Enable KNN strategy allocator
