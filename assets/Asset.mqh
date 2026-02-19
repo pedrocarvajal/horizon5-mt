@@ -238,14 +238,14 @@ public:
 	}
 
 	virtual void OnStartMinute() {
-		SendWARRoomHeartbeats(HEARTBEAT_ONLINE);
-
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartMinute();
 		}
 	}
 
 	virtual void OnStartHour() {
+		SendWARRoomHeartbeats(HEARTBEAT_ONLINE);
+
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartHour();
 		}
