@@ -18,6 +18,11 @@ input group "Risk management";
 input bool EquityAtRiskCompounded = false; // [1] > Equity at risk compounded
 input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
+input group "WARRoom Integration";
+input bool EnableWARRoom = true; // [1] > Enable WARRoom API integration
+input string WARRoomUrl = "http://localhost:3001"; // [1] > WARRoom PostgREST API URL
+input string WARRoomApiKey = "REDACTED_JWT_TOKEN"; // [1] > WARRoom JWT API key (required)
+
 input group "Strategy Allocator";
 input bool EnableStrategyAllocator = false; // [1] > Enable KNN strategy allocator
 input ENUM_ALLOCATOR_MODE AllocatorMode = ALLOCATOR_MODE_TRAIN; // [1] > Allocator mode (Train = collect data, Inference = use model)
@@ -37,8 +42,10 @@ input int AllocatorForwardWindow = 4; // [1] > Forward performance window (days)
 #include "helpers/HGetPipValue.mqh"
 #include "helpers/HIsLiveTrading.mqh"
 #include "services/SEDateTime/SEDateTime.mqh"
+#include "integrations/WARRoom/WARRoom.mqh"
 SEDateTime dtime;
 SELogger hlogger;
+WARRoom warroom;
 
 int lastCheckedDay = -1;
 int lastCheckedHour = -1;
@@ -135,6 +142,10 @@ int OnInit() {
 		return INIT_FAILED;
 	}
 
+	if (!warroom.Initialize(WARRoomUrl, WARRoomApiKey, EnableWARRoom && IsLiveTrading()))
+		return INIT_FAILED;
+
+	warroom.InsertOrUpdateAccount();
 	return INIT_SUCCEEDED;
 }
 
@@ -183,6 +194,16 @@ void OnTimer() {
 
 		assets[i].OnTick();
 		assets[i].ProcessOrders();
+	}
+
+	if (isStartHour) {
+		warroom.InsertOrUpdateAccount();
+		warroom.InsertAccountSnapshot();
+
+		for (int i = 0; i < ArraySize(assets); i++) {
+			assets[i].SyncToWARRoom();
+			assets[i].SendWARRoomHeartbeats(HEARTBEAT_ONLINE);
+		}
 	}
 }
 

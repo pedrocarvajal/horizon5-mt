@@ -14,8 +14,10 @@
 #include "../services/SEReportOfMarketSnapshots/SEReportOfMarketSnapshots.mqh"
 #include "../services/SEStrategyAllocator/SEStrategyAllocator.mqh"
 #include "../strategies/Strategy.mqh"
+#include "../integrations/WARRoom/WARRoom.mqh"
 
 extern SEDateTime dtime;
+extern WARRoom warroom;
 
 class SEAsset:
 public IAsset {
@@ -207,6 +209,9 @@ public:
 			balance
 		));
 
+		SyncToWARRoom();
+		SendWARRoomHeartbeats(HEARTBEAT_INIT);
+
 		return INIT_SUCCEEDED;
 	}
 
@@ -313,6 +318,8 @@ public:
 	}
 
 	virtual void OnDeinit() {
+		SendWARRoomHeartbeats(HEARTBEAT_DEINIT);
+
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnDeinit();
 		}
@@ -507,6 +514,29 @@ public:
 
 	void SetWeight(double newWeight) {
 		weight = newWeight;
+	}
+
+	void SyncToWARRoom() {
+		if (!warroom.IsEnabled()) return;
+
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			warroom.InsertOrUpdateStrategy(
+				strategies[i].GetName(),
+				strategies[i].GetSymbol(),
+				strategies[i].GetPrefix(),
+				strategies[i].GetMagicNumber(),
+				strategies[i].GetWeight(),
+				strategies[i].GetBalance()
+			);
+		}
+	}
+
+	void SendWARRoomHeartbeats(ENUM_HEARTBEAT_EVENT event) {
+		if (!warroom.IsEnabled()) return;
+
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			warroom.InsertHeartbeat(strategies[i].GetMagicNumber(), event);
+		}
 	}
 };
 
