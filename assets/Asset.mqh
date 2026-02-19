@@ -82,8 +82,9 @@ private:
 	}
 
 	void runAllocator() {
-		if (CheckPointer(allocator) == POINTER_INVALID)
+		if (CheckPointer(allocator) == POINTER_INVALID) {
 			return;
+		}
 
 		double dailyPerformances[];
 		collectDailyPerformances(dailyPerformances);
@@ -99,8 +100,9 @@ private:
 			dailyPerformances
 		);
 
-		if (!allocator.IsWarmupComplete())
+		if (!allocator.IsWarmupComplete()) {
 			return;
+		}
 
 		string activeStrategyPrefixes[];
 		allocator.GetActiveStrategies(activeStrategyPrefixes);
@@ -130,15 +132,18 @@ public:
 	}
 
 	~SEAsset() {
-		if (CheckPointer(marketSnapshotsReporter) == POINTER_DYNAMIC)
+		if (CheckPointer(marketSnapshotsReporter) == POINTER_DYNAMIC) {
 			delete marketSnapshotsReporter;
+		}
 
-		if (CheckPointer(allocator) == POINTER_DYNAMIC)
+		if (CheckPointer(allocator) == POINTER_DYNAMIC) {
 			delete allocator;
+		}
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			if (CheckPointer(strategies[i]) != POINTER_DYNAMIC)
+			if (CheckPointer(strategies[i]) != POINTER_DYNAMIC) {
 				continue;
+			}
 
 			delete strategies[i];
 		}
@@ -247,8 +252,9 @@ public:
 	virtual void OnStartDay() {
 		runAllocator();
 
-		if (CheckPointer(marketSnapshotsReporter) != POINTER_INVALID)
+		if (CheckPointer(marketSnapshotsReporter) != POINTER_INVALID) {
 			marketSnapshotsReporter.AddSnapshot(BuildMarketSnapshot());
+		}
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartDay();
@@ -288,8 +294,9 @@ public:
 			totalEntries += ArraySize(allocatorEntries);
 		}
 
-		if (totalEntries == 0)
+		if (totalEntries == 0) {
 			return;
+		}
 
 		SEReportOfLogs exporter;
 		exporter.Initialize(GetLogsPath(symbol));
@@ -349,8 +356,9 @@ public:
 			double strategyQuality =
 				strategies[i].GetStatistics().GetQuality().quality;
 
-			if (strategyQuality == 0)
+			if (strategyQuality == 0) {
 				return 0;
+			}
 
 			quality = MathPow(
 				quality * strategyQuality,
@@ -368,16 +376,18 @@ public:
 	}
 
 	void ExportAllocatorModel() {
-		if (CheckPointer(allocator) == POINTER_INVALID)
+		if (CheckPointer(allocator) == POINTER_INVALID) {
 			return;
+		}
 
 		string collectionName = StringFormat("%s_Allocator", symbol);
 		allocator.SaveModel(AllocatorModelPath, collectionName);
 	}
 
 	void ExportMarketSnapshots() {
-		if (CheckPointer(marketSnapshotsReporter) == POINTER_INVALID)
+		if (CheckPointer(marketSnapshotsReporter) == POINTER_INVALID) {
 			return;
+		}
 
 		marketSnapshotsReporter.Export();
 
@@ -463,16 +473,18 @@ public:
 
 	SEStrategy * GetStrategyByPrefix(string strategyPrefix) {
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			if (strategies[i].GetPrefix() == strategyPrefix)
+			if (strategies[i].GetPrefix() == strategyPrefix) {
 				return strategies[i];
+			}
 		}
 
 		return NULL;
 	}
 
 	SEStrategy * GetStrategyAtIndex(int index) {
-		if (index < 0 || index >= ArraySize(strategies))
+		if (index < 0 || index >= ArraySize(strategies)) {
 			return NULL;
+		}
 
 		return strategies[index];
 	}
@@ -500,8 +512,9 @@ public:
 			strategies[i].SetDebugLevel(level);
 		}
 
-		if (CheckPointer(allocator) != POINTER_INVALID)
+		if (CheckPointer(allocator) != POINTER_INVALID) {
 			allocator.SetDebugLevel(level);
+		}
 	}
 
 	void SetName(string newName) {
@@ -517,7 +530,9 @@ public:
 	}
 
 	void SyncToWARRoom() {
-		if (!warroom.IsEnabled()) return;
+		if (!warroom.IsEnabled()) {
+			return;
+		}
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			warroom.InsertOrUpdateStrategy(
@@ -532,7 +547,9 @@ public:
 	}
 
 	void SendWARRoomHeartbeats(ENUM_HEARTBEAT_EVENT event) {
-		if (!warroom.IsEnabled()) return;
+		if (!warroom.IsEnabled()) {
+			return;
+		}
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			warroom.InsertHeartbeat(strategies[i].GetMagicNumber(), event);

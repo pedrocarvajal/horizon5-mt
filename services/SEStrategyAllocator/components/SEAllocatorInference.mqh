@@ -89,8 +89,9 @@ private:
 			int neighborNormIdx = distanceIndices[n];
 			int originalDay = neighborNormIdx + normalizationWindow;
 
-			if (n > 0)
+			if (n > 0) {
 				topNeighborsLog += " ";
+			}
 
 			topNeighborsLog += StringFormat(
 				"[normIdx=%d day=%d dist=%.4f]",
@@ -142,8 +143,9 @@ private:
 
 			strategyScores[s] = weightedSum / weightSum;
 
-			if (s > 0)
+			if (s > 0) {
 				scoresLog += " ";
+			}
 
 			scoresLog += StringFormat("%s=%.6f", strategyPrefixes[s], strategyScores[s]);
 		}
@@ -182,8 +184,9 @@ private:
 		);
 
 		for (int i = 0; i < activeCount; i++) {
-			if (i > 0)
+			if (i > 0) {
 				activeLog += ", ";
+			}
 
 			activeLog += activeStrategies[i];
 		}
@@ -237,8 +240,9 @@ public:
 
 		int neighborsCount = computeNeighborDistances(normalizedFeatures, normalizedCount, distances, distanceIndices, weightSum);
 
-		if (neighborsCount < 1)
+		if (neighborsCount < 1) {
 			return;
+		}
 
 		double strategyScores[];
 		computeStrategyScores(strategyScores, distances, distanceIndices, neighborsCount, weightSum);

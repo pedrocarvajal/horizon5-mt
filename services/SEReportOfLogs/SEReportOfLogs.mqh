@@ -24,8 +24,9 @@ public:
 	void Export(string collectionName, string &entries[]) {
 		int entryCount = ArraySize(entries);
 
-		if (!initialized || entryCount == 0)
+		if (!initialized || entryCount == 0) {
 			return;
+		}
 
 		SEDbCollection *collection = database.Collection(collectionName);
 		collection.SetAutoFlush(false);

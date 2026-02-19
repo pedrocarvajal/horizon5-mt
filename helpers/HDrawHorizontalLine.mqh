@@ -11,8 +11,9 @@ bool DrawHorizontalLine(
 ) {
 	ObjectDelete(chartId, name);
 
-	if (!ObjectCreate(chartId, name, OBJ_HLINE, 0, 0, price))
+	if (!ObjectCreate(chartId, name, OBJ_HLINE, 0, 0, price)) {
 		return false;
+	}
 
 	ObjectSetInteger(chartId, name, OBJPROP_COLOR, lineColor);
 	ObjectSetInteger(chartId, name, OBJPROP_STYLE, style);

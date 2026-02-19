@@ -16,11 +16,13 @@ private:
 	ENUM_ORDER_TYPE_FILLING getFillingMode(string symbol) {
 		long fillingModes = SymbolInfoInteger(symbol, SYMBOL_FILLING_MODE);
 
-		if ((fillingModes & SYMBOL_FILLING_FOK) == SYMBOL_FILLING_FOK)
+		if ((fillingModes & SYMBOL_FILLING_FOK) == SYMBOL_FILLING_FOK) {
 			return ORDER_FILLING_FOK;
+		}
 
-		if ((fillingModes & SYMBOL_FILLING_IOC) == SYMBOL_FILLING_IOC)
+		if ((fillingModes & SYMBOL_FILLING_IOC) == SYMBOL_FILLING_IOC) {
 			return ORDER_FILLING_IOC;
+		}
 
 		return ORDER_FILLING_RETURN;
 	}
@@ -72,8 +74,9 @@ public:
 		logger.Info(StringFormat("Modifying order, position_id=%d, order_id=%d",
 			GetPositionId(), GetOrderId()));
 
-		if (stopLoss == 0 && takeProfit == 0)
+		if (stopLoss == 0 && takeProfit == 0) {
 			return false;
+		}
 
 		if (!PositionSelectByTicket(GetPositionId())) {
 			logger.Error(StringFormat("Error selecting position: %llu", GetPositionId()));
@@ -165,15 +168,19 @@ public:
 									ORDER_TYPE_SELL_LIMIT
 	    : ORDER_TYPE_SELL_STOP);
 
-			if (request.type == ORDER_TYPE_BUY_STOP)
-				if (openAtPrice <= ask + minDistance)
+			if (request.type == ORDER_TYPE_BUY_STOP) {
+				if (openAtPrice <= ask + minDistance) {
 					openAtPrice = ask + minDistance +
 						      (5 * SymbolInfoDouble(symbol, SYMBOL_POINT));
+				}
+			}
 
-			if (request.type == ORDER_TYPE_SELL_STOP)
-				if (openAtPrice >= bid - minDistance)
+			if (request.type == ORDER_TYPE_SELL_STOP) {
+				if (openAtPrice >= bid - minDistance) {
 					openAtPrice = bid - minDistance -
 						      (5 * SymbolInfoDouble(symbol, SYMBOL_POINT));
+				}
+			}
 		}
 
 		request.comment = id;
@@ -186,15 +193,17 @@ public:
 		request.type_filling = getFillingMode(symbol);
 		request.price = (isMarketOrder) ? currentPrice : openAtPrice;
 
-		if (stopLoss > 0)
+		if (stopLoss > 0) {
 			request.sl = NormalizeDouble(stopLoss,
 				(int)SymbolInfoInteger(symbol,
 					SYMBOL_DIGITS));
+		}
 
-		if (takeProfit > 0)
+		if (takeProfit > 0) {
 			request.tp = NormalizeDouble(takeProfit,
 				(int)SymbolInfoInteger(symbol,
 					SYMBOL_DIGITS));
+		}
 
 		logger.Separator("Trade request");
 		logger.Debug(StringFormat("Comment: %s", request.comment));
@@ -234,16 +243,19 @@ public:
 		double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
 		double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
 
-		if (lot < minLot)
+		if (lot < minLot) {
 			lot = minLot;
-		else
+		} else {
 			lot = MathFloor(lot / lotStep) * lotStep;
+		}
 
-		if (lot < minLot)
+		if (lot < minLot) {
 			lot = 0;
+		}
 
-		if (lot > maxLot)
+		if (lot > maxLot) {
 			lot = maxLot;
+		}
 
 		return NormalizeDouble(lot, 2);
 	}
