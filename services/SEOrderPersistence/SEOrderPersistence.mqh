@@ -222,8 +222,8 @@ private:
 		json.setProperty("signal_price", order.GetSignalPrice());
 		json.setProperty("open_at_price", order.GetOpenAtPrice());
 		json.setProperty("open_price", order.GetOpenPrice());
-		json.setProperty("take_profit_price", order.takeProfitPrice);
-		json.setProperty("stop_loss_price", order.stopLossPrice);
+		json.setProperty("take_profit_price", order.GetTakeProfitPrice());
+		json.setProperty("stop_loss_price", order.GetStopLossPrice());
 
 		json.setProperty("signal_at", (long)order.GetSignalAt().timestamp);
 		json.setProperty("open_at", (long)order.GetOpenAt().timestamp);
