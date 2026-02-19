@@ -187,11 +187,11 @@ public:
 		body.setProperty("open_at_price", NormalizeDouble(order.GetOpenAtPrice(), 5));
 		body.setProperty("open_price", NormalizeDouble(order.GetOpenPrice(), 5));
 		body.setProperty("close_price", NormalizeDouble(order.GetClosePrice(), 5));
-		body.setProperty("take_profit", NormalizeDouble(order.takeProfitPrice, 5));
-		body.setProperty("stop_loss", NormalizeDouble(order.stopLossPrice, 5));
+		body.setProperty("take_profit", NormalizeDouble(order.GetTakeProfitPrice(), 5));
+		body.setProperty("stop_loss", NormalizeDouble(order.GetStopLossPrice(), 5));
 		body.setProperty("profit", NormalizeDouble(order.GetProfitInDollars(), 2));
 
-		string closeReason = CloseReasonToString(order.orderCloseReason);
+		string closeReason = CloseReasonToString(order.GetCloseReason());
 
 		if (order.GetStatus() == ORDER_STATUS_CLOSED) {
 			body.setProperty("close_reason", closeReason);
@@ -208,8 +208,9 @@ public:
 			body.setProperty("opened_at", openTime.ToISO());
 		}
 
-		if (order.closeAt.timestamp > 0) {
-			body.setProperty("closed_at", order.closeAt.ToISO());
+		SDateTime closeTime = order.GetCloseAt();
+		if (closeTime.timestamp > 0) {
+			body.setProperty("closed_at", closeTime.ToISO());
 		}
 
 		request.Post("orders?on_conflict=ticket", body, 0, upsertHeader);

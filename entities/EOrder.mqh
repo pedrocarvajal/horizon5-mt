@@ -528,6 +528,10 @@ public:
 		return status;
 	}
 
+	ENUM_DEAL_REASON GetCloseReason() {
+		return orderCloseReason;
+	}
+
 	int GetSide() {
 		return side;
 	}
@@ -550,6 +554,14 @@ public:
 
 	double GetClosePrice() {
 		return closePrice;
+	}
+
+	double GetTakeProfitPrice() {
+		return takeProfitPrice;
+	}
+
+	double GetStopLossPrice() {
+		return stopLossPrice;
 	}
 
 	double GetProfitInDollars() {
@@ -579,6 +591,10 @@ public:
 
 	SDateTime GetOpenAt() {
 		return openAt;
+	}
+
+	SDateTime GetCloseAt() {
+		return closeAt;
 	}
 
 	SSOrderHistory GetSnapshot() {

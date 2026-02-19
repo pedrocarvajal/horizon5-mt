@@ -217,7 +217,7 @@ void OnTimer() {
 		assets[i].ProcessOrders();
 	}
 
-	if (isStartHour) {
+	if (isStartMinute) {
 		warroom.InsertOrUpdateAccount();
 		warroom.InsertAccountSnapshot();
 
