@@ -18,11 +18,13 @@ class SEAsset;
 #include "../services/SEReportOfOrderHistory/SEReportOfOrderHistory.mqh"
 #include "../services/SEReportOfStrategySnapshots/SEReportOfStrategySnapshots.mqh"
 #include "../services/SEOrderPersistence/SEOrderPersistence.mqh"
+#include "../integrations/WARRoom/WARRoom.mqh"
 
 #define ORDER_TYPE_ANY    -1
 #define ORDER_STATUS_ANY  -1
 
 extern SEDateTime dtime;
+extern WARRoom warroom;
 
 class SEStrategy:
 public IStrategy {
@@ -253,11 +255,15 @@ public:
 		openOrderCount--;
 		closedOrderCount++;
 
+		warroom.InsertOrUpdateOrder(order);
+
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID)
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
 	}
 
 	virtual void OnDeinit() {
+		warroom.InsertHeartbeat(strategyMagicNumber, HEARTBEAT_DEINIT);
+
 		for (int i = 0; i < ArraySize(orders); i++) {
 			orders[i].OnDeinit();
 		}
@@ -285,11 +291,14 @@ public:
 				return INIT_FAILED;
 		}
 
+		warroom.InsertHeartbeat(strategyMagicNumber, HEARTBEAT_INIT);
+
 		return INIT_SUCCEEDED;
 	}
 
 	virtual void OnOpenOrder(EOrder& order) {
 		statistics.OnOpenOrder(order, orders);
+		warroom.InsertOrUpdateOrder(order);
 	}
 
 	virtual void OnStartDay() {

@@ -12,6 +12,13 @@ struct SDateTime {
 	int dayOfYear;
 	datetime timestamp;
 
+	string ToISO() {
+		return StringFormat(
+			"%04d-%02d-%02dT%02d:%02d:%02dZ",
+			year, month, day, hour, minute, second
+		);
+	}
+
 	MqlDateTime ToMql() {
 		MqlDateTime mql;
 
