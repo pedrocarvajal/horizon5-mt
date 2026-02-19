@@ -130,9 +130,14 @@ public:
 		model.setProperty("normalizedFeatures", normalized);
 
 		collection.InsertOne(model);
-		collection.Flush();
+		bool flushed = collection.Flush();
 
 		delete model;
+
+		if (!flushed) {
+			logger.Error(StringFormat("Model flush failed: %s/%s", databasePath, collectionName));
+			return false;
+		}
 
 		logger.Info(StringFormat(
 			"Model saved: %s/%s | days=%d normalized=%d strategies=%d",
