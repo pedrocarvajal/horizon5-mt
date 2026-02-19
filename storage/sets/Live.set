@@ -1,0 +1,31 @@
+; Live preset — optimized allocator (k=20, maxActive=1, threshold=0.0)
+; Trained on 2021-2023, validated on 2024-2025 + 2026 OOS
+
+[TesterInputs]
+TickIntervalTime=60
+FillingMode=1
+DebugLevel=1
+EnableOrderHistoryReport=false
+EnableSnapshotHistoryReport=false
+EnableMarketHistoryReport=false
+EquityAtRiskCompounded=false
+EquityAtRisk=1
+EnableStrategyAllocator=true
+AllocatorMode=1
+AllocatorModelPath=Models
+AllocatorRollingWindow=150
+AllocatorNormalizationWindow=365
+AllocatorKNeighbors=20
+AllocatorMaxActiveStrategies=1
+AllocatorScoreThreshold=0.0
+AllocatorForwardWindow=4
+GoldSowetoEnabled=true
+GoldBoksburgEnabled=true
+GoldKimberleyEnabled=true
+GoldPolokwaneEnabled=true
+GoldBenoniEnabled=true
+GoldSpringsEnabled=true
+GoldCenturionEnabled=true
+GoldStellenboschEnabled=true
+GoldGermistonEnabled=true
+GoldRoodepoortEnabled=true

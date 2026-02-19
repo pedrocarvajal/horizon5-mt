@@ -332,6 +332,7 @@ public:
 
 		ArrayResize(strategies, ArraySize(strategies) + 1);
 		strategies[ArraySize(strategies) - 1] = strategy;
+		isEnabled = true;
 	}
 
 	double CalculateQualityProduct() {
