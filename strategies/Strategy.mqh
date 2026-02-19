@@ -314,6 +314,7 @@ public:
 	}
 
 	virtual void OnStartMinute() {
+		warroom.InsertHeartbeat(strategyMagicNumber, HEARTBEAT_ONLINE);
 	}
 
 	virtual int OnTesterInit() {
