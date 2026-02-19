@@ -360,6 +360,85 @@ public:
 		return nav[ArraySize(nav) - 1];
 	}
 
+	double GetNavPeak() {
+		return navPeak;
+	}
+
+	double GetDailyPerformance() {
+		return dailyPerformance;
+	}
+
+	datetime GetStartTime() {
+		return startTime;
+	}
+
+	double GetNavYesterday() {
+		return navYesterday;
+	}
+
+	double GetDrawdownMaxInDollars() {
+		return drawdownMaxInDollars;
+	}
+
+	double GetDrawdownMaxInPercentage() {
+		return drawdownMaxInPercentage;
+	}
+
+	int GetWinningOrders() {
+		return winningOrders;
+	}
+
+	double GetWinningOrdersPerformance() {
+		return winningOrdersPerformance;
+	}
+
+	int GetLosingOrders() {
+		return losingOrders;
+	}
+
+	double GetLosingOrdersPerformance() {
+		return losingOrdersPerformance;
+	}
+
+	double GetMaxLoss() {
+		return maxLoss;
+	}
+
+	double GetMaxExposureInLots() {
+		return maxExposureInLots;
+	}
+
+	double GetMaxExposureInPercentage() {
+		return maxExposureInPercentage;
+	}
+
+	bool GetStopOutDetected() {
+		return stopOutDetected;
+	}
+
+	void GetNavArray(double &target[]) {
+		ArrayResize(target, ArraySize(nav));
+		ArrayCopy(target, nav);
+	}
+
+	void GetPerformanceArray(double &target[]) {
+		ArrayResize(target, ArraySize(performance));
+		ArrayCopy(target, performance);
+	}
+
+	void GetReturnsArray(double &target[]) {
+		ArrayResize(target, ArraySize(returns));
+		ArrayCopy(target, returns);
+	}
+
+	void GetOrdersHistory(SSOrderHistory &target[]) {
+		ArrayResize(target, ArraySize(ordersHistory));
+
+		for (int i = 0; i < ArraySize(ordersHistory); i++) {
+			target[i] = ordersHistory[i];
+		}
+	}
+
 	SSQualityResult GetQuality() {
 		SSQualityResult result;
 
@@ -549,6 +628,60 @@ public:
 		SSStatisticsSnapshot snapshotData = buildSnapshotData(quality);
 		ArrayResize(snapshotData.orders, 0);
 		return snapshotData;
+	}
+
+	void RestoreState(
+		datetime restoredStartTime,
+		double restoredNavPeak,
+		double restoredNavYesterday,
+		double restoredDrawdownMaxInDollars,
+		double restoredDrawdownMaxInPercentage,
+		int restoredWinningOrders,
+		double restoredWinningOrdersPerformance,
+		int restoredLosingOrders,
+		double restoredLosingOrdersPerformance,
+		double restoredMaxLoss,
+		double restoredMaxExposureInLots,
+		double restoredMaxExposureInPercentage,
+		bool restoredStopOutDetected,
+		double &restoredNav[],
+		double &restoredPerformance[],
+		double &restoredReturns[],
+		SSOrderHistory &restoredOrdersHistory[]
+	) {
+		startTime = restoredStartTime;
+		navPeak = restoredNavPeak;
+		navYesterday = restoredNavYesterday;
+		drawdownMaxInDollars = restoredDrawdownMaxInDollars;
+		drawdownMaxInPercentage = restoredDrawdownMaxInPercentage;
+		winningOrders = restoredWinningOrders;
+		winningOrdersPerformance = restoredWinningOrdersPerformance;
+		losingOrders = restoredLosingOrders;
+		losingOrdersPerformance = restoredLosingOrdersPerformance;
+		maxLoss = restoredMaxLoss;
+		maxExposureInLots = restoredMaxExposureInLots;
+		maxExposureInPercentage = restoredMaxExposureInPercentage;
+		stopOutDetected = restoredStopOutDetected;
+
+		ArrayResize(nav, ArraySize(restoredNav));
+		ArrayCopy(nav, restoredNav);
+
+		ArrayResize(performance, ArraySize(restoredPerformance));
+		ArrayCopy(performance, restoredPerformance);
+
+		ArrayResize(returns, ArraySize(restoredReturns));
+		ArrayCopy(returns, restoredReturns);
+
+		ArrayResize(ordersHistory, ArraySize(restoredOrdersHistory));
+		for (int i = 0; i < ArraySize(restoredOrdersHistory); i++) {
+			ordersHistory[i] = restoredOrdersHistory[i];
+		}
+
+		updateRatios();
+
+		if (ArraySize(nav) > 0) {
+			dailyPerformance = nav[ArraySize(nav) - 1] - navYesterday;
+		}
 	}
 };
 
