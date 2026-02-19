@@ -6,8 +6,9 @@
 double CalculateSharpeRatio(double &perf[]) {
 	int n = ArraySize(perf);
 
-	if (n < 3)
+	if (n < 3) {
 		return 0.0;
+	}
 
 	double mean = 0.0, var = 0.0;
 	int m = 0;
@@ -18,8 +19,9 @@ double CalculateSharpeRatio(double &perf[]) {
 		m++;
 	}
 
-	if (m < 2)
+	if (m < 2) {
 		return 0.0;
+	}
 
 	mean /= (double)m;
 
@@ -32,8 +34,9 @@ double CalculateSharpeRatio(double &perf[]) {
 	var /= (double)(m - 1);
 	double sd = (var > 0.0 ? MathSqrt(var) : 0.0);
 
-	if (sd <= 1e-12)
+	if (sd <= 1e-12) {
 		return 0.0;
+	}
 
 	double sharpeRatio = mean / sd;
 	double annualizationFactor = MathSqrt((double)TRADING_HOURS_PER_YEAR);

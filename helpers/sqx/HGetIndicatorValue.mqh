@@ -5,8 +5,9 @@ double GetIndicatorValue(int handle, int buffer, int shift) {
 	double value[];
 	ArraySetAsSeries(value, true);
 
-	if (CopyBuffer(handle, buffer, shift, 1, value) > 0)
+	if (CopyBuffer(handle, buffer, shift, 1, value) > 0) {
 		return value[0];
+	}
 
 	return 0.0;
 }

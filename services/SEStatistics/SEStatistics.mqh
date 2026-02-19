@@ -98,8 +98,9 @@ private:
 			losingOrdersPerformance += profit;
 			double currentLoss = MathAbs(profit);
 
-			if (currentLoss > maxLoss)
+			if (currentLoss > maxLoss) {
 				maxLoss = currentLoss;
+			}
 		}
 	}
 
@@ -126,8 +127,9 @@ private:
 	}
 
 	void processPendingOrders() {
-		if (ArraySize(lastClosedOrders) == 0)
+		if (ArraySize(lastClosedOrders) == 0) {
 			return;
+		}
 
 		int lastIndex = ArraySize(performance) - 1;
 		double prevPerformance = (lastIndex >= 0) ? performance[lastIndex] : 0;
@@ -183,10 +185,11 @@ private:
 		snapshotData.maxExposureInLots = maxExposureInLots;
 		snapshotData.maxExposureInPercentage = maxExposureInPercentage;
 
-		if (ArraySize(nav) > 1 && nav[ArraySize(nav) - 2] != 0.0)
+		if (ArraySize(nav) > 1 && nav[ArraySize(nav) - 2] != 0.0) {
 			snapshotData.dailyPerformance = dailyPerformance / nav[ArraySize(nav) - 2];
-		else
+		} else {
 			snapshotData.dailyPerformance = 0.0;
+		}
 
 		return snapshotData;
 	}
@@ -203,8 +206,9 @@ private:
 		double floatingPnL = 0.0;
 
 		for (int i = 0; i < ArraySize(strategyOrders); i++) {
-			if (strategyOrders[i].GetStatus() == ORDER_STATUS_OPEN)
+			if (strategyOrders[i].GetStatus() == ORDER_STATUS_OPEN) {
 				floatingPnL += strategyOrders[i].GetFloatingPnL();
+			}
 		}
 
 		return floatingPnL;
@@ -242,33 +246,38 @@ private:
 		for (int i = 0; i < ArraySize(strategyOrders); i++) {
 			if (strategyOrders[i].GetStatus() == ORDER_STATUS_OPEN ||
 			    strategyOrders[i].GetStatus() == ORDER_STATUS_PENDING) {
-				if (strategyOrders[i].GetSide() == ORDER_TYPE_BUY)
+				if (strategyOrders[i].GetSide() == ORDER_TYPE_BUY) {
 					currentExposureLots += strategyOrders[i].GetVolume();
-				else if (strategyOrders[i].GetSide() == ORDER_TYPE_SELL)
+				} else if (strategyOrders[i].GetSide() == ORDER_TYPE_SELL) {
 					currentExposureLots -= strategyOrders[i].GetVolume();
+				}
 			}
 		}
 
-		if (MathAbs(currentExposureLots) > MathAbs(maxExposureInLots))
+		if (MathAbs(currentExposureLots) > MathAbs(maxExposureInLots)) {
 			maxExposureInLots = currentExposureLots;
+		}
 
 		double accountEquity = AccountInfoDouble(ACCOUNT_EQUITY);
 		double symbolPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
 		double currentExposurePercentage = 0.0;
 
-		if (accountEquity > 0)
+		if (accountEquity > 0) {
 			currentExposurePercentage = (currentExposureLots * symbolPrice) / accountEquity;
+		}
 
-		if (MathAbs(currentExposurePercentage) > MathAbs(maxExposureInPercentage))
+		if (MathAbs(currentExposurePercentage) > MathAbs(maxExposureInPercentage)) {
 			maxExposureInPercentage = currentExposurePercentage;
+		}
 	}
 
 	bool evaluateOptimizationFormula(
 		int formula, double qualityValue,
 		SSQualityResult &result, string failReason
 	) {
-		if (qualityThresholds.optimizationFormula != formula)
+		if (qualityThresholds.optimizationFormula != formula) {
 			return false;
+		}
 
 		if (qualityValue == 0) {
 			result.quality = 0;
@@ -313,8 +322,9 @@ public:
 	}
 
 	double GetDailyPerformancePercent() {
-		if (ArraySize(nav) > 1 && nav[ArraySize(nav) - 2] != 0.0)
+		if (ArraySize(nav) > 1 && nav[ArraySize(nav) - 2] != 0.0) {
 			return dailyPerformance / nav[ArraySize(nav) - 2];
+		}
 
 		return 0.0;
 	}
@@ -343,8 +353,9 @@ public:
 	}
 
 	double GetNav() {
-		if (ArraySize(nav) == 0)
+		if (ArraySize(nav) == 0) {
 			return 0.0;
+		}
 
 		return nav[ArraySize(nav) - 1];
 	}
@@ -409,38 +420,45 @@ public:
 
 		if (evaluateOptimizationFormula(
 			OPTIMIZATION_BY_PERFORMANCE, qPerformance,
-			result, "Performance below minimum threshold"))
+			result, "Performance below minimum threshold")) {
 			return result;
+		}
 
 		if (evaluateOptimizationFormula(
 			OPTIMIZATION_BY_DRAWDOWN, qDrawdown,
-			result, "Drawdown below minimum threshold"))
+			result, "Drawdown below minimum threshold")) {
 			return result;
+		}
 
 		if (evaluateOptimizationFormula(
 			OPTIMIZATION_BY_RISK_REWARD, qRiskReward,
-			result, "Risk-reward ratio below minimum threshold"))
+			result, "Risk-reward ratio below minimum threshold")) {
 			return result;
+		}
 
 		if (evaluateOptimizationFormula(
 			OPTIMIZATION_BY_WIN_RATE, qWinRate,
-			result, "Win rate below minimum threshold"))
+			result, "Win rate below minimum threshold")) {
 			return result;
+		}
 
 		if (evaluateOptimizationFormula(
 			OPTIMIZATION_BY_R_SQUARED, qRSquared,
-			result, "R-squared below minimum threshold"))
+			result, "R-squared below minimum threshold")) {
 			return result;
+		}
 
 		if (evaluateOptimizationFormula(
 			OPTIMIZATION_BY_TRADES, qTrades,
-			result, "Number of trades below minimum threshold"))
+			result, "Number of trades below minimum threshold")) {
 			return result;
+		}
 
 		if (evaluateOptimizationFormula(
 			OPTIMIZATION_BY_RECOVERY_FACTOR, qRecoveryFactor,
-			result, "Recovery factor below minimum threshold"))
+			result, "Recovery factor below minimum threshold")) {
 			return result;
+		}
 
 		return result;
 	}
@@ -450,8 +468,9 @@ public:
 	}
 
 	double GetRecoveryFactor() {
-		if (drawdownMaxInDollars <= 0.0000001)
+		if (drawdownMaxInDollars <= 0.0000001) {
 			return 0;
+		}
 
 		int lastIndex = ArraySize(performance) - 1;
 		double totalProfit = (lastIndex >= 0) ? performance[lastIndex] : 0;
@@ -480,8 +499,9 @@ public:
 	}
 
 	void OnOpenOrder(EOrder &order, EOrder &strategyOrders[]) {
-		if (order.GetStatus() == ORDER_STATUS_CANCELLED)
+		if (order.GetStatus() == ORDER_STATUS_CANCELLED) {
 			return;
+		}
 
 		updateExposure(strategyOrders);
 		updateDrawdownWithFloatingPnL(strategyOrders);
@@ -503,8 +523,9 @@ public:
 
 		nav[ArraySize(nav) - 1] = realNav;
 
-		if (realNav > navPeak)
+		if (realNav > navPeak) {
 			navPeak = realNav;
+		}
 
 		updateDrawdownWithFloatingPnL(strategyOrders);
 

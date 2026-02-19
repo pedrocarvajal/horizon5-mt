@@ -28,8 +28,9 @@ public:
 		int size = ArraySize(collections);
 
 		for (int i = 0; i < size; i++) {
-			if (collections[i] != NULL && CheckPointer(collections[i]) == POINTER_DYNAMIC)
+			if (collections[i] != NULL && CheckPointer(collections[i]) == POINTER_DYNAMIC) {
 				delete collections[i];
+			}
 		}
 
 		ArrayResize(collections, 0);
@@ -43,8 +44,9 @@ public:
 
 		int index = FindCollectionIndex(collectionName);
 
-		if (index != -1)
+		if (index != -1) {
 			return collections[index];
+		}
 
 		SEDbCollection *collection = new SEDbCollection();
 		collection.Initialize(collectionName, basePath, useCommonFiles);
@@ -64,13 +66,15 @@ public:
 		}
 
 		int index = FindCollectionIndex(collectionName);
-		if (index == -1)
+		if (index == -1) {
 			return false;
+		}
 
 		collections[index].DeleteFile();
 
-		if (CheckPointer(collections[index]) == POINTER_DYNAMIC)
+		if (CheckPointer(collections[index]) == POINTER_DYNAMIC) {
 			delete collections[index];
+		}
 
 		int size = ArraySize(collections);
 		for (int i = index; i < size - 1; i++) {
@@ -90,8 +94,9 @@ private:
 		int size = ArraySize(collections);
 
 		for (int i = 0; i < size; i++) {
-			if (collections[i] != NULL && collections[i].GetName() == collectionName)
+			if (collections[i] != NULL && collections[i].GetName() == collectionName) {
 				return i;
+			}
 		}
 
 		return -1;

@@ -205,13 +205,15 @@ public:
 	}
 
 	void CheckToOpen(SMarketStatus &marketStatus) {
-		if (!pendingToOpen || isProcessed)
+		if (!pendingToOpen || isProcessed) {
 			return;
+		}
 
 		datetime currentTime = dtime.Timestamp();
 
-		if (retryAfter > 0 && currentTime < retryAfter)
+		if (retryAfter > 0 && currentTime < retryAfter) {
 			return;
+		}
 
 		if (retryCount >= MAX_RETRY_COUNT) {
 			logger.Warning(StringFormat("[%s] Max retry count reached, cancelling order", GetId()));
@@ -234,13 +236,15 @@ public:
 	}
 
 	void CheckToClose(SMarketStatus &marketStatus) {
-		if (!pendingToClose)
+		if (!pendingToClose) {
 			return;
+		}
 
 		datetime currentTime = dtime.Timestamp();
 
-		if (retryAfter > 0 && currentTime < retryAfter)
+		if (retryAfter > 0 && currentTime < retryAfter) {
 			return;
+		}
 
 		if (retryCount >= MAX_RETRY_COUNT) {
 			logger.Warning(StringFormat("[%s] Max retry count reached for close, giving up", GetId()));
@@ -377,8 +381,9 @@ public:
 				MAX_RETRY_COUNT
 			));
 
-			if (retryCount >= MAX_RETRY_COUNT)
+			if (retryCount >= MAX_RETRY_COUNT) {
 				Cancel();
+			}
 
 			return;
 		}
@@ -426,8 +431,9 @@ public:
 
 		buildSnapshot();
 
-		if (CheckPointer(persistence) != POINTER_INVALID)
+		if (CheckPointer(persistence) != POINTER_INVALID) {
 			persistence.SaveOrder(this);
+		}
 	}
 
 	void OnClose(
@@ -449,27 +455,35 @@ public:
 		orderCloseReason = reason;
 		buildSnapshot();
 
-		if (reason == DEAL_REASON_TP)
+		if (reason == DEAL_REASON_TP) {
 			logger.Info(StringFormat("[%s] Order closed by Take Profit", GetId()));
+		}
 
-		if (reason == DEAL_REASON_EXPERT)
+		if (reason == DEAL_REASON_EXPERT) {
 			logger.Info(StringFormat("[%s] Order closed by Expert", GetId()));
+		}
 
-		if (reason == DEAL_REASON_CLIENT)
+		if (reason == DEAL_REASON_CLIENT) {
 			logger.Info(StringFormat("[%s] Order closed by Client", GetId()));
+		}
 
-		if (reason == DEAL_REASON_MOBILE)
+		if (reason == DEAL_REASON_MOBILE) {
 			logger.Info(StringFormat("[%s] Order closed by Mobile", GetId()));
+		}
 
-		if (reason == DEAL_REASON_WEB)
+		if (reason == DEAL_REASON_WEB) {
 			logger.Info(StringFormat("[%s] Order closed by Web", GetId()));
+		}
 
-		if (reason == DEAL_REASON_SL)
+		if (reason == DEAL_REASON_SL) {
 			logger.Info(StringFormat("[%s] Order closed by Stop Loss", GetId()));
+		}
 
-		if (status == ORDER_STATUS_CLOSED)
-			if (CheckPointer(persistence) != POINTER_INVALID)
+		if (status == ORDER_STATUS_CLOSED) {
+			if (CheckPointer(persistence) != POINTER_INVALID) {
 				persistence.DeleteOrder(GetId());
+			}
+		}
 	}
 
 	void OnDeinit() {
@@ -485,13 +499,15 @@ public:
 		pendingToOpen = false;
 		isProcessed = true;
 
-		if (CheckPointer(persistence) != POINTER_INVALID)
+		if (CheckPointer(persistence) != POINTER_INVALID) {
 			persistence.DeleteOrder(GetId());
+		}
 	}
 
 	string GetId() {
-		if (id == "")
+		if (id == "") {
 			refreshId();
+		}
 
 		return id;
 	}
@@ -541,14 +557,17 @@ public:
 	}
 
 	double GetFloatingPnL() {
-		if (status != ORDER_STATUS_OPEN)
+		if (status != ORDER_STATUS_OPEN) {
 			return 0.0;
+		}
 
-		if (GetPositionId() == 0)
+		if (GetPositionId() == 0) {
 			return 0.0;
+		}
 
-		if (!PositionSelectByTicket(GetPositionId()))
+		if (!PositionSelectByTicket(GetPositionId())) {
 			return 0.0;
+		}
 
 		return PositionGetDouble(POSITION_PROFIT) +
 		       PositionGetDouble(POSITION_SWAP);
@@ -599,8 +618,9 @@ public:
 	}
 
 	bool SetTakeProfit(double newTakeProfitPrice = 0) {
-		if (newTakeProfitPrice <= 0)
+		if (newTakeProfitPrice <= 0) {
 			return false;
+		}
 
 		takeProfitPrice = newTakeProfitPrice;
 
@@ -622,8 +642,9 @@ public:
 	}
 
 	bool SetStopLoss(double newStopLossPrice = 0) {
-		if (newStopLossPrice <= 0)
+		if (newStopLossPrice <= 0) {
 			return false;
+		}
 
 		stopLossPrice = newStopLossPrice;
 

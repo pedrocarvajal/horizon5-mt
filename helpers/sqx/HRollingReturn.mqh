@@ -7,11 +7,13 @@ double RollingReturn(string symbolName, ENUM_TIMEFRAMES timeframe, int period, i
 
 	int copied = CopyClose(symbolName, timeframe, shift, period + 1, closes);
 
-	if (copied < period + 1)
+	if (copied < period + 1) {
 		return 0.0;
+	}
 
-	if (closes[period] == 0.0)
+	if (closes[period] == 0.0) {
 		return 0.0;
+	}
 
 	return (closes[0] - closes[period]) / closes[period];
 }

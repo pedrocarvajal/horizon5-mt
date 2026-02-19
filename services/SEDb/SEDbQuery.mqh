@@ -17,13 +17,15 @@ public:
 	}
 
 	bool Matches(JSON::Object *document) {
-		if (document == NULL)
+		if (document == NULL) {
 			return false;
+		}
 
 		int size = ArraySize(conditions);
 		for (int i = 0; i < size; i++) {
-			if (!evaluateCondition(document, conditions[i]))
+			if (!evaluateCondition(document, conditions[i])) {
 				return false;
+			}
 		}
 
 		return true;
@@ -97,43 +99,53 @@ private:
 	}
 
 	bool evaluateCondition(JSON::Object *document, const SSDbCondition &condition) {
-		if (!document.hasValue(condition.field))
+		if (!document.hasValue(condition.field)) {
 			return false;
+		}
 
 		if (condition.useStringValue) {
 			string documentValue = document.getString(condition.field);
 
-			if (condition.op == SE_DB_OP_EQUALS)
+			if (condition.op == SE_DB_OP_EQUALS) {
 				return documentValue == condition.stringValue;
+			}
 
-			if (condition.op == SE_DB_OP_NOT_EQUALS)
+			if (condition.op == SE_DB_OP_NOT_EQUALS) {
 				return documentValue != condition.stringValue;
+			}
 
-			if (condition.op == SE_DB_OP_CONTAINS)
+			if (condition.op == SE_DB_OP_CONTAINS) {
 				return StringFind(documentValue, condition.stringValue) != -1;
+			}
 
 			return false;
 		}
 
 		double documentValue = document.getNumber(condition.field);
 
-		if (condition.op == SE_DB_OP_EQUALS)
+		if (condition.op == SE_DB_OP_EQUALS) {
 			return documentValue == condition.numberValue;
+		}
 
-		if (condition.op == SE_DB_OP_NOT_EQUALS)
+		if (condition.op == SE_DB_OP_NOT_EQUALS) {
 			return documentValue != condition.numberValue;
+		}
 
-		if (condition.op == SE_DB_OP_GREATER_THAN)
+		if (condition.op == SE_DB_OP_GREATER_THAN) {
 			return documentValue > condition.numberValue;
+		}
 
-		if (condition.op == SE_DB_OP_LESS_THAN)
+		if (condition.op == SE_DB_OP_LESS_THAN) {
 			return documentValue < condition.numberValue;
+		}
 
-		if (condition.op == SE_DB_OP_GREATER_THAN_OR_EQUAL)
+		if (condition.op == SE_DB_OP_GREATER_THAN_OR_EQUAL) {
 			return documentValue >= condition.numberValue;
+		}
 
-		if (condition.op == SE_DB_OP_LESS_THAN_OR_EQUAL)
+		if (condition.op == SE_DB_OP_LESS_THAN_OR_EQUAL) {
 			return documentValue <= condition.numberValue;
+		}
 
 		return false;
 	}

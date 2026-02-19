@@ -4,9 +4,11 @@
 #include "../../services/SERequest/SERequest.mqh"
 #include "../../services/SELogger/SELogger.mqh"
 #include "../../entities/EOrder.mqh"
+#include "../../interfaces/IRemoteLogger.mqh"
 #include "enums/EHeartbeatEvent.mqh"
 
-class WARRoom {
+class WARRoom:
+public IRemoteLogger {
 private:
 	SERequest * request;
 	SELogger logger;
@@ -40,8 +42,9 @@ private:
 	}
 
 	double GetSafeMarginLevel() {
-		if (AccountInfoDouble(ACCOUNT_MARGIN) > 0)
+		if (AccountInfoDouble(ACCOUNT_MARGIN) > 0) {
 			return NormalizeDouble(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 2);
+		}
 
 		return 0.0;
 	}
@@ -69,21 +72,24 @@ public:
 	}
 
 	~WARRoom() {
-		if (request != NULL && CheckPointer(request) == POINTER_DYNAMIC)
+		if (request != NULL && CheckPointer(request) == POINTER_DYNAMIC) {
 			delete request;
+		}
 	}
 
 	bool Initialize(string baseUrl, string apiKey, bool enabled) {
-		if (!enabled)
+		if (!enabled) {
 			return true;
+		}
 
 		if (apiKey == "") {
 			logger.Error("API key is required. WARRoom integration disabled.");
 			return false;
 		}
 
-		if (request != NULL && CheckPointer(request) == POINTER_DYNAMIC)
+		if (request != NULL && CheckPointer(request) == POINTER_DYNAMIC) {
 			delete request;
+		}
 
 		accountId = AccountInfoInteger(ACCOUNT_LOGIN);
 		request = new SERequest(baseUrl);
@@ -100,7 +106,9 @@ public:
 	}
 
 	void InsertOrUpdateAccount() {
-		if (!isEnabled) return;
+		if (!isEnabled) {
+			return;
+		}
 
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
@@ -127,7 +135,9 @@ public:
 		double weight,
 		double balance
 	) {
-		if (!isEnabled) return;
+		if (!isEnabled) {
+			return;
+		}
 
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
@@ -142,7 +152,9 @@ public:
 	}
 
 	void InsertHeartbeat(ulong magicNumber, ENUM_HEARTBEAT_EVENT event) {
-		if (!isEnabled) return;
+		if (!isEnabled) {
+			return;
+		}
 
 		string eventString = HeartbeatEventToString(event);
 
@@ -155,7 +167,9 @@ public:
 	}
 
 	void InsertOrUpdateOrder(EOrder &order) {
-		if (!isEnabled) return;
+		if (!isEnabled) {
+			return;
+		}
 
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
@@ -179,40 +193,49 @@ public:
 
 		string closeReason = CloseReasonToString(order.orderCloseReason);
 
-		if (order.GetStatus() == ORDER_STATUS_CLOSED)
+		if (order.GetStatus() == ORDER_STATUS_CLOSED) {
 			body.setProperty("close_reason", closeReason);
+		}
 
 		SDateTime signalTime = order.GetSignalAt();
 		SDateTime openTime = order.GetOpenAt();
 
-		if (signalTime.timestamp > 0)
+		if (signalTime.timestamp > 0) {
 			body.setProperty("signal_at", signalTime.ToISO());
+		}
 
-		if (openTime.timestamp > 0)
+		if (openTime.timestamp > 0) {
 			body.setProperty("opened_at", openTime.ToISO());
+		}
 
-		if (order.closeAt.timestamp > 0)
+		if (order.closeAt.timestamp > 0) {
 			body.setProperty("closed_at", order.closeAt.ToISO());
+		}
 
 		request.Post("orders?on_conflict=ticket", body, 0, upsertHeader);
 	}
 
 	void InsertLog(string level, string message, ulong magicNumber = 0) {
-		if (!isEnabled) return;
+		if (!isEnabled) {
+			return;
+		}
 
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
 		body.setProperty("level", level);
 		body.setProperty("message", message);
 
-		if (magicNumber > 0)
+		if (magicNumber > 0) {
 			body.setProperty("magic_number", (long)magicNumber);
+		}
 
 		request.Post("logs", body);
 	}
 
 	void InsertAccountSnapshot() {
-		if (!isEnabled) return;
+		if (!isEnabled) {
+			return;
+		}
 
 		JSON::Object body;
 		body.setProperty("account_id", accountId);

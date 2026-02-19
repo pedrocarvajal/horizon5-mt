@@ -7,8 +7,9 @@ double Volatility(string symbolName, ENUM_TIMEFRAMES timeframe, int period, int 
 
 	int copied = CopyClose(symbolName, timeframe, shift, period + 1, closes);
 
-	if (copied < period + 1)
+	if (copied < period + 1) {
 		return 0.0;
+	}
 
 	double returns[];
 	ArrayResize(returns, period);
@@ -16,8 +17,9 @@ double Volatility(string symbolName, ENUM_TIMEFRAMES timeframe, int period, int 
 	double sum = 0.0;
 
 	for (int i = 0; i < period; i++) {
-		if (closes[i + 1] == 0.0)
+		if (closes[i + 1] == 0.0) {
 			return 0.0;
+		}
 
 		returns[i] = (closes[i] - closes[i + 1]) / closes[i + 1];
 		sum += returns[i];
@@ -31,8 +33,9 @@ double Volatility(string symbolName, ENUM_TIMEFRAMES timeframe, int period, int 
 		sumSquaredDiff += diff * diff;
 	}
 
-	if (period <= 1)
+	if (period <= 1) {
 		return 0.0;
+	}
 
 	return MathSqrt(sumSquaredDiff / (period - 1));
 }

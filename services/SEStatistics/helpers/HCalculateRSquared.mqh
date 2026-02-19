@@ -2,8 +2,9 @@
 #define __H_CALCULATE_R_SQUARED_MQH__
 
 double CalculateRSquared(double &points[]) {
-	if (ArraySize(points) < 3)
+	if (ArraySize(points) < 3) {
 		return 0;
+	}
 
 	double xValues[];
 	double yValues[];
@@ -30,14 +31,16 @@ double CalculateRSquared(double &points[]) {
 	double varianceX = n * sumX2 - sumX * sumX;
 	double varianceY = n * sumY2 - sumY * sumY;
 
-	if (varianceX <= 0.0000001 || varianceY <= 0.0000001)
+	if (varianceX <= 0.0000001 || varianceY <= 0.0000001) {
 		return 0;
+	}
 
 	double numerator = n * sumXy - sumX * sumY;
 	double denominator = MathSqrt(varianceX * varianceY);
 
-	if (denominator <= 0.0000001)
+	if (denominator <= 0.0000001) {
 		return 0;
+	}
 
 	double correlation = numerator / denominator;
 	return correlation * correlation;

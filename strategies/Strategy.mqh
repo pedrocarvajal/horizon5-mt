@@ -53,20 +53,25 @@ protected:
 
 public:
 	virtual ~SEStrategy() {
-		if (CheckPointer(statistics) == POINTER_DYNAMIC)
+		if (CheckPointer(statistics) == POINTER_DYNAMIC) {
 			delete statistics;
+		}
 
-		if (CheckPointer(lotSize) == POINTER_DYNAMIC)
+		if (CheckPointer(lotSize) == POINTER_DYNAMIC) {
 			delete lotSize;
+		}
 
-		if (CheckPointer(orderHistoryReporter) == POINTER_DYNAMIC)
+		if (CheckPointer(orderHistoryReporter) == POINTER_DYNAMIC) {
 			delete orderHistoryReporter;
+		}
 
-		if (CheckPointer(strategySnapshotsReporter) == POINTER_DYNAMIC)
+		if (CheckPointer(strategySnapshotsReporter) == POINTER_DYNAMIC) {
 			delete strategySnapshotsReporter;
+		}
 
-		if (CheckPointer(orderPersistence) == POINTER_DYNAMIC)
+		if (CheckPointer(orderPersistence) == POINTER_DYNAMIC) {
 			delete orderPersistence;
+		}
 	}
 
 	void AddOrder(EOrder &order) {
@@ -86,8 +91,9 @@ public:
 			) {
 				orders[i].OnDeinit();
 			} else {
-				if (writeIndex != i)
+				if (writeIndex != i) {
 					orders[writeIndex] = orders[i];
+				}
 				writeIndex++;
 			}
 		}
@@ -97,16 +103,18 @@ public:
 
 	void CloseAllActiveOrders() {
 		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetStatus() == ORDER_STATUS_OPEN)
+			if (orders[i].GetStatus() == ORDER_STATUS_OPEN) {
 				orders[i].Close();
-			else if (orders[i].GetStatus() == ORDER_STATUS_PENDING)
+			} else if (orders[i].GetStatus() == ORDER_STATUS_PENDING) {
 				orders[i].Cancel();
+			}
 		}
 	}
 
 	void ExportOrderHistory() {
-		if (CheckPointer(orderHistoryReporter) == POINTER_INVALID)
+		if (CheckPointer(orderHistoryReporter) == POINTER_INVALID) {
 			return;
+		}
 
 		orderHistoryReporter.Export();
 
@@ -117,8 +125,9 @@ public:
 	}
 
 	void ExportStrategySnapshots() {
-		if (CheckPointer(strategySnapshotsReporter) == POINTER_INVALID)
+		if (CheckPointer(strategySnapshotsReporter) == POINTER_INVALID) {
 			return;
+		}
 
 		strategySnapshotsReporter.AddSnapshot(statistics.GetDailySnapshot());
 		strategySnapshotsReporter.Export();
@@ -131,8 +140,9 @@ public:
 
 	int FindOrderIndexById(string id) {
 		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetId() == id)
+			if (orders[i].GetId() == id) {
 				return i;
+			}
 		}
 
 		return -1;
@@ -140,8 +150,9 @@ public:
 
 	int FindOrderIndexByOrderId(ulong orderId) {
 		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetOrderId() == orderId)
+			if (orders[i].GetOrderId() == orderId) {
 				return i;
+			}
 		}
 
 		return -1;
@@ -149,8 +160,9 @@ public:
 
 	int FindOrderIndexByPositionId(ulong positionId) {
 		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetPositionId() == positionId)
+			if (orders[i].GetPositionId() == positionId) {
 				return i;
+			}
 		}
 
 		return -1;
@@ -173,8 +185,9 @@ public:
 	}
 
 	double GetLotSizeByStopLoss(double stopLossDistance) {
-		if (balance <= 0)
+		if (balance <= 0) {
 			return -1;
+		}
 
 		double nav = EquityAtRiskCompounded
 			? statistics.GetNav()
@@ -210,8 +223,9 @@ public:
 	}
 
 	EOrder * GetOrderAtIndex(int index) {
-		if (index < 0 || index >= ArraySize(orders))
+		if (index < 0 || index >= ArraySize(orders)) {
 			return NULL;
+		}
 
 		return GetPointer(orders[index]);
 	}
@@ -243,8 +257,9 @@ public:
 	bool HasActiveOrders() {
 		for (int i = 0; i < ArraySize(orders); i++) {
 			if (orders[i].GetStatus() == ORDER_STATUS_OPEN ||
-			    orders[i].GetStatus() == ORDER_STATUS_PENDING)
+			    orders[i].GetStatus() == ORDER_STATUS_PENDING) {
 				return true;
+			}
 		}
 
 		return false;
@@ -257,8 +272,9 @@ public:
 
 		warroom.InsertOrUpdateOrder(order);
 
-		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID)
+		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
+		}
 	}
 
 	virtual void OnDeinit() {
@@ -276,8 +292,9 @@ public:
 
 	virtual int OnInit() {
 		int validationResult = validateConfiguration();
-		if (validationResult != INIT_SUCCEEDED)
+		if (validationResult != INIT_SUCCEEDED) {
 			return validationResult;
+		}
 
 		initializeServices();
 		initializeDefaultThresholds();
@@ -287,8 +304,9 @@ public:
 			orderPersistence.Initialize(prefix);
 			int restored = restoreOrders();
 
-			if (restored == -1)
+			if (restored == -1) {
 				return INIT_FAILED;
+			}
 		}
 
 		warroom.InsertHeartbeat(strategyMagicNumber, HEARTBEAT_INIT);
@@ -302,8 +320,9 @@ public:
 	}
 
 	virtual void OnStartDay() {
-		if (CheckPointer(strategySnapshotsReporter) != POINTER_INVALID)
+		if (CheckPointer(strategySnapshotsReporter) != POINTER_INVALID) {
 			strategySnapshotsReporter.AddSnapshot(statistics.GetDailySnapshot());
+		}
 
 		statistics.OnStartDay(orders);
 		todayOrderCount = 0;
@@ -352,11 +371,13 @@ public:
 		order.SetSignalAt(signalTime);
 		order.SetIsMarketOrder(isMarketOrder);
 
-		if (stopLoss > 0)
+		if (stopLoss > 0) {
 			order.SetStopLoss(stopLoss);
+		}
 
-		if (takeProfit > 0)
+		if (takeProfit > 0) {
 			order.SetTakeProfit(takeProfit);
+		}
 
 		order.GetId();
 		AddOrder(order);
@@ -370,14 +391,17 @@ public:
 		SMarketStatus marketStatus = GetMarketStatus(symbol);
 
 		for (int i = 0; i < ArraySize(orders); i++) {
-			if (!orders[i].IsInitialized())
+			if (!orders[i].IsInitialized()) {
 				orders[i].OnInit();
+			}
 
-			if (orders[i].GetStatus() == ORDER_STATUS_PENDING)
+			if (orders[i].GetStatus() == ORDER_STATUS_PENDING) {
 				orders[i].CheckToOpen(marketStatus);
+			}
 
-			if (orders[i].GetStatus() == ORDER_STATUS_OPEN)
+			if (orders[i].GetStatus() == ORDER_STATUS_OPEN) {
 				orders[i].CheckToClose(marketStatus);
+			}
 		}
 	}
 
@@ -430,8 +454,9 @@ private:
 
 			if (status == ORDER_STATUS_ANY) {
 				isStatusMatch = (orders[i].GetStatus() == defaultStatus1);
-				if (defaultStatus2 != ORDER_STATUS_ANY)
+				if (defaultStatus2 != ORDER_STATUS_ANY) {
 					isStatusMatch = isStatusMatch || (orders[i].GetStatus() == defaultStatus2);
+				}
 			} else {
 				isStatusMatch = (orders[i].GetStatus() == status);
 			}
@@ -486,8 +511,9 @@ private:
 	}
 
 	int restoreOrders() {
-		if (CheckPointer(orderPersistence) == POINTER_INVALID)
+		if (CheckPointer(orderPersistence) == POINTER_INVALID) {
 			return 0;
+		}
 
 		EOrder restoredOrders[];
 		int restoredCount = orderPersistence.LoadOrders(restoredOrders);
@@ -504,8 +530,9 @@ private:
 		int totalRestored = 0;
 
 		for (int i = 0; i < restoredCount; i++) {
-			if (FindOrderIndexById(restoredOrders[i].GetId()) != -1)
+			if (FindOrderIndexById(restoredOrders[i].GetId()) != -1) {
 				continue;
+			}
 
 			restoredOrders[i].OnInit();
 			AddOrder(restoredOrders[i]);
@@ -513,12 +540,14 @@ private:
 
 			EOrder *addedOrder = GetOrderAtIndex(GetOrdersCount() - 1);
 
-			if (addedOrder != NULL)
+			if (addedOrder != NULL) {
 				OnOpenOrder(addedOrder);
+			}
 		}
 
-		if (totalRestored > 0)
+		if (totalRestored > 0) {
 			logger.Info(StringFormat("Restored %d orders from JSON", totalRestored));
+		}
 
 		return totalRestored;
 	}

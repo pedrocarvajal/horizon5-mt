@@ -73,8 +73,9 @@ int OnInit() {
 	}
 
 	for (int i = 0; i < assetCount; i++) {
-		if (assets[i].IsEnabled())
+		if (assets[i].IsEnabled()) {
 			enabledAssetCount++;
+		}
 	}
 
 	if (enabledAssetCount == 0) {
@@ -95,8 +96,9 @@ int OnInit() {
 
 		int result = assets[i].OnInit();
 
-		if (result != INIT_SUCCEEDED)
+		if (result != INIT_SUCCEEDED) {
 			return INIT_FAILED;
+		}
 	}
 
 	ulong magicNumbers[];
@@ -142,8 +144,13 @@ int OnInit() {
 		return INIT_FAILED;
 	}
 
-	if (!warroom.Initialize(WARRoomUrl, WARRoomApiKey, EnableWARRoom && IsLiveTrading()))
+	if (!warroom.Initialize(WARRoomUrl, WARRoomApiKey, EnableWARRoom && IsLiveTrading())) {
 		return INIT_FAILED;
+	}
+
+	if (warroom.IsEnabled()) {
+		SELogger::SetRemoteLogger(GetPointer(warroom));
+	}
 
 	warroom.InsertOrUpdateAccount();
 	return INIT_SUCCEEDED;
@@ -164,8 +171,9 @@ void OnDeinit(const int reason) {
 
 	if (reason != REASON_CHARTCHANGE && reason != REASON_PARAMETERS) {
 		for (int i = 0; i < ArraySize(assets); i++) {
-			if (CheckPointer(assets[i]) != POINTER_INVALID)
+			if (CheckPointer(assets[i]) != POINTER_INVALID) {
 				delete assets[i];
+			}
 		}
 	}
 }
@@ -177,9 +185,17 @@ void OnTimer() {
 	bool isStartHour = (now.hour != lastCheckedHour);
 	bool isStartMinute = (now.minute != lastCheckedMinute);
 
-	if (isStartDay) lastCheckedDay = now.dayOfYear;
-	if (isStartHour) lastCheckedHour = now.hour;
-	if (isStartMinute) lastCheckedMinute = now.minute;
+	if (isStartDay) {
+		lastCheckedDay = now.dayOfYear;
+	}
+
+	if (isStartHour) {
+		lastCheckedHour = now.hour;
+	}
+
+	if (isStartMinute) {
+		lastCheckedMinute = now.minute;
+	}
 
 	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].OnTimer();
@@ -189,8 +205,13 @@ void OnTimer() {
 			assets[i].OnStartDay();
 		}
 
-		if (isStartHour) assets[i].OnStartHour();
-		if (isStartMinute) assets[i].OnStartMinute();
+		if (isStartHour) {
+			assets[i].OnStartHour();
+		}
+
+		if (isStartMinute) {
+			assets[i].OnStartMinute();
+		}
 
 		assets[i].OnTick();
 		assets[i].ProcessOrders();
@@ -281,12 +302,14 @@ void OnTradeTransaction(
 				}
 			}
 
-			if (isValidMagic)
+			if (isValidMagic) {
 				break;
+			}
 		}
 
-		if (!isValidMagic && magic != 0)
+		if (!isValidMagic && magic != 0) {
 			return;
+		}
 
 		if (transaction.type == TRADE_TRANSACTION_DEAL_ADD) {
 			int entry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(
@@ -442,10 +465,11 @@ double OnTester() {
 		assets[i].PerformStatistics();
 		double assetQuality = assets[i].CalculateQualityProduct();
 
-		if (assetQuality == 0)
+		if (assetQuality == 0) {
 			quality = 0;
-		else
+		} else {
 			quality = MathPow(quality * assetQuality, 1.0 / 2.0);
+		}
 	}
 
 	for (int i = 0; i < ArraySize(assets); i++) {

@@ -20,9 +20,11 @@ private:
 		int size = ArraySize(documents);
 
 		for (int i = 0; i < size; i++) {
-			if (documents[i] != NULL && documents[i].hasValue(key))
-				if (documents[i].getString(key) == value)
+			if (documents[i] != NULL && documents[i].hasValue(key)) {
+				if (documents[i].getString(key) == value) {
 					return i;
+				}
+			}
 		}
 
 		return -1;
@@ -37,8 +39,9 @@ private:
 			position = StringFind(filePath, "/", lastSlash + 1);
 		}
 
-		if (lastSlash <= 0)
+		if (lastSlash <= 0) {
 			return;
+		}
 
 		string directory = StringSubstr(filePath, 0, lastSlash);
 		int commonFlag = (fileFlags & FILE_COMMON) != 0 ? FILE_COMMON : 0;
@@ -48,11 +51,13 @@ private:
 	void removeAtIndex(int index) {
 		int size = ArraySize(documents);
 
-		if (index < 0 || index >= size)
+		if (index < 0 || index >= size) {
 			return;
+		}
 
-		if (documents[index] != NULL && CheckPointer(documents[index]) == POINTER_DYNAMIC)
+		if (documents[index] != NULL && CheckPointer(documents[index]) == POINTER_DYNAMIC) {
 			delete documents[index];
+		}
 
 		for (int i = index; i < size - 1; i++) {
 			documents[i] = documents[i + 1];
@@ -74,16 +79,18 @@ public:
 		filePath = StringFormat("%s/%s.json", basePath, collectionName);
 		fileFlags = FILE_TXT | FILE_ANSI;
 
-		if (useCommonFiles)
+		if (useCommonFiles) {
 			fileFlags |= FILE_COMMON;
+		}
 	}
 
 	~SEDbCollection() {
 		int size = ArraySize(documents);
 
 		for (int i = 0; i < size; i++) {
-			if (documents[i] != NULL && CheckPointer(documents[i]) == POINTER_DYNAMIC)
+			if (documents[i] != NULL && CheckPointer(documents[i]) == POINTER_DYNAMIC) {
 				delete documents[i];
+			}
 		}
 
 		ArrayResize(documents, 0);
@@ -99,8 +106,9 @@ public:
 
 	bool Load() {
 		int handle = FileOpen(filePath, FILE_READ | fileFlags);
-		if (handle == INVALID_HANDLE)
+		if (handle == INVALID_HANDLE) {
 			return false;
+		}
 
 		string jsonData = "";
 		while (!FileIsEnding(handle)) {
@@ -108,15 +116,17 @@ public:
 		}
 		FileClose(handle);
 
-		if (StringLen(jsonData) == 0)
+		if (StringLen(jsonData) == 0) {
 			return true;
+		}
 
 		JSON::Array *array = new JSON::Array(jsonData);
 		int length = array.getLength();
 
 		for (int i = 0; i < length; i++) {
-			if (!array.isObject(i))
+			if (!array.isObject(i)) {
 				continue;
+			}
 
 			string objectJson = array.getObject(i).toString();
 			JSON::Object *document = new JSON::Object(objectJson);
@@ -135,8 +145,9 @@ public:
 		int size = ArraySize(documents);
 
 		for (int i = 0; i < size; i++) {
-			if (documents[i] == NULL)
+			if (documents[i] == NULL) {
 				continue;
+			}
 
 			string objectJson = documents[i].toString();
 			JSON::Object *copy = new JSON::Object(objectJson);
@@ -160,21 +171,24 @@ public:
 	}
 
 	bool InsertOne(JSON::Object *document) {
-		if (document == NULL)
+		if (document == NULL) {
 			return false;
+		}
 
 		string documentJson = document.toString();
 		JSON::Object *stored = new JSON::Object(documentJson);
 
-		if (!stored.hasValue("_id"))
+		if (!stored.hasValue("_id")) {
 			stored.setProperty("_id", generateId());
+		}
 
 		int size = ArraySize(documents);
 		ArrayResize(documents, size + 1);
 		documents[size] = stored;
 
-		if (shouldAutoFlush)
+		if (shouldAutoFlush) {
 			Flush();
+		}
 
 		return true;
 	}
@@ -182,8 +196,9 @@ public:
 	JSON::Object *FindOne(string key, string value) {
 		int index = findIndexByKeyValue(key, value);
 
-		if (index == -1)
+		if (index == -1) {
 			return NULL;
+		}
 
 		return documents[index];
 	}
@@ -193,8 +208,9 @@ public:
 		int size = ArraySize(documents);
 
 		for (int i = 0; i < size; i++) {
-			if (documents[i] == NULL)
+			if (documents[i] == NULL) {
 				continue;
+			}
 
 			if (query.Matches(documents[i])) {
 				int resultSize = ArraySize(results);
@@ -207,12 +223,14 @@ public:
 	}
 
 	bool UpdateOne(string key, string value, JSON::Object *newData) {
-		if (newData == NULL)
+		if (newData == NULL) {
 			return false;
+		}
 
 		int index = findIndexByKeyValue(key, value);
-		if (index == -1)
+		if (index == -1) {
 			return false;
+		}
 
 		string keys[];
 		newData.getKeysToArray(keys);
@@ -235,21 +253,24 @@ public:
 			}
 		}
 
-		if (shouldAutoFlush)
+		if (shouldAutoFlush) {
 			Flush();
+		}
 
 		return true;
 	}
 
 	bool DeleteOne(string key, string value) {
 		int index = findIndexByKeyValue(key, value);
-		if (index == -1)
+		if (index == -1) {
 			return false;
+		}
 
 		removeAtIndex(index);
 
-		if (shouldAutoFlush)
+		if (shouldAutoFlush) {
 			Flush();
+		}
 
 		return true;
 	}
@@ -262,8 +283,9 @@ public:
 		int size = ArraySize(documents);
 
 		for (int i = 0; i < size; i++) {
-			if (documents[i] != NULL && CheckPointer(documents[i]) == POINTER_DYNAMIC)
+			if (documents[i] != NULL && CheckPointer(documents[i]) == POINTER_DYNAMIC) {
 				delete documents[i];
+			}
 		}
 
 		ArrayResize(documents, 0);

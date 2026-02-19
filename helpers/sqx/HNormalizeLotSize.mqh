@@ -7,11 +7,13 @@ double NormalizeLotSize(double lots, string symbolName) {
 	double maxLot = SymbolInfoDouble(symbolName, SYMBOL_VOLUME_MAX);
 	double normalized = MathFloor(lots / lotStep) * lotStep;
 
-	if (normalized < minLot)
+	if (normalized < minLot) {
 		return 0;
+	}
 
-	if (normalized > maxLot)
+	if (normalized > maxLot) {
 		normalized = maxLot;
+	}
 
 	return NormalizeDouble(normalized, 2);
 }
