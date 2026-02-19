@@ -115,10 +115,7 @@ public:
 
 		body.setProperty("margin_level", GetSafeMarginLevel());
 
-		string result = request.Post("accounts", body);
-
-		if (result == "")
-			logger.Warning("InsertOrUpdateAccount: empty response");
+		request.Post("accounts", body);
 	}
 
 	void InsertOrUpdateStrategy(
@@ -140,10 +137,7 @@ public:
 		body.setProperty("weight", NormalizeDouble(weight, 4));
 		body.setProperty("balance", NormalizeDouble(balance, 2));
 
-		string result = request.Post("strategies", body);
-
-		if (result == "")
-			logger.Warning("InsertOrUpdateStrategy: empty response for " + prefix);
+		request.Post("strategies", body);
 	}
 
 	void InsertHeartbeat(ulong magicNumber, ENUM_HEARTBEAT_EVENT event) {
@@ -156,10 +150,7 @@ public:
 		body.setProperty("magic_number", (long)magicNumber);
 		body.setProperty("event", eventString);
 
-		string result = request.Post("heartbeats", body);
-
-		if (result == "")
-			logger.Warning("InsertHeartbeat: empty response for " + eventString);
+		request.Post("heartbeats", body);
 	}
 
 	void InsertOrUpdateOrder(EOrder &order) {
@@ -202,10 +193,7 @@ public:
 		if (order.closeAt.timestamp > 0)
 			body.setProperty("closed_at", order.closeAt.ToISO());
 
-		string result = request.Post("orders", body);
-
-		if (result == "")
-			logger.Warning("InsertOrUpdateOrder: empty response for ticket " + IntegerToString(order.GetOrderId()));
+		request.Post("orders", body);
 	}
 
 	void InsertLog(string level, string message, ulong magicNumber = 0) {
@@ -219,10 +207,7 @@ public:
 		if (magicNumber > 0)
 			body.setProperty("magic_number", (long)magicNumber);
 
-		string result = request.Post("logs", body);
-
-		if (result == "")
-			logger.Warning("InsertLog: empty response");
+		request.Post("logs", body);
 	}
 
 	void InsertAccountSnapshot() {
@@ -236,10 +221,7 @@ public:
 
 		body.setProperty("margin_level", GetSafeMarginLevel());
 
-		string result = request.Post("account_snapshots", body);
-
-		if (result == "")
-			logger.Warning("InsertAccountSnapshot: empty response");
+		request.Post("account_snapshots", body);
 	}
 };
 
