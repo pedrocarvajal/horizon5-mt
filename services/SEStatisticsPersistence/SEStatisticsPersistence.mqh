@@ -148,51 +148,27 @@ private:
 			return false;
 		}
 
-		datetime restoredStartTime = (datetime)json.getNumber("start_time");
-		double restoredNavPeak = json.getNumber("nav_peak");
-		double restoredNavYesterday = json.getNumber("nav_yesterday");
-		double restoredDrawdownMaxInDollars = json.getNumber("drawdown_max_dollars");
-		double restoredDrawdownMaxInPercentage = json.getNumber("drawdown_max_percentage");
-		int restoredWinningOrders = (int)json.getNumber("winning_orders");
-		double restoredWinningOrdersPerformance = json.getNumber("winning_orders_performance");
-		int restoredLosingOrders = (int)json.getNumber("losing_orders");
-		double restoredLosingOrdersPerformance = json.getNumber("losing_orders_performance");
-		double restoredMaxLoss = json.getNumber("max_loss");
-		double restoredMaxExposureInLots = json.getNumber("max_exposure_lots");
-		double restoredMaxExposureInPercentage = json.getNumber("max_exposure_percentage");
-		bool restoredStopOutDetected = json.getBoolean("stop_out_detected");
+		SStatisticsState state;
+		state.startTime = (datetime)json.getNumber("start_time");
+		state.navPeak = json.getNumber("nav_peak");
+		state.navYesterday = json.getNumber("nav_yesterday");
+		state.drawdownMaxInDollars = json.getNumber("drawdown_max_dollars");
+		state.drawdownMaxInPercentage = json.getNumber("drawdown_max_percentage");
+		state.winningOrders = (int)json.getNumber("winning_orders");
+		state.winningOrdersPerformance = json.getNumber("winning_orders_performance");
+		state.losingOrders = (int)json.getNumber("losing_orders");
+		state.losingOrdersPerformance = json.getNumber("losing_orders_performance");
+		state.maxLoss = json.getNumber("max_loss");
+		state.maxExposureInLots = json.getNumber("max_exposure_lots");
+		state.maxExposureInPercentage = json.getNumber("max_exposure_percentage");
+		state.stopOutDetected = json.getBoolean("stop_out_detected");
 
-		double restoredNav[];
-		deserializeDoubleArray(json.getArray("nav"), restoredNav);
+		deserializeDoubleArray(json.getArray("nav"), state.nav);
+		deserializeDoubleArray(json.getArray("performance"), state.performance);
+		deserializeDoubleArray(json.getArray("returns"), state.returns);
+		deserializeOrdersHistory(json.getArray("orders_history"), state.ordersHistory);
 
-		double restoredPerformance[];
-		deserializeDoubleArray(json.getArray("performance"), restoredPerformance);
-
-		double restoredReturns[];
-		deserializeDoubleArray(json.getArray("returns"), restoredReturns);
-
-		SSOrderHistory restoredOrdersHistory[];
-		deserializeOrdersHistory(json.getArray("orders_history"), restoredOrdersHistory);
-
-		stats.RestoreState(
-			restoredStartTime,
-			restoredNavPeak,
-			restoredNavYesterday,
-			restoredDrawdownMaxInDollars,
-			restoredDrawdownMaxInPercentage,
-			restoredWinningOrders,
-			restoredWinningOrdersPerformance,
-			restoredLosingOrders,
-			restoredLosingOrdersPerformance,
-			restoredMaxLoss,
-			restoredMaxExposureInLots,
-			restoredMaxExposureInPercentage,
-			restoredStopOutDetected,
-			restoredNav,
-			restoredPerformance,
-			restoredReturns,
-			restoredOrdersHistory
-		);
+		stats.RestoreState(state);
 
 		return true;
 	}
