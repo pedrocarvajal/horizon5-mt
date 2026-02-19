@@ -4,12 +4,15 @@
 [TesterInputs]
 TickIntervalTime=60
 FillingMode=1
-DebugLevel=1
+DebugLevel=4
 EnableOrderHistoryReport=false
 EnableSnapshotHistoryReport=false
 EnableMarketHistoryReport=false
 EquityAtRiskCompounded=false
 EquityAtRisk=1
+EnableWARRoom=true
+WARRoomUrl=http://100.104.230.121:3001
+WARRoomApiKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYXBpX2F1dGhlbnRpY2F0ZWQiLCJpc3MiOiJ3YXJyb29tIiwiZXhwIjoyMDg2ODYwOTcwfQ.a-xfNkGP9D577oizy2ULaikTTkItpkeNfqTMI1ZRWcY
 EnableStrategyAllocator=true
 AllocatorMode=1
 AllocatorModelPath=Models
@@ -29,3 +32,4 @@ GoldCenturionEnabled=true
 GoldStellenboschEnabled=true
 GoldGermistonEnabled=true
 GoldRoodepoortEnabled=true
+GoldTestEnabled=false

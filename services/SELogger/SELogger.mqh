@@ -94,10 +94,6 @@ private:
 			return;
 		}
 
-		if (level != "ERROR" && level != "WARNING") {
-			return;
-		}
-
 		isSendingToRemote = true;
 		remoteLogger.InsertLog(level, prefix + ": " + message);
 		isSendingToRemote = false;
