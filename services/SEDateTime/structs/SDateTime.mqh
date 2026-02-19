@@ -19,6 +19,17 @@ struct SDateTime {
 		);
 	}
 
+	string ToUTCISO() {
+		datetime utcTime = timestamp - (TimeTradeServer() - TimeGMT());
+		MqlDateTime utc;
+		TimeToStruct(utcTime, utc);
+
+		return StringFormat(
+			"%04d-%02d-%02dT%02d:%02d:%02dZ",
+			utc.year, utc.mon, utc.day, utc.hour, utc.min, utc.sec
+		);
+	}
+
 	MqlDateTime ToMql() {
 		MqlDateTime mql;
 
