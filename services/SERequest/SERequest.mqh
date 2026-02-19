@@ -92,9 +92,10 @@ private:
 		}
 
 		if (status < 200 || status >= 300) {
-			logger.Error("HTTP error: " + IntegerToString(status) + " - " + method + " " + url);
+			string responseBody = CharArrayToString(result);
+			logger.Error("HTTP " + IntegerToString(status) + " " + method + " " + url + " | " + responseBody);
 			handleRequestFailure(url);
-			return CharArrayToString(result);
+			return responseBody;
 		}
 
 		handleRequestSuccess();
