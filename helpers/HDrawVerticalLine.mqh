@@ -11,8 +11,9 @@ bool DrawVerticalLine(
 ) {
 	ObjectDelete(chartId, name);
 
-	if (!ObjectCreate(chartId, name, OBJ_VLINE, 0, time, 0))
+	if (!ObjectCreate(chartId, name, OBJ_VLINE, 0, time, 0)) {
 		return false;
+	}
 
 	ObjectSetInteger(chartId, name, OBJPROP_COLOR, lineColor);
 	ObjectSetInteger(chartId, name, OBJPROP_STYLE, style);

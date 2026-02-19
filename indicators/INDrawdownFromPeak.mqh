@@ -7,14 +7,16 @@ double DrawdownFromPeak(string symbolName, ENUM_TIMEFRAMES timeframe, int period
 
 	int copied = CopyClose(symbolName, timeframe, shift, period + 1, closes);
 
-	if (copied < period + 1)
+	if (copied < period + 1) {
 		return 0.0;
+	}
 
 	int peakIndex = ArrayMaximum(closes, 0, copied);
 	double peak = closes[peakIndex];
 
-	if (peak <= 0.0)
+	if (peak <= 0.0) {
 		return 0.0;
+	}
 
 	return (peak - closes[0]) / peak;
 }

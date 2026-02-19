@@ -39,8 +39,9 @@ private:
 	}
 
 	void normalizeLatestFeatures() {
-		if (totalDays < normalizationWindow + 1)
+		if (totalDays < normalizationWindow + 1) {
 			return;
+		}
 
 		int windowStart = totalDays - normalizationWindow - 1;
 
@@ -126,10 +127,11 @@ public:
 		trainer = NULL;
 		inference = NULL;
 
-		if (mode == ALLOCATOR_MODE_TRAIN)
+		if (mode == ALLOCATOR_MODE_TRAIN) {
 			trainer = new SEAllocatorTrainer(GetPointer(logger));
-		else
+		} else {
 			inference = new SEAllocatorInference(GetPointer(logger));
+		}
 
 		logger.Info(StringFormat(
 			"Initialized | mode=%s rolling=%d norm=%d k=%d maxActive=%d threshold=%.4f forward=%d",
@@ -144,11 +146,13 @@ public:
 	}
 
 	~SEStrategyAllocator() {
-		if (CheckPointer(trainer) == POINTER_DYNAMIC)
+		if (CheckPointer(trainer) == POINTER_DYNAMIC) {
 			delete trainer;
+		}
 
-		if (CheckPointer(inference) == POINTER_DYNAMIC)
+		if (CheckPointer(inference) == POINTER_DYNAMIC) {
 			delete inference;
+		}
 	}
 
 	void SetDebugLevel(ENUM_DEBUG_LEVEL level) {
@@ -182,8 +186,9 @@ public:
 		featureHistory[featureIndex(totalDays, 1)] = rollingVolatility;
 		featureHistory[featureIndex(totalDays, 2)] = rollingDrawdown;
 
-		if (mode == ALLOCATOR_MODE_TRAIN)
+		if (mode == ALLOCATOR_MODE_TRAIN) {
 			trainer.CollectPerformance(totalDays, strategyCount, dailyPerformances);
+		}
 
 		totalDays++;
 
@@ -195,13 +200,15 @@ public:
 			rollingDrawdown
 		));
 
-		if (totalDays <= normalizationWindow)
+		if (totalDays <= normalizationWindow) {
 			return;
+		}
 
 		normalizeLatestFeatures();
 
-		if (mode == ALLOCATOR_MODE_TRAIN)
+		if (mode == ALLOCATOR_MODE_TRAIN) {
 			return;
+		}
 
 		logger.Debug(StringFormat(
 			"Inference day %d | raw=[%.4f,%.4f,%.4f] | normIdx=%d candidateRange=[0..%d]",

@@ -7,11 +7,13 @@ double DailyPerformance(string symbolName, ENUM_TIMEFRAMES timeframe, int shift)
 
 	int copied = CopyClose(symbolName, timeframe, shift, 2, closes);
 
-	if (copied < 2)
+	if (copied < 2) {
 		return 0.0;
+	}
 
-	if (closes[1] == 0.0)
+	if (closes[1] == 0.0) {
 		return 0.0;
+	}
 
 	return (closes[0] - closes[1]) / closes[1];
 }

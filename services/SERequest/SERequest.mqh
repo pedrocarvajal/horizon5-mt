@@ -14,24 +14,28 @@ private:
 	SELogger logger;
 
 	string buildUrl(const string path) {
-		if (StringFind(path, "http://") == 0 || StringFind(path, "https://") == 0)
+		if (StringFind(path, "http://") == 0 || StringFind(path, "https://") == 0) {
 			return path;
+		}
 
 		bool baseHasTrailing = StringSubstr(baseUrl, StringLen(baseUrl) - 1) == "/";
 		bool pathHasLeading = StringSubstr(path, 0, 1) == "/";
 
-		if (baseHasTrailing && pathHasLeading)
+		if (baseHasTrailing && pathHasLeading) {
 			return StringSubstr(baseUrl, 0, StringLen(baseUrl) - 1) + path;
+		}
 
-		if (!baseHasTrailing && !pathHasLeading)
+		if (!baseHasTrailing && !pathHasLeading) {
 			return baseUrl + "/" + path;
+		}
 
 		return baseUrl + path;
 	}
 
 	bool isCircuitBreakerOpen() {
-		if (circuitBreaker.state == CIRCUIT_BREAKER_CLOSED)
+		if (circuitBreaker.state == CIRCUIT_BREAKER_CLOSED) {
 			return false;
+		}
 
 		datetime currentTime = TimeCurrent();
 

@@ -8,8 +8,9 @@ extern SEDateTime dtime;
 string GetReportsPath(string symbol) {
 	static ulong reportSeed = 0;
 
-	if (reportSeed == 0)
+	if (reportSeed == 0) {
 		reportSeed = GetTickCount64();
+	}
 
 	return StringFormat(
 		"/Reports/%s/%lld_%llu",

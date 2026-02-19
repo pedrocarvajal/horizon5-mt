@@ -15,8 +15,9 @@ bool DrawRectangle(
 	ObjectDelete(chartId, name);
 
 	if (!ObjectCreate(chartId, name, OBJ_RECTANGLE, 0, time1, price1, time2,
-		price2))
+		price2)) {
 		return false;
+	}
 
 	ObjectSetInteger(chartId, name, OBJPROP_COLOR, rectColor);
 	ObjectSetInteger(chartId, name, OBJPROP_STYLE, style);

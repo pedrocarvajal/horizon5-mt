@@ -4,20 +4,24 @@
 double CalculateMetricQuality(double currentValue, double expectedValue,
 			      double thresholdValue, bool higherIsBetter) {
 	if (higherIsBetter) {
-		if (currentValue < thresholdValue)
+		if (currentValue < thresholdValue) {
 			return 0;
+		}
 
-		if (currentValue >= expectedValue)
+		if (currentValue >= expectedValue) {
 			return 1;
+		}
 
 		return (currentValue - thresholdValue) /
 		       (expectedValue - thresholdValue);
 	} else {
-		if (currentValue > thresholdValue)
+		if (currentValue > thresholdValue) {
 			return 0;
+		}
 
-		if (currentValue <= expectedValue)
+		if (currentValue <= expectedValue) {
 			return 1;
+		}
 
 		return (thresholdValue - currentValue) /
 		       (thresholdValue - expectedValue);
