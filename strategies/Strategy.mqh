@@ -81,26 +81,6 @@ public:
 		orders[count] = order;
 	}
 
-	void CleanupClosedOrders() {
-		int writeIndex = 0;
-
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (
-				orders[i].GetStatus() == ORDER_STATUS_CLOSED ||
-				orders[i].GetStatus() == ORDER_STATUS_CANCELLED
-			) {
-				orders[i].OnDeinit();
-			} else {
-				if (writeIndex != i) {
-					orders[writeIndex] = orders[i];
-				}
-				writeIndex++;
-			}
-		}
-
-		ArrayResize(orders, writeIndex);
-	}
-
 	void CloseAllActiveOrders() {
 		for (int i = 0; i < ArraySize(orders); i++) {
 			if (orders[i].GetStatus() == ORDER_STATUS_OPEN) {
@@ -336,6 +316,15 @@ public:
 		warroom.InsertHeartbeat(strategyMagicNumber, HEARTBEAT_ONLINE);
 	}
 
+	void SyncOrdersToWARRoom() {
+		for (int i = 0; i < ArraySize(orders); i++) {
+			if (orders[i].GetStatus() == ORDER_STATUS_OPEN ||
+			    orders[i].GetStatus() == ORDER_STATUS_PENDING) {
+				warroom.InsertOrUpdateOrder(orders[i]);
+			}
+		}
+	}
+
 	virtual int OnTesterInit() {
 		return INIT_SUCCEEDED;
 	}
@@ -538,10 +527,17 @@ private:
 			AddOrder(restoredOrders[i]);
 			totalRestored++;
 
-			EOrder *addedOrder = GetOrderAtIndex(GetOrdersCount() - 1);
+			ENUM_ORDER_STATUSES orderStatus = restoredOrders[i].GetStatus();
 
-			if (addedOrder != NULL) {
-				OnOpenOrder(addedOrder);
+			if (orderStatus == ORDER_STATUS_CLOSED || orderStatus == ORDER_STATUS_CANCELLED) {
+				closedOrderCount++;
+			} else {
+				openOrderCount++;
+				EOrder *addedOrder = GetOrderAtIndex(GetOrdersCount() - 1);
+
+				if (addedOrder != NULL) {
+					OnOpenOrder(addedOrder);
+				}
 			}
 		}
 

@@ -479,10 +479,8 @@ public:
 			logger.Info(StringFormat("[%s] Order closed by Stop Loss", GetId()));
 		}
 
-		if (status == ORDER_STATUS_CLOSED) {
-			if (CheckPointer(persistence) != POINTER_INVALID) {
-				persistence.DeleteOrder(GetId());
-			}
+		if (CheckPointer(persistence) != POINTER_INVALID) {
+			persistence.SaveOrder(this);
 		}
 	}
 
@@ -500,7 +498,7 @@ public:
 		isProcessed = true;
 
 		if (CheckPointer(persistence) != POINTER_INVALID) {
-			persistence.DeleteOrder(GetId());
+			persistence.SaveOrder(this);
 		}
 	}
 
