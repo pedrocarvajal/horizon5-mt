@@ -28,32 +28,38 @@ public:
 	}
 
 	bool DeleteOrder(string orderId) {
-		if (!IsLiveTrading())
+		if (!IsLiveTrading()) {
 			return true;
+		}
 
-		if (ordersCollection == NULL)
+		if (ordersCollection == NULL) {
 			return false;
+		}
 
 		bool isDeleted = ordersCollection.DeleteOne("_id", orderId);
 
-		if (isDeleted)
+		if (isDeleted) {
 			logger.Info(StringFormat("Order deleted from database: %s", orderId));
+		}
 
 		return isDeleted;
 	}
 
 	int LoadOrders(EOrder &restoredOrders[]) {
-		if (!IsLiveTrading())
+		if (!IsLiveTrading()) {
 			return 0;
+		}
 
-		if (ordersCollection == NULL)
+		if (ordersCollection == NULL) {
 			return 0;
+		}
 
 		int documentCount = ordersCollection.Count();
 		logger.Info(StringFormat("Starting order restoration, found %d documents", documentCount));
 
-		if (documentCount == 0)
+		if (documentCount == 0) {
 			return 0;
+		}
 
 		SEDbQuery findAll;
 		JSON::Object *documents[];
@@ -65,11 +71,13 @@ public:
 		for (int i = 0; i < foundCount; i++) {
 			int result = loadAndValidateOrder(documents[i], restoredOrders, idsToDelete, i);
 
-			if (result == -1)
+			if (result == -1) {
 				return -1;
+			}
 
-			if (result == 1)
+			if (result == 1) {
 				loadedCount++;
+			}
 		}
 
 		cleanupOrphanedOrders(idsToDelete);
@@ -81,25 +89,29 @@ public:
 	}
 
 	bool SaveOrder(EOrder &order) {
-		if (!IsLiveTrading())
+		if (!IsLiveTrading()) {
 			return true;
+		}
 
-		if (ordersCollection == NULL)
+		if (ordersCollection == NULL) {
 			return false;
+		}
 
 		JSON::Object *json = serializeOrder(order);
 		JSON::Object *existing = ordersCollection.FindOne("_id", order.GetId());
 		bool result;
 
-		if (existing != NULL)
+		if (existing != NULL) {
 			result = ordersCollection.UpdateOne("_id", order.GetId(), json);
-		else
+		} else {
 			result = ordersCollection.InsertOne(json);
+		}
 
 		delete json;
 
-		if (result)
+		if (result) {
 			logger.Info(StringFormat("Order saved to database: %s", order.GetId()));
+		}
 
 		return result;
 	}
@@ -221,14 +233,17 @@ private:
 	}
 
 	bool validateOrderExists(EOrder &order) {
-		if (!IsLiveTrading())
+		if (!IsLiveTrading()) {
 			return true;
+		}
 
-		if (order.GetStatus() == ORDER_STATUS_PENDING && order.GetOrderId() > 0)
+		if (order.GetStatus() == ORDER_STATUS_PENDING && order.GetOrderId() > 0) {
 			return OrderSelect(order.GetOrderId());
+		}
 
-		if (order.GetStatus() == ORDER_STATUS_OPEN && order.GetPositionId() > 0)
+		if (order.GetStatus() == ORDER_STATUS_OPEN && order.GetPositionId() > 0) {
 			return PositionSelectByTicket(order.GetPositionId());
+		}
 
 		return false;
 	}

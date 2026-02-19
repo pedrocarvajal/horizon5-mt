@@ -2,19 +2,25 @@
 #define __SE_LOGGER_MQH__
 
 #include "../../enums/EDebugLevel.mqh"
+#include "../../helpers/HIsLiveTrading.mqh"
+#include "../../interfaces/IRemoteLogger.mqh"
 
 class SELogger {
 private:
 	string prefix;
 	string entries[];
 	ENUM_DEBUG_LEVEL debugLevel;
+	static IRemoteLogger *remoteLogger;
+	static bool isSendingToRemote;
 
 	bool shouldPrint(string level) {
-		if (debugLevel == DEBUG_LEVEL_NONE)
+		if (debugLevel == DEBUG_LEVEL_NONE) {
 			return false;
+		}
 
-		if (debugLevel == DEBUG_LEVEL_ERRORS || debugLevel == DEBUG_LEVEL_ERRORS_PERSIST)
+		if (debugLevel == DEBUG_LEVEL_ERRORS || debugLevel == DEBUG_LEVEL_ERRORS_PERSIST) {
 			return level == "ERROR" || level == "WARNING";
+		}
 
 		return true;
 	}
@@ -23,14 +29,31 @@ private:
 		return debugLevel == DEBUG_LEVEL_ERRORS_PERSIST || debugLevel == DEBUG_LEVEL_ALL_PERSIST;
 	}
 
-	void log(string level, string message) {
-		if (!shouldPrint(level))
+	void sendToRemote(string level, string message) {
+		if (isSendingToRemote || remoteLogger == NULL || !IsLiveTrading()) {
 			return;
+		}
+
+		if (level != "ERROR" && level != "WARNING") {
+			return;
+		}
+
+		isSendingToRemote = true;
+		remoteLogger.InsertLog(level, prefix + ": " + message);
+		isSendingToRemote = false;
+	}
+
+	void log(string level, string message) {
+		if (!shouldPrint(level)) {
+			return;
+		}
 
 		Print("[", level, "] ", prefix, ": ", message);
+		sendToRemote(level, message);
 
-		if (!shouldPersist())
+		if (!shouldPersist()) {
 			return;
+		}
 
 		int size = ArraySize(entries);
 		ArrayResize(entries, size + 1);
@@ -46,6 +69,10 @@ public:
 	SELogger(string newPrefix) {
 		prefix = newPrefix;
 		debugLevel = DEBUG_LEVEL_ALL;
+	}
+
+	static void SetRemoteLogger(IRemoteLogger *logger) {
+		remoteLogger = logger;
 	}
 
 	void SetPrefix(string newPrefix) {
@@ -96,5 +123,8 @@ public:
 		log("INFO", title + " -------------------------------- ");
 	}
 };
+
+IRemoteLogger *SELogger::remoteLogger = NULL;
+bool SELogger::isSendingToRemote = false;
 
 #endif
