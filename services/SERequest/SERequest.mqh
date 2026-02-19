@@ -73,6 +73,7 @@ private:
 	string execute(const string method, const string url, const char &data[], int effectiveTimeout, const string headers = "") {
 		if (isCircuitBreakerOpen()) {
 			logger.Warning("Request blocked by circuit breaker: " + method + " " + url);
+			Sleep(1000);
 			return "";
 		}
 
