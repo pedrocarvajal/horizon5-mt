@@ -138,7 +138,7 @@ public:
 		body.setProperty("weight", NormalizeDouble(weight, 4));
 		body.setProperty("balance", NormalizeDouble(balance, 2));
 
-		request.Post("strategies", body, 0, upsertHeader);
+		request.Post("strategies?on_conflict=magic_number", body, 0, upsertHeader);
 	}
 
 	void InsertHeartbeat(ulong magicNumber, ENUM_HEARTBEAT_EVENT event) {
@@ -194,7 +194,7 @@ public:
 		if (order.closeAt.timestamp > 0)
 			body.setProperty("closed_at", order.closeAt.ToISO());
 
-		request.Post("orders", body, 0, upsertHeader);
+		request.Post("orders?on_conflict=ticket", body, 0, upsertHeader);
 	}
 
 	void InsertLog(string level, string message, ulong magicNumber = 0) {
