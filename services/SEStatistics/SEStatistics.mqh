@@ -5,6 +5,7 @@
 #include "../../structs/SSStatisticsSnapshot.mqh"
 #include "../../structs/SQualityThresholds.mqh"
 #include "../../structs/SSQualityResult.mqh"
+#include "../../structs/SStatisticsState.mqh"
 #include "../SEDateTime/SEDateTime.mqh"
 #include "../../entities/EOrder.mqh"
 
@@ -16,7 +17,6 @@
 
 extern SEDateTime dtime;
 
-#define STOP_OUT_THRESHOLD      0.20
 #define SEVERE_LOSS_THRESHOLD   0.50
 
 class SEStatistics {
@@ -72,11 +72,6 @@ private:
 	bool detectStopOut() {
 		finalEquity = AccountInfoDouble(ACCOUNT_EQUITY);
 		double equityPercentage = finalEquity / initialBalance;
-
-		if (equityPercentage < STOP_OUT_THRESHOLD) {
-			stopOutDetected = true;
-			return true;
-		}
 
 		if (equityPercentage < SEVERE_LOSS_THRESHOLD) {
 			stopOutDetected = true;
@@ -497,46 +492,32 @@ public:
 			qualityThresholds.minRecoveryFactor,
 			true);
 
-		if (evaluateOptimizationFormula(
-			OPTIMIZATION_BY_PERFORMANCE, qPerformance,
-			result, "Performance below minimum threshold")) {
-			return result;
-		}
+		int formulas[7] = {
+			OPTIMIZATION_BY_PERFORMANCE, OPTIMIZATION_BY_DRAWDOWN,
+			OPTIMIZATION_BY_RISK_REWARD, OPTIMIZATION_BY_WIN_RATE,
+			OPTIMIZATION_BY_R_SQUARED,   OPTIMIZATION_BY_TRADES,
+			OPTIMIZATION_BY_RECOVERY_FACTOR
+		};
 
-		if (evaluateOptimizationFormula(
-			OPTIMIZATION_BY_DRAWDOWN, qDrawdown,
-			result, "Drawdown below minimum threshold")) {
-			return result;
-		}
+		double qualityValues[7] = {
+			qPerformance, qDrawdown, qRiskReward, qWinRate,
+			qRSquared,    qTrades,	 qRecoveryFactor
+		};
 
-		if (evaluateOptimizationFormula(
-			OPTIMIZATION_BY_RISK_REWARD, qRiskReward,
-			result, "Risk-reward ratio below minimum threshold")) {
-			return result;
-		}
+		string failReasons[7] = {
+			"Performance below minimum threshold",
+			"Drawdown below minimum threshold",
+			"Risk-reward ratio below minimum threshold",
+			"Win rate below minimum threshold",
+			"R-squared below minimum threshold",
+			"Number of trades below minimum threshold",
+			"Recovery factor below minimum threshold"
+		};
 
-		if (evaluateOptimizationFormula(
-			OPTIMIZATION_BY_WIN_RATE, qWinRate,
-			result, "Win rate below minimum threshold")) {
-			return result;
-		}
-
-		if (evaluateOptimizationFormula(
-			OPTIMIZATION_BY_R_SQUARED, qRSquared,
-			result, "R-squared below minimum threshold")) {
-			return result;
-		}
-
-		if (evaluateOptimizationFormula(
-			OPTIMIZATION_BY_TRADES, qTrades,
-			result, "Number of trades below minimum threshold")) {
-			return result;
-		}
-
-		if (evaluateOptimizationFormula(
-			OPTIMIZATION_BY_RECOVERY_FACTOR, qRecoveryFactor,
-			result, "Recovery factor below minimum threshold")) {
-			return result;
+		for (int i = 0; i < 7; i++) {
+			if (evaluateOptimizationFormula(formulas[i], qualityValues[i], result, failReasons[i])) {
+				return result;
+			}
 		}
 
 		return result;
@@ -630,51 +611,33 @@ public:
 		return snapshotData;
 	}
 
-	void RestoreState(
-		datetime restoredStartTime,
-		double restoredNavPeak,
-		double restoredNavYesterday,
-		double restoredDrawdownMaxInDollars,
-		double restoredDrawdownMaxInPercentage,
-		int restoredWinningOrders,
-		double restoredWinningOrdersPerformance,
-		int restoredLosingOrders,
-		double restoredLosingOrdersPerformance,
-		double restoredMaxLoss,
-		double restoredMaxExposureInLots,
-		double restoredMaxExposureInPercentage,
-		bool restoredStopOutDetected,
-		double &restoredNav[],
-		double &restoredPerformance[],
-		double &restoredReturns[],
-		SSOrderHistory &restoredOrdersHistory[]
-	) {
-		startTime = restoredStartTime;
-		navPeak = restoredNavPeak;
-		navYesterday = restoredNavYesterday;
-		drawdownMaxInDollars = restoredDrawdownMaxInDollars;
-		drawdownMaxInPercentage = restoredDrawdownMaxInPercentage;
-		winningOrders = restoredWinningOrders;
-		winningOrdersPerformance = restoredWinningOrdersPerformance;
-		losingOrders = restoredLosingOrders;
-		losingOrdersPerformance = restoredLosingOrdersPerformance;
-		maxLoss = restoredMaxLoss;
-		maxExposureInLots = restoredMaxExposureInLots;
-		maxExposureInPercentage = restoredMaxExposureInPercentage;
-		stopOutDetected = restoredStopOutDetected;
+	void RestoreState(SStatisticsState &state) {
+		startTime = state.startTime;
+		navPeak = state.navPeak;
+		navYesterday = state.navYesterday;
+		drawdownMaxInDollars = state.drawdownMaxInDollars;
+		drawdownMaxInPercentage = state.drawdownMaxInPercentage;
+		winningOrders = state.winningOrders;
+		winningOrdersPerformance = state.winningOrdersPerformance;
+		losingOrders = state.losingOrders;
+		losingOrdersPerformance = state.losingOrdersPerformance;
+		maxLoss = state.maxLoss;
+		maxExposureInLots = state.maxExposureInLots;
+		maxExposureInPercentage = state.maxExposureInPercentage;
+		stopOutDetected = state.stopOutDetected;
 
-		ArrayResize(nav, ArraySize(restoredNav));
-		ArrayCopy(nav, restoredNav);
+		ArrayResize(nav, ArraySize(state.nav));
+		ArrayCopy(nav, state.nav);
 
-		ArrayResize(performance, ArraySize(restoredPerformance));
-		ArrayCopy(performance, restoredPerformance);
+		ArrayResize(performance, ArraySize(state.performance));
+		ArrayCopy(performance, state.performance);
 
-		ArrayResize(returns, ArraySize(restoredReturns));
-		ArrayCopy(returns, restoredReturns);
+		ArrayResize(returns, ArraySize(state.returns));
+		ArrayCopy(returns, state.returns);
 
-		ArrayResize(ordersHistory, ArraySize(restoredOrdersHistory));
-		for (int i = 0; i < ArraySize(restoredOrdersHistory); i++) {
-			ordersHistory[i] = restoredOrdersHistory[i];
+		ArrayResize(ordersHistory, ArraySize(state.ordersHistory));
+		for (int i = 0; i < ArraySize(state.ordersHistory); i++) {
+			ordersHistory[i] = state.ordersHistory[i];
 		}
 
 		updateRatios();
