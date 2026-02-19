@@ -12,6 +12,7 @@ private:
 	SELogger logger;
 	long accountId;
 	bool isEnabled;
+	string upsertHeader;
 
 	string OrderStatusToString(ENUM_ORDER_STATUSES status) {
 		switch (status) {
@@ -63,6 +64,7 @@ public:
 		request = NULL;
 		accountId = 0;
 		isEnabled = false;
+		upsertHeader = "Prefer: resolution=merge-duplicates\r\n";
 		logger.SetPrefix("WARRoom");
 	}
 
@@ -86,7 +88,6 @@ public:
 		accountId = AccountInfoInteger(ACCOUNT_LOGIN);
 		request = new SERequest(baseUrl);
 		request.AddHeader("Content-Type", "application/json");
-		request.AddHeader("Prefer", "resolution=merge-duplicates");
 		request.AddHeader("Authorization", "Bearer " + apiKey);
 
 		isEnabled = true;
@@ -115,7 +116,7 @@ public:
 
 		body.setProperty("margin_level", GetSafeMarginLevel());
 
-		request.Post("accounts", body);
+		request.Post("accounts", body, 0, upsertHeader);
 	}
 
 	void InsertOrUpdateStrategy(
@@ -137,7 +138,7 @@ public:
 		body.setProperty("weight", NormalizeDouble(weight, 4));
 		body.setProperty("balance", NormalizeDouble(balance, 2));
 
-		request.Post("strategies", body);
+		request.Post("strategies", body, 0, upsertHeader);
 	}
 
 	void InsertHeartbeat(ulong magicNumber, ENUM_HEARTBEAT_EVENT event) {
@@ -193,7 +194,7 @@ public:
 		if (order.closeAt.timestamp > 0)
 			body.setProperty("closed_at", order.closeAt.ToISO());
 
-		request.Post("orders", body);
+		request.Post("orders", body, 0, upsertHeader);
 	}
 
 	void InsertLog(string level, string message, ulong magicNumber = 0) {

@@ -119,15 +119,16 @@ public:
 		return execute("GET", url, data, effectiveTimeout);
 	}
 
-	string Post(const string path, JSON::Object &body, int customTimeout = 0) {
+	string Post(const string path, JSON::Object &body, int customTimeout = 0, const string extraHeaders = "") {
 		string url = buildUrl(path);
 		string bodyString = body.toString();
 		int effectiveTimeout = (customTimeout > 0) ? customTimeout : timeout;
+		string headers = (extraHeaders != "") ? defaultHeaders + extraHeaders : "";
 
 		char data[];
-		StringToCharArray(bodyString, data, 0, WHOLE_ARRAY, CP_UTF8);
+		StringToCharArray(bodyString, data, 0, StringLen(bodyString), CP_UTF8);
 
-		return execute("POST", url, data, effectiveTimeout);
+		return execute("POST", url, data, effectiveTimeout, headers);
 	}
 
 	void AddHeader(const string key, const string value) {
