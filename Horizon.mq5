@@ -202,7 +202,6 @@ void OnTimer() {
 
 		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].SyncToWARRoom();
-			assets[i].SendWARRoomHeartbeats(HEARTBEAT_ONLINE);
 		}
 	}
 }
