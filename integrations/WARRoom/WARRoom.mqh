@@ -207,6 +207,9 @@ public:
 		body.setProperty("stop_loss", ClampNumeric(order.GetStopLossPrice(), 10, 5));
 		if (order.GetStatus() == ORDER_STATUS_CLOSED) {
 			body.setProperty("profit", ClampNumeric(order.GetProfitInDollars(), 13, 2));
+			body.setProperty("gross_profit", ClampNumeric(order.GetGrossProfit(), 13, 2));
+			body.setProperty("commission", ClampNumeric(order.GetCommission(), 13, 2));
+			body.setProperty("swap", ClampNumeric(order.GetSwap(), 13, 2));
 			body.setProperty("close_reason", CloseReasonToString(order.GetCloseReason()));
 		} else {
 			body.setProperty("profit", ClampNumeric(order.GetFloatingPnL(), 13, 2));
@@ -266,8 +269,37 @@ public:
 		body.setProperty("equity", equity);
 		body.setProperty("profit", ClampNumeric(AccountInfoDouble(ACCOUNT_PROFIT), 13, 2));
 		body.setProperty("margin_level", ClampNumeric(GetSafeMarginLevel(), 8, 2));
+		body.setProperty("open_positions", PositionsTotal());
 
 		request.Post("account_snapshots", body);
+	}
+
+	void InsertStrategySnapshot(
+		ulong magicNumber,
+		double nav,
+		double drawdownPct,
+		double dailyPnl,
+		double floatingPnl,
+		int openOrderCount,
+		double exposureLots
+	) {
+		if (!isEnabled) {
+			return;
+		}
+
+		logger.Info(StringFormat("Snapshot magic=%llu nav=%.2f dd=%.4f", magicNumber, nav, drawdownPct));
+
+		JSON::Object body;
+		body.setProperty("account_id", accountId);
+		body.setProperty("magic_number", (long)magicNumber);
+		body.setProperty("nav", ClampNumeric(nav, 13, 2));
+		body.setProperty("drawdown_pct", ClampNumeric(drawdownPct, 4, 4));
+		body.setProperty("daily_pnl", ClampNumeric(dailyPnl, 13, 2));
+		body.setProperty("floating_pnl", ClampNumeric(floatingPnl, 13, 2));
+		body.setProperty("open_order_count", openOrderCount);
+		body.setProperty("exposure_lots", ClampNumeric(exposureLots, 6, 4));
+
+		request.Post("strategy_snapshots", body);
 	}
 };
 

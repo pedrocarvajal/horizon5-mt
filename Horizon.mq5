@@ -379,6 +379,9 @@ void OnTradeTransaction(
 							);
 
 						if (order != NULL) {
+							order.SetGrossProfit(dealProfit);
+							order.SetCommission(dealCommission);
+							order.SetSwap(dealSwap);
 							order.OnClose(dealTime, dealPrice, netProfit, dealReason);
 							assets[i].GetStrategyAtIndex(strategyIndex).OnCloseOrder(order, dealReason);
 

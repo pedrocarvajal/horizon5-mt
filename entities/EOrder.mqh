@@ -43,6 +43,9 @@ public:
 	double profitInDollars;
 	double takeProfitPrice;
 	double stopLossPrice;
+	double commission;
+	double swap;
+	double grossProfit;
 
 	SDateTime signalAt;
 	SDateTime openAt;
@@ -107,6 +110,9 @@ public:
 
 		takeProfitPrice = other.takeProfitPrice;
 		stopLossPrice = other.stopLossPrice;
+		commission = other.commission;
+		swap = other.swap;
+		grossProfit = other.grossProfit;
 
 		snapshot = other.snapshot;
 
@@ -566,6 +572,18 @@ public:
 		return profitInDollars;
 	}
 
+	double GetCommission() {
+		return commission;
+	}
+
+	double GetSwap() {
+		return swap;
+	}
+
+	double GetGrossProfit() {
+		return grossProfit;
+	}
+
 	double GetFloatingPnL() {
 		if (status != ORDER_STATUS_OPEN) {
 			return 0.0;
@@ -749,6 +767,18 @@ public:
 
 	void SetRetryAfter(datetime value) {
 		retryAfter = value;
+	}
+
+	void SetCommission(double value) {
+		commission = value;
+	}
+
+	void SetSwap(double value) {
+		swap = value;
+	}
+
+	void SetGrossProfit(double value) {
+		grossProfit = value;
 	}
 
 	void SetPersistence(SEOrderPersistence *value) {

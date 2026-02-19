@@ -18,6 +18,7 @@ class SEAsset;
 #include "../services/SEReportOfOrderHistory/SEReportOfOrderHistory.mqh"
 #include "../services/SEReportOfStrategySnapshots/SEReportOfStrategySnapshots.mqh"
 #include "../services/SEOrderPersistence/SEOrderPersistence.mqh"
+#include "../services/SEStatisticsPersistence/SEStatisticsPersistence.mqh"
 #include "../integrations/WARRoom/WARRoom.mqh"
 
 #define ORDER_TYPE_ANY    -1
@@ -42,6 +43,7 @@ private:
 	SEReportOfOrderHistory *orderHistoryReporter;
 	SEReportOfStrategySnapshots *strategySnapshotsReporter;
 	SEOrderPersistence *orderPersistence;
+	SEStatisticsPersistence *statisticsPersistence;
 
 protected:
 	SELogger logger;
@@ -71,6 +73,10 @@ public:
 
 		if (CheckPointer(orderPersistence) == POINTER_DYNAMIC) {
 			delete orderPersistence;
+		}
+
+		if (CheckPointer(statisticsPersistence) == POINTER_DYNAMIC) {
+			delete statisticsPersistence;
 		}
 	}
 
@@ -250,6 +256,10 @@ public:
 		openOrderCount--;
 		closedOrderCount++;
 
+		if (CheckPointer(statisticsPersistence) == POINTER_DYNAMIC) {
+			statisticsPersistence.Save(statistics);
+		}
+
 		warroom.InsertOrUpdateOrder(order);
 
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
@@ -258,7 +268,9 @@ public:
 	}
 
 	virtual void OnDeinit() {
-		warroom.InsertHeartbeat(strategyMagicNumber, HEARTBEAT_DEINIT);
+		if (CheckPointer(statisticsPersistence) == POINTER_DYNAMIC) {
+			statisticsPersistence.Save(statistics);
+		}
 
 		for (int i = 0; i < ArraySize(orders); i++) {
 			orders[i].OnDeinit();
@@ -287,9 +299,11 @@ public:
 			if (restored == -1) {
 				return INIT_FAILED;
 			}
-		}
 
-		warroom.InsertHeartbeat(strategyMagicNumber, HEARTBEAT_INIT);
+			statisticsPersistence = new SEStatisticsPersistence();
+			statisticsPersistence.Initialize(prefix);
+			statisticsPersistence.Load(statistics);
+		}
 
 		return INIT_SUCCEEDED;
 	}
@@ -305,6 +319,11 @@ public:
 		}
 
 		statistics.OnStartDay(orders);
+
+		if (CheckPointer(statisticsPersistence) == POINTER_DYNAMIC) {
+			statisticsPersistence.Save(statistics);
+		}
+
 		todayOrderCount = 0;
 	}
 
@@ -313,7 +332,6 @@ public:
 	}
 
 	virtual void OnStartMinute() {
-		warroom.InsertHeartbeat(strategyMagicNumber, HEARTBEAT_ONLINE);
 	}
 
 	void SyncOrdersToWARRoom() {
@@ -323,6 +341,34 @@ public:
 				warroom.InsertOrUpdateOrder(orders[i]);
 			}
 		}
+	}
+
+	void SyncSnapshotToWARRoom() {
+		double floatingPnl = 0;
+		double exposureLots = 0;
+
+		for (int i = 0; i < ArraySize(orders); i++) {
+			if (orders[i].GetStatus() == ORDER_STATUS_OPEN) {
+				floatingPnl += orders[i].GetFloatingPnL();
+				exposureLots += orders[i].GetVolume();
+			}
+		}
+
+		double nav = statistics.GetNav();
+		double peak = statistics.GetNavPeak();
+		double drawdownPct = (peak > 0 && nav < peak)
+			? (peak - nav) / peak
+			: 0.0;
+
+		warroom.InsertStrategySnapshot(
+			strategyMagicNumber,
+			nav,
+			drawdownPct,
+			statistics.GetDailyPerformance(),
+			floatingPnl,
+			openOrderCount,
+			exposureLots
+		);
 	}
 
 	virtual int OnTesterInit() {
