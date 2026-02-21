@@ -4,6 +4,7 @@
 
 #include "enums/EAllocatorMode.mqh"
 #include "enums/EDebugLevel.mqh"
+#include "structs/STradingStatus.mqh"
 
 input group "General Settings";
 input int TickIntervalTime = 60; // [1] > Tick interval (1 = 1 second by tick)
@@ -27,12 +28,6 @@ input group "Strategy Allocator";
 input bool EnableStrategyAllocator = false; // [1] > Enable KNN strategy allocator
 input ENUM_ALLOCATOR_MODE AllocatorMode = ALLOCATOR_MODE_TRAIN; // [1] > Allocator mode (Train = collect data, Inference = use model)
 input string AllocatorModelPath = "Models"; // [1] > Model directory path (in common files)
-input int AllocatorRollingWindow = 150; // [1] > Rolling window for feature computation (days)
-input int AllocatorNormalizationWindow = 365; // [1] > Normalization window for z-score (days)
-input int AllocatorKNeighbors = 20; // [1] > Number of KNN neighbors
-input int AllocatorMaxActiveStrategies = 1; // [1] > Maximum active strategies
-input double AllocatorScoreThreshold = 0.0; // [1] > Minimum score to activate strategy
-input int AllocatorForwardWindow = 4; // [1] > Forward performance window (days)
 
 #include <Trade/Trade.mqh>
 
@@ -46,6 +41,7 @@ input int AllocatorForwardWindow = 4; // [1] > Forward performance window (days)
 SEDateTime dtime;
 SELogger hlogger;
 WARRoom warroom;
+STradingStatus tradingStatus;
 
 int lastCheckedDay = -1;
 int lastCheckedHour = -1;
@@ -187,6 +183,12 @@ void OnTimer() {
 
 	if (isStartDay) {
 		lastCheckedDay = now.dayOfYear;
+
+		if (tradingStatus.isPaused) {
+			hlogger.Info("Trading pause cleared - new day started");
+			tradingStatus.isPaused = false;
+			tradingStatus.reason = TRADING_PAUSE_REASON_NONE;
+		}
 	}
 
 	if (isStartHour) {
@@ -489,6 +491,7 @@ double OnTester() {
 	if (EnableStrategyAllocator && AllocatorMode == ALLOCATOR_MODE_TRAIN) {
 		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].ExportAllocatorModel();
+			assets[i].ExportAllocatorAnalysis();
 		}
 	}
 

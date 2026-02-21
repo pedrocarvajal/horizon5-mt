@@ -1,5 +1,5 @@
-; Live preset — all assets enabled
-; Allocator parameters are defined per-asset via inputs
+; Training preset — BTCUSD
+; Used for allocator analysis and model training
 
 [TesterInputs]
 TickIntervalTime=60
@@ -10,28 +10,28 @@ EnableSnapshotHistoryReport=false
 EnableMarketHistoryReport=false
 EquityAtRiskCompounded=false
 EquityAtRisk=1
-EnableWARRoom=true
+EnableWARRoom=false
 WARRoomUrl=http://100.80.90.111:3001
 WARRoomApiKey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYXBpX2F1dGhlbnRpY2F0ZWQiLCJpc3MiOiJ3YXJyb29tIiwiZXhwIjoyMDg2ODUzNTQ4fQ.wov_ZhDGwQHRrTX9pmpkxzaShrTmQaFrCpsZw3Ky020
 EnableStrategyAllocator=true
-AllocatorMode=1
+AllocatorMode=0
 AllocatorModelPath=Models
 GoldAllocatorRollingWindow=150
 GoldAllocatorNormalizationWindow=365
-GoldAllocatorKNeighbors=15
-GoldAllocatorMaxActiveStrategies=3
-GoldAllocatorScoreThreshold=0.0
+GoldAllocatorKNeighbors=20
+GoldAllocatorMaxActiveStrategies=1
+GoldAllocatorScoreThreshold=0.0008
 GoldAllocatorForwardWindow=5
-GoldSowetoEnabled=true
-GoldBoksburgEnabled=true
-GoldKimberleyEnabled=true
-GoldPolokwaneEnabled=true
-GoldBenoniEnabled=true
-GoldSpringsEnabled=true
-GoldCenturionEnabled=true
-GoldStellenboschEnabled=true
-GoldGermistonEnabled=true
-GoldRoodepoortEnabled=true
+GoldSowetoEnabled=false
+GoldBoksburgEnabled=false
+GoldKimberleyEnabled=false
+GoldPolokwaneEnabled=false
+GoldBenoniEnabled=false
+GoldSpringsEnabled=false
+GoldCenturionEnabled=false
+GoldStellenboschEnabled=false
+GoldGermistonEnabled=false
+GoldRoodepoortEnabled=false
 BitcoinAllocatorRollingWindow=150
 BitcoinAllocatorNormalizationWindow=365
 BitcoinAllocatorKNeighbors=20
