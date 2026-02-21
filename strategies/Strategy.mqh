@@ -20,12 +20,14 @@ class SEAsset;
 #include "../services/SEOrderPersistence/SEOrderPersistence.mqh"
 #include "../services/SEStatisticsPersistence/SEStatisticsPersistence.mqh"
 #include "../integrations/WARRoom/WARRoom.mqh"
+#include "../structs/STradingStatus.mqh"
 
 #define ORDER_TYPE_ANY    -1
 #define ORDER_STATUS_ANY  -1
 
 extern SEDateTime dtime;
 extern WARRoom warroom;
+extern STradingStatus tradingStatus;
 
 class SEStrategy:
 public IStrategy {
@@ -265,6 +267,16 @@ public:
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
 		}
+
+		if (!tradingStatus.isPaused && (
+			    reason == DEAL_REASON_CLIENT ||
+			    reason == DEAL_REASON_MOBILE ||
+			    reason == DEAL_REASON_WEB
+		    )) {
+			tradingStatus.isPaused = true;
+			tradingStatus.reason = TRADING_PAUSE_REASON_MANUAL_CLOSE;
+			logger.Warning("Manual close detected - trading paused until next day");
+		}
 	}
 
 	virtual void OnDeinit() {
@@ -386,6 +398,11 @@ public:
 		double takeProfit = 0,
 		double stopLoss = 0
 	) {
+		if (tradingStatus.isPaused) {
+			logger.Debug("New order blocked - trading paused (manual close)");
+			return NULL;
+		}
+
 		if (balance <= 0) {
 			logger.Debug("New order blocked - no balance allocated");
 			return NULL;
@@ -431,7 +448,11 @@ public:
 			}
 
 			if (orders[i].GetStatus() == ORDER_STATUS_PENDING) {
-				orders[i].CheckToOpen(marketStatus);
+				if (tradingStatus.isPaused) {
+					orders[i].Cancel();
+				} else {
+					orders[i].CheckToOpen(marketStatus);
+				}
 			}
 
 			if (orders[i].GetStatus() == ORDER_STATUS_OPEN) {
