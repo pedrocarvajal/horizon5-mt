@@ -31,6 +31,15 @@ private:
 	bool isEnabled;
 	double balance;
 
+	int allocatorRollingWindow;
+	int allocatorNormalizationWindow;
+	int allocatorKNeighbors;
+	int allocatorMaxActiveStrategies;
+	double allocatorScoreThreshold;
+	int allocatorForwardWindow;
+	int allocatorRebalanceFrequency;
+	int daysSinceLastRebalance;
+
 	SEStrategy *strategies[];
 
 	void collectDailyPerformances(double &dailyPerformances[]) {
@@ -89,9 +98,9 @@ private:
 		double dailyPerformances[];
 		collectDailyPerformances(dailyPerformances);
 
-		double rollingReturn = RollingReturn(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
-		double rollingVolatility = Volatility(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
-		double rollingDrawdown = MaxDrawdownInWindow(symbol, PERIOD_D1, AllocatorRollingWindow, 0);
+		double rollingReturn = RollingReturn(symbol, PERIOD_D1, allocatorRollingWindow, 0);
+		double rollingVolatility = Volatility(symbol, PERIOD_D1, allocatorRollingWindow, 0);
+		double rollingDrawdown = MaxDrawdownInWindow(symbol, PERIOD_D1, allocatorRollingWindow, 0);
 
 		allocator.OnStartDay(
 			rollingReturn,
@@ -103,6 +112,14 @@ private:
 		if (!allocator.IsWarmupComplete()) {
 			return;
 		}
+
+		daysSinceLastRebalance++;
+
+		if (daysSinceLastRebalance < allocatorRebalanceFrequency) {
+			return;
+		}
+
+		daysSinceLastRebalance = 0;
 
 		string activeStrategyPrefixes[];
 		allocator.GetActiveStrategies(activeStrategyPrefixes);
@@ -129,6 +146,14 @@ public:
 		logger.SetPrefix("SEAsset");
 		weight = 0;
 		isEnabled = false;
+		allocatorRollingWindow = 150;
+		allocatorNormalizationWindow = 365;
+		allocatorKNeighbors = 20;
+		allocatorMaxActiveStrategies = 1;
+		allocatorScoreThreshold = 0.0;
+		allocatorForwardWindow = 5;
+		allocatorRebalanceFrequency = 1;
+		daysSinceLastRebalance = 0;
 	}
 
 	~SEAsset() {
@@ -185,7 +210,7 @@ public:
 		}
 
 		if (EnableStrategyAllocator) {
-			allocator = new SEStrategyAllocator(AllocatorMode, AllocatorRollingWindow, AllocatorNormalizationWindow, AllocatorKNeighbors, AllocatorMaxActiveStrategies, AllocatorScoreThreshold, AllocatorForwardWindow);
+			allocator = new SEStrategyAllocator(AllocatorMode, allocatorRollingWindow, allocatorNormalizationWindow, allocatorKNeighbors, allocatorMaxActiveStrategies, allocatorScoreThreshold, allocatorForwardWindow);
 
 			for (int i = 0; i < strategyCount; i++) {
 				allocator.RegisterStrategy(strategies[i].GetPrefix());
@@ -380,6 +405,14 @@ public:
 		allocator.SaveModel(AllocatorModelPath, collectionName);
 	}
 
+	void ExportAllocatorAnalysis() {
+		if (CheckPointer(allocator) == POINTER_INVALID) {
+			return;
+		}
+
+		allocator.RunAnalysis(symbol);
+	}
+
 	void ExportMarketSnapshots() {
 		if (CheckPointer(marketSnapshotsReporter) == POINTER_INVALID) {
 			return;
@@ -523,6 +556,34 @@ public:
 
 	void SetWeight(double newWeight) {
 		weight = newWeight;
+	}
+
+	void SetAllocatorRollingWindow(int window) {
+		allocatorRollingWindow = window;
+	}
+
+	void SetAllocatorNormalizationWindow(int window) {
+		allocatorNormalizationWindow = window;
+	}
+
+	void SetAllocatorKNeighbors(int neighbors) {
+		allocatorKNeighbors = neighbors;
+	}
+
+	void SetAllocatorMaxActiveStrategies(int maxActive) {
+		allocatorMaxActiveStrategies = maxActive;
+	}
+
+	void SetAllocatorScoreThreshold(double threshold) {
+		allocatorScoreThreshold = threshold;
+	}
+
+	void SetAllocatorForwardWindow(int window) {
+		allocatorForwardWindow = window;
+	}
+
+	void SetAllocatorRebalanceFrequency(int days) {
+		allocatorRebalanceFrequency = days;
 	}
 
 	void SyncToWARRoom() {
