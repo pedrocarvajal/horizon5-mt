@@ -118,8 +118,6 @@ public:
 		double balance = ClampNumeric(AccountInfoDouble(ACCOUNT_BALANCE), 13, 2);
 		double equity = ClampNumeric(AccountInfoDouble(ACCOUNT_EQUITY), 13, 2);
 
-		logger.Info(StringFormat("Sync account balance=%.2f equity=%.2f", balance, equity));
-
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
 		body.setProperty("broker", AccountInfoString(ACCOUNT_COMPANY));
@@ -148,8 +146,6 @@ public:
 			return;
 		}
 
-		logger.Info(StringFormat("Sync strategy %s balance=%.2f", strategyName, balance));
-
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
 		body.setProperty("name", strategyName);
@@ -169,8 +165,6 @@ public:
 
 		string eventString = HeartbeatEventToString(event);
 
-		logger.Info(StringFormat("Heartbeat event=%s magic=%llu", eventString, magicNumber));
-
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
 		body.setProperty("magic_number", (long)magicNumber);
@@ -183,9 +177,6 @@ public:
 		if (!isEnabled) {
 			return;
 		}
-
-		logger.Info(StringFormat("Sync order %s status=%s ticket=%llu",
-			order.GetId(), OrderStatusToString(order.GetStatus()), order.GetOrderId()));
 
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
@@ -239,8 +230,6 @@ public:
 			return;
 		}
 
-		logger.Info(StringFormat("Send log level=%s", level));
-
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
 		body.setProperty("level", level);
@@ -260,8 +249,6 @@ public:
 
 		double balance = ClampNumeric(AccountInfoDouble(ACCOUNT_BALANCE), 13, 2);
 		double equity = ClampNumeric(AccountInfoDouble(ACCOUNT_EQUITY), 13, 2);
-
-		logger.Info(StringFormat("Snapshot balance=%.2f equity=%.2f", balance, equity));
 
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
@@ -286,8 +273,6 @@ public:
 		if (!isEnabled) {
 			return;
 		}
-
-		logger.Info(StringFormat("Snapshot magic=%llu nav=%.2f dd=%.4f", magicNumber, nav, drawdownPct));
 
 		JSON::Object body;
 		body.setProperty("account_id", accountId);

@@ -262,6 +262,28 @@ public:
 		);
 	}
 
+	void RunAnalysis(string symbol) {
+		if (mode != ALLOCATOR_MODE_TRAIN) {
+			logger.Error("RunAnalysis called in non-train mode");
+			return;
+		}
+
+		maxCandidateCount = totalDays - normalizationWindow - forwardWindow;
+
+		trainer.RunAnalysis(
+			symbol,
+			kNeighbors,
+			normalizationWindow,
+			maxCandidateCount,
+			strategyCount,
+			strategyPrefixes,
+			totalDays,
+			normalizedCount,
+			featureHistory,
+			normalizedFeatures
+		);
+	}
+
 	bool LoadModel(string databasePath, string collectionName) {
 		if (mode != ALLOCATOR_MODE_INFERENCE) {
 			logger.Error("LoadModel called in non-inference mode");
