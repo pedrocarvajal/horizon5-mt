@@ -73,12 +73,17 @@ public:
 
 private:
 	void log(string level, string message) {
+		if (debugLevel == DEBUG_LEVEL_NONE) {
+			return;
+		}
+
+		sendToRemote(level, message);
+
 		if (!shouldPrint(level)) {
 			return;
 		}
 
 		Print("[", level, "] ", prefix, ": ", message);
-		sendToRemote(level, message);
 
 		if (!shouldPersist()) {
 			return;
