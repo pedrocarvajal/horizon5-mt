@@ -56,6 +56,14 @@ int OnInit() {
 	hlogger.SetPrefix("Horizon");
 	hlogger.SetDebugLevel(DebugLevel);
 
+	if (!warroom.Initialize(WARRoomUrl, WARRoomApiKey, EnableWARRoom && IsLiveTrading())) {
+		return INIT_FAILED;
+	}
+
+	if (warroom.IsEnabled()) {
+		SELogger::SetRemoteLogger(GetPointer(warroom));
+	}
+
 	lastCheckedDay = dtime.Today().dayOfYear;
 	lastCheckedHour = dtime.Today().hour;
 
@@ -138,14 +146,6 @@ int OnInit() {
 		);
 
 		return INIT_FAILED;
-	}
-
-	if (!warroom.Initialize(WARRoomUrl, WARRoomApiKey, EnableWARRoom && IsLiveTrading())) {
-		return INIT_FAILED;
-	}
-
-	if (warroom.IsEnabled()) {
-		SELogger::SetRemoteLogger(GetPointer(warroom));
 	}
 
 	warroom.InsertOrUpdateAccount();
