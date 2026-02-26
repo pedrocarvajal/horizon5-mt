@@ -15,10 +15,10 @@ class SEAsset;
 #include "../entities/EOrder.mqh"
 #include "../services/SEStatistics/SEStatistics.mqh"
 #include "../services/SELotSize/SELotSize.mqh"
-#include "../services/SEReportOfOrderHistory/SEReportOfOrderHistory.mqh"
-#include "../services/SEReportOfStrategySnapshots/SEReportOfStrategySnapshots.mqh"
-#include "../services/SEOrderPersistence/SEOrderPersistence.mqh"
-#include "../services/SEStatisticsPersistence/SEStatisticsPersistence.mqh"
+#include "../services/SRReportOfOrderHistory/SRReportOfOrderHistory.mqh"
+#include "../services/SRReportOfStrategySnapshots/SRReportOfStrategySnapshots.mqh"
+#include "../services/SRPersistenceOfOrders/SRPersistenceOfOrders.mqh"
+#include "../services/SRPersistenceOfStatistics/SRPersistenceOfStatistics.mqh"
 #include "../integrations/WARRoom/WARRoom.mqh"
 #include "../structs/STradingStatus.mqh"
 
@@ -42,10 +42,10 @@ private:
 	SEAsset *asset;
 	SEStatistics *statistics;
 	SELotSize *lotSize;
-	SEReportOfOrderHistory *orderHistoryReporter;
-	SEReportOfStrategySnapshots *strategySnapshotsReporter;
-	SEOrderPersistence *orderPersistence;
-	SEStatisticsPersistence *statisticsPersistence;
+	SRReportOfOrderHistory *orderHistoryReporter;
+	SRReportOfStrategySnapshots *strategySnapshotsReporter;
+	SRPersistenceOfOrders *orderPersistence;
+	SRPersistenceOfStatistics *statisticsPersistence;
 
 protected:
 	SELogger logger;
@@ -162,14 +162,6 @@ public:
 
 	int GetClosedOrderCount() {
 		return closedOrderCount;
-	}
-
-	void SetDebugLevel(ENUM_DEBUG_LEVEL level) {
-		logger.SetDebugLevel(level);
-	}
-
-	void GetLogEntries(string &result[]) {
-		logger.GetEntries(result);
 	}
 
 	double GetLotSizeByStopLoss(double stopLossDistance) {
@@ -304,7 +296,7 @@ public:
 		initializeDefaultThresholds();
 
 		if (IsLiveTrading()) {
-			orderPersistence = new SEOrderPersistence();
+			orderPersistence = new SRPersistenceOfOrders();
 			orderPersistence.Initialize(prefix);
 			int restored = restoreOrders();
 
@@ -312,7 +304,7 @@ public:
 				return INIT_FAILED;
 			}
 
-			statisticsPersistence = new SEStatisticsPersistence();
+			statisticsPersistence = new SRPersistenceOfStatistics();
 			statisticsPersistence.Initialize(prefix);
 			statisticsPersistence.Load(statistics);
 		}
@@ -557,12 +549,12 @@ private:
 
 		if (EnableOrderHistoryReport) {
 			string reportName = StringFormat("%s_%s_Orders", symbol, prefix);
-			orderHistoryReporter = new SEReportOfOrderHistory(symbol, reportName);
+			orderHistoryReporter = new SRReportOfOrderHistory(symbol, reportName);
 		}
 
 		if (EnableSnapshotHistoryReport) {
 			string reportName = StringFormat("%s_%s_Snapshots", symbol, prefix);
-			strategySnapshotsReporter = new SEReportOfStrategySnapshots(symbol, name, prefix, reportName);
+			strategySnapshotsReporter = new SRReportOfStrategySnapshots(symbol, name, prefix, reportName);
 		}
 	}
 

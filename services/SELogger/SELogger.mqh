@@ -8,19 +8,14 @@
 class SELogger {
 private:
 	string prefix;
-	string entries[];
-	ENUM_DEBUG_LEVEL debugLevel;
+	static ENUM_DEBUG_LEVEL globalDebugLevel;
+	static string globalEntries[];
 	static IRemoteLogger *remoteLogger;
 	static bool isSendingToRemote;
 
 public:
 	SELogger(string newPrefix = "") {
 		prefix = newPrefix;
-		debugLevel = DEBUG_LEVEL_ALL;
-	}
-
-	void ClearEntries() {
-		ArrayResize(entries, 0);
 	}
 
 	void Debug(string message) {
@@ -31,22 +26,6 @@ public:
 		log("ERROR", message);
 	}
 
-	ENUM_DEBUG_LEVEL GetDebugLevel() {
-		return debugLevel;
-	}
-
-	void GetEntries(string &result[]) {
-		ArrayResize(result, ArraySize(entries));
-
-		for (int i = 0; i < ArraySize(entries); i++) {
-			result[i] = entries[i];
-		}
-	}
-
-	int GetEntryCount() {
-		return ArraySize(entries);
-	}
-
 	void Info(string message) {
 		log("INFO", message);
 	}
@@ -55,25 +34,42 @@ public:
 		log("INFO", title + " -------------------------------- ");
 	}
 
-	void SetDebugLevel(ENUM_DEBUG_LEVEL level) {
-		debugLevel = level;
-	}
-
 	void SetPrefix(string newPrefix) {
 		prefix = newPrefix;
-	}
-
-	static void SetRemoteLogger(IRemoteLogger *logger) {
-		remoteLogger = logger;
 	}
 
 	void Warning(string message) {
 		log("WARNING", message);
 	}
 
+	static void SetGlobalDebugLevel(ENUM_DEBUG_LEVEL level) {
+		globalDebugLevel = level;
+	}
+
+	static void SetRemoteLogger(IRemoteLogger *logger) {
+		remoteLogger = logger;
+	}
+
+	static void GetGlobalEntries(string &result[]) {
+		int size = ArraySize(globalEntries);
+		ArrayResize(result, size);
+
+		for (int i = 0; i < size; i++) {
+			result[i] = globalEntries[i];
+		}
+	}
+
+	static int GetGlobalEntryCount() {
+		return ArraySize(globalEntries);
+	}
+
+	static void ClearGlobalEntries() {
+		ArrayResize(globalEntries, 0);
+	}
+
 private:
 	void log(string level, string message) {
-		if (debugLevel == DEBUG_LEVEL_NONE) {
+		if (globalDebugLevel == DEBUG_LEVEL_NONE) {
 			return;
 		}
 
@@ -89,9 +85,9 @@ private:
 			return;
 		}
 
-		int size = ArraySize(entries);
-		ArrayResize(entries, size + 1, size + 64);
-		entries[size] = StringFormat("[%s] %s: %s", level, prefix, message);
+		int size = ArraySize(globalEntries);
+		ArrayResize(globalEntries, size + 1, size + 64);
+		globalEntries[size] = StringFormat("[%s] %s: %s", level, prefix, message);
 	}
 
 	void sendToRemote(string level, string message) {
@@ -104,16 +100,16 @@ private:
 		isSendingToRemote = false;
 	}
 
-	bool shouldPersist() {
-		return debugLevel == DEBUG_LEVEL_ERRORS_PERSIST || debugLevel == DEBUG_LEVEL_ALL_PERSIST;
+	static bool shouldPersist() {
+		return globalDebugLevel == DEBUG_LEVEL_ERRORS_PERSIST || globalDebugLevel == DEBUG_LEVEL_ALL_PERSIST;
 	}
 
-	bool shouldPrint(string level) {
-		if (debugLevel == DEBUG_LEVEL_NONE) {
+	static bool shouldPrint(string level) {
+		if (globalDebugLevel == DEBUG_LEVEL_NONE) {
 			return false;
 		}
 
-		if (debugLevel == DEBUG_LEVEL_ERRORS || debugLevel == DEBUG_LEVEL_ERRORS_PERSIST) {
+		if (globalDebugLevel == DEBUG_LEVEL_ERRORS || globalDebugLevel == DEBUG_LEVEL_ERRORS_PERSIST) {
 			return level == "ERROR" || level == "WARNING";
 		}
 
@@ -121,6 +117,8 @@ private:
 	}
 };
 
+ENUM_DEBUG_LEVEL SELogger::globalDebugLevel = DEBUG_LEVEL_ALL;
+string SELogger::globalEntries[];
 IRemoteLogger *SELogger::remoteLogger = NULL;
 bool SELogger::isSendingToRemote = false;
 

@@ -1,12 +1,12 @@
-#ifndef __SE_STATISTICS_PERSISTENCE_MQH__
-#define __SE_STATISTICS_PERSISTENCE_MQH__
+#ifndef __SR_PERSISTENCE_OF_STATISTICS_MQH__
+#define __SR_PERSISTENCE_OF_STATISTICS_MQH__
 
 #include "../../helpers/HIsLiveTrading.mqh"
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 #include "../SEStatistics/SEStatistics.mqh"
 
-class SEStatisticsPersistence {
+class SRPersistenceOfStatistics {
 private:
 	SELogger logger;
 	SEDb database;
@@ -174,7 +174,7 @@ private:
 	}
 
 public:
-	SEStatisticsPersistence() {
+	SRPersistenceOfStatistics() {
 		logger.SetPrefix("StatisticsPersistence");
 		statisticsCollection = NULL;
 	}

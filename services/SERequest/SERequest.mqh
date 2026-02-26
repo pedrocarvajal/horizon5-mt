@@ -3,6 +3,7 @@
 
 #include "../SELogger/SELogger.mqh"
 #include "../../libraries/json/index.mqh"
+#include "structs/SRequestResponse.mqh"
 
 class SERequest {
 private:
@@ -30,31 +31,41 @@ private:
 		return baseUrl + path;
 	}
 
-	string execute(const string method, const string url, const char &data[], int effectiveTimeout, const string headers = "") {
+	SRequestResponse execute(const string method, const string url, const char &data[], int effectiveTimeout, const string headers = "") {
+		SRequestResponse response;
 		char result[];
 		string resultHeaders;
 		string finalHeaders = (headers == "") ? defaultHeaders : headers;
+		ulong startTime = GetTickCount64();
 
 		ResetLastError();
 		int status = WebRequest(method, url, finalHeaders, effectiveTimeout, data, result, resultHeaders);
+
+		response.delay = GetTickCount64() - startTime;
+		response.status = status;
+
+		if (response.delay > 1000) {
+			logger.Warning(StringFormat("Slow request: %dms %s %s", response.delay, method, url));
+		}
 
 		if (status == -1) {
 			int errorCode = GetLastError();
 			string reason = errorCode == 4014 ? "URL not in allowed list" : "Connection failed";
 			logger.Error(StringFormat("%s: error=%d %s %s", reason, errorCode, method, url));
 			logger.Debug("Sent: " + CharArrayToString(data));
-			return "";
+			response.body = "";
+			return response;
 		}
+
+		response.body = CharArrayToString(result);
 
 		if (status >= 400) {
-			string responseBody = CharArrayToString(result);
 			logger.Error(StringFormat("HTTP %d %s %s", status, method, url));
 			logger.Debug("Sent: " + CharArrayToString(data));
-			logger.Debug("Response: " + responseBody);
-			return responseBody;
+			logger.Debug("Response: " + response.body);
 		}
 
-		return CharArrayToString(result);
+		return response;
 	}
 
 public:
@@ -65,7 +76,7 @@ public:
 		logger.SetPrefix("SERequest");
 	}
 
-	string Get(const string path, int customTimeout = 0) {
+	SRequestResponse Get(const string path, int customTimeout = 0) {
 		string url = buildUrl(path);
 		char data[];
 		ArrayResize(data, 0);
@@ -74,7 +85,7 @@ public:
 		return execute("GET", url, data, effectiveTimeout);
 	}
 
-	string Post(const string path, JSON::Object &body, int customTimeout = 0, const string extraHeaders = "") {
+	SRequestResponse Post(const string path, JSON::Object &body, int customTimeout = 0, const string extraHeaders = "") {
 		string url = buildUrl(path);
 		string bodyString = body.toString();
 		int effectiveTimeout = (customTimeout > 0) ? customTimeout : timeout;

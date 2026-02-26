@@ -14,7 +14,7 @@ Strategies maintain in-memory state (flags, counters, timestamps) that is lost w
 
 ## What Exists Today
 
-- `services/SEOrderPersistence/SEOrderPersistence.mqh` - Persists individual **order** data to JSON files, restoring open orders on restart. This solves order recovery but does not cover arbitrary strategy-level state.
+- `services/SRPersistenceOfOrders/SRPersistenceOfOrders.mqh` - Persists individual **order** data to JSON files, restoring open orders on restart. This solves order recovery but does not cover arbitrary strategy-level state.
 
 - Order persistence is gated by `isLiveTrading()` and only runs in live mode. The same constraint applies to this problem - state loss only matters in live trading.
 

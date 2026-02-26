@@ -9,9 +9,7 @@
 #include "../indicators/INDrawdownFromPeak.mqh"
 #include "../indicators/INVolatility.mqh"
 #include "../indicators/INMaxDrawdownInWindow.mqh"
-#include "../helpers/HGetLogsPath.mqh"
-#include "../services/SEReportOfLogs/SEReportOfLogs.mqh"
-#include "../services/SEReportOfMarketSnapshots/SEReportOfMarketSnapshots.mqh"
+#include "../services/SRReportOfMarketSnapshots/SRReportOfMarketSnapshots.mqh"
 #include "../services/SEStrategyAllocator/SEStrategyAllocator.mqh"
 #include "../strategies/Strategy.mqh"
 #include "../integrations/WARRoom/WARRoom.mqh"
@@ -23,7 +21,7 @@ class SEAsset:
 public IAsset {
 private:
 	SELogger logger;
-	SEReportOfMarketSnapshots *marketSnapshotsReporter;
+	SRReportOfMarketSnapshots *marketSnapshotsReporter;
 	SEStrategyAllocator *allocator;
 
 	string name;
@@ -206,7 +204,7 @@ public:
 
 		if (EnableMarketHistoryReport) {
 			string marketReportName = StringFormat("%s_MARKET_Snapshots", symbol);
-			marketSnapshotsReporter = new SEReportOfMarketSnapshots(symbol, marketReportName);
+			marketSnapshotsReporter = new SRReportOfMarketSnapshots(symbol, marketReportName);
 		}
 
 		if (EnableStrategyAllocator) {
@@ -307,46 +305,7 @@ public:
 	}
 
 	virtual void OnEnd() {
-		int totalEntries = logger.GetEntryCount();
-
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			string strategyEntries[];
-			strategies[i].GetLogEntries(strategyEntries);
-			totalEntries += ArraySize(strategyEntries);
-		}
-
-		if (CheckPointer(allocator) != POINTER_INVALID) {
-			string allocatorEntries[];
-			allocator.GetLogEntries(allocatorEntries);
-			totalEntries += ArraySize(allocatorEntries);
-		}
-
-		if (totalEntries == 0) {
-			return;
-		}
-
-		SEReportOfLogs exporter;
-		exporter.Initialize(GetLogsPath(symbol));
-
-		string assetEntries[];
-		logger.GetEntries(assetEntries);
-		exporter.Export(StringFormat("%s_Asset", name), assetEntries);
-		logger.ClearEntries();
-
-		if (CheckPointer(allocator) != POINTER_INVALID) {
-			string allocatorLogEntries[];
-			allocator.GetLogEntries(allocatorLogEntries);
-			exporter.Export(StringFormat("%s_Allocator", name), allocatorLogEntries);
-		}
-
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			string strategyLogEntries[];
-			strategies[i].GetLogEntries(strategyLogEntries);
-			exporter.Export(
-				StringFormat("%s_%s_Strategy", name, strategies[i].GetPrefix()),
-				strategyLogEntries
-			);
-
 			strategies[i].OnEnd();
 		}
 	}
@@ -532,18 +491,6 @@ public:
 
 	void SetBalance(double newBalance) {
 		balance = newBalance;
-	}
-
-	void SetDebugLevel(ENUM_DEBUG_LEVEL level) {
-		logger.SetDebugLevel(level);
-
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].SetDebugLevel(level);
-		}
-
-		if (CheckPointer(allocator) != POINTER_INVALID) {
-			allocator.SetDebugLevel(level);
-		}
 	}
 
 	void SetName(string newName) {

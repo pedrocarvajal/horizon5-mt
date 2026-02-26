@@ -37,6 +37,8 @@ input string AllocatorModelPath = "Models"; // [1] > Model directory path (in co
 #include "helpers/HGetPipValue.mqh"
 #include "helpers/HIsLiveTrading.mqh"
 #include "services/SEDateTime/SEDateTime.mqh"
+#include "helpers/HGetLogsPath.mqh"
+#include "services/SRReportOfLogs/SRReportOfLogs.mqh"
 #include "integrations/WARRoom/WARRoom.mqh"
 SEDateTime dtime;
 SELogger hlogger;
@@ -54,7 +56,7 @@ int OnInit() {
 	dtime = SEDateTime();
 
 	hlogger.SetPrefix("Horizon");
-	hlogger.SetDebugLevel(DebugLevel);
+	SELogger::SetGlobalDebugLevel(DebugLevel);
 
 	if (!warroom.Initialize(WARRoomUrl, WARRoomApiKey, EnableWARRoom && IsLiveTrading())) {
 		return INIT_FAILED;
@@ -91,8 +93,6 @@ int OnInit() {
 	double weightPerAsset = 1.0 / enabledAssetCount;
 
 	for (int i = 0; i < assetCount; i++) {
-		assets[i].SetDebugLevel(DebugLevel);
-
 		if (assets[i].IsEnabled()) {
 			assets[i].SetWeight(weightPerAsset);
 			assets[i].SetBalance(AccountInfoDouble(ACCOUNT_BALANCE) * weightPerAsset);
@@ -158,6 +158,17 @@ void OnDeinit(const int reason) {
 	if (reason != REASON_CHARTCHANGE && reason != REASON_PARAMETERS) {
 		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].OnEnd();
+		}
+
+		if (SELogger::GetGlobalEntryCount() > 0) {
+			string logEntries[];
+			SELogger::GetGlobalEntries(logEntries);
+
+			SRReportOfLogs logExporter;
+			logExporter.Initialize(GetLogsPath("Portfolio"));
+			logExporter.Export("Logs", logEntries);
+
+			SELogger::ClearGlobalEntries();
 		}
 	}
 

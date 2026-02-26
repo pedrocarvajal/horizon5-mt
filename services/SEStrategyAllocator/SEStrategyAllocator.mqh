@@ -155,14 +155,6 @@ public:
 		}
 	}
 
-	void SetDebugLevel(ENUM_DEBUG_LEVEL level) {
-		logger.SetDebugLevel(level);
-	}
-
-	void GetLogEntries(string &result[]) {
-		logger.GetEntries(result);
-	}
-
 	void GetActiveStrategies(string &result[]) {
 		int size = ArraySize(activeStrategies);
 		ArrayResize(result, size);

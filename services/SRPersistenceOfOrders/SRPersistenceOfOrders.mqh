@@ -1,5 +1,5 @@
-#ifndef __SE_ORDER_PERSISTENCE_MQH__
-#define __SE_ORDER_PERSISTENCE_MQH__
+#ifndef __SR_PERSISTENCE_OF_ORDERS_MQH__
+#define __SR_PERSISTENCE_OF_ORDERS_MQH__
 
 #include "../../helpers/HIsLiveTrading.mqh"
 #include "../SELogger/SELogger.mqh"
@@ -9,14 +9,14 @@
 
 extern SEDateTime dtime;
 
-class SEOrderPersistence {
+class SRPersistenceOfOrders {
 private:
 	SELogger logger;
 	SEDb database;
 	SEDbCollection *ordersCollection;
 
 public:
-	SEOrderPersistence() {
+	SRPersistenceOfOrders() {
 		logger.SetPrefix("OrderPersistence");
 		ordersCollection = NULL;
 	}

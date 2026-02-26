@@ -4,7 +4,7 @@
 #include "SEAllocatorConstants.mqh"
 #include "../../SEDb/SEDb.mqh"
 #include "../../SELogger/SELogger.mqh"
-#include "../../SEReportOfAllocatorAnalysis/SEReportOfAllocatorAnalysis.mqh"
+#include "../../SRReportOfAllocatorAnalysis/SRReportOfAllocatorAnalysis.mqh"
 
 class SEAllocatorTrainer {
 private:
@@ -266,7 +266,7 @@ public:
 		}
 
 		string reportName = StringFormat("%s_Allocator_Analysis", symbol);
-		SEReportOfAllocatorAnalysis reporter(symbol, reportName);
+		SRReportOfAllocatorAnalysis reporter(symbol, reportName);
 
 		logger.Info(StringFormat(
 			"Running analysis: %d candidate days, %d strategies, horizons=[1,2,3,5,10]",
