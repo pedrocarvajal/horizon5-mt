@@ -1,12 +1,12 @@
-#ifndef __SE_REPORT_OF_ORDER_HISTORY_MQH__
-#define __SE_REPORT_OF_ORDER_HISTORY_MQH__
+#ifndef __SR_REPORT_OF_ORDER_HISTORY_MQH__
+#define __SR_REPORT_OF_ORDER_HISTORY_MQH__
 
 #include "../../structs/SSOrderHistory.mqh"
 #include "../../helpers/HGetReportsPath.mqh"
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 
-class SEReportOfOrderHistory {
+class SRReportOfOrderHistory {
 private:
 	SELogger logger;
 	SEDb database;
@@ -52,7 +52,7 @@ private:
 	}
 
 public:
-	SEReportOfOrderHistory(string symbol, string customReportName) {
+	SRReportOfOrderHistory(string symbol, string customReportName) {
 		initialize(GetReportsPath(symbol), customReportName);
 	}
 

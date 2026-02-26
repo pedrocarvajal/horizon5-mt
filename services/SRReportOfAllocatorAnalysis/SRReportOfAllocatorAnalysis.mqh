@@ -1,11 +1,11 @@
-#ifndef __SE_REPORT_OF_ALLOCATOR_ANALYSIS_MQH__
-#define __SE_REPORT_OF_ALLOCATOR_ANALYSIS_MQH__
+#ifndef __SR_REPORT_OF_ALLOCATOR_ANALYSIS_MQH__
+#define __SR_REPORT_OF_ALLOCATOR_ANALYSIS_MQH__
 
 #include "../../helpers/HGetReportsPath.mqh"
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 
-class SEReportOfAllocatorAnalysis {
+class SRReportOfAllocatorAnalysis {
 private:
 	SELogger logger;
 	SEDb database;
@@ -26,7 +26,7 @@ private:
 	}
 
 public:
-	SEReportOfAllocatorAnalysis(string symbol, string customReportName) {
+	SRReportOfAllocatorAnalysis(string symbol, string customReportName) {
 		reportSymbol = symbol;
 		initialize(GetReportsPath(symbol), customReportName);
 	}
