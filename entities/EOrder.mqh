@@ -10,14 +10,14 @@
 
 #define MAX_RETRY_COUNT 3
 
-class SEOrderPersistence;
+class SRPersistenceOfOrders;
 
 extern SEDateTime dtime;
 
 class EOrder:
 public ATrade {
 public:
-	SEOrderPersistence * persistence;
+	SRPersistenceOfOrders * persistence;
 	bool isInitialized;
 	bool isProcessed;
 	bool isMarketOrder;
@@ -781,7 +781,7 @@ public:
 		grossProfit = value;
 	}
 
-	void SetPersistence(SEOrderPersistence *value) {
+	void SetPersistence(SRPersistenceOfOrders *value) {
 		persistence = value;
 	}
 };

@@ -1,12 +1,12 @@
-#ifndef __SE_REPORT_OF_MARKET_SNAPSHOTS_MQH__
-#define __SE_REPORT_OF_MARKET_SNAPSHOTS_MQH__
+#ifndef __SR_REPORT_OF_MARKET_SNAPSHOTS_MQH__
+#define __SR_REPORT_OF_MARKET_SNAPSHOTS_MQH__
 
 #include "../../structs/SSMarketSnapshot.mqh"
 #include "../../helpers/HGetReportsPath.mqh"
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 
-class SEReportOfMarketSnapshots {
+class SRReportOfMarketSnapshots {
 private:
 	SELogger logger;
 	SEDb database;
@@ -17,7 +17,7 @@ private:
 	string reportSymbol;
 
 public:
-	SEReportOfMarketSnapshots(string symbol, string customReportName) {
+	SRReportOfMarketSnapshots(string symbol, string customReportName) {
 		reportSymbol = symbol;
 		initialize(GetReportsPath(symbol), customReportName);
 	}

@@ -1,5 +1,5 @@
-#ifndef __SE_REPORT_OF_STRATEGY_SNAPSHOTS_MQH__
-#define __SE_REPORT_OF_STRATEGY_SNAPSHOTS_MQH__
+#ifndef __SR_REPORT_OF_STRATEGY_SNAPSHOTS_MQH__
+#define __SR_REPORT_OF_STRATEGY_SNAPSHOTS_MQH__
 
 #include "../../structs/SSStatisticsSnapshot.mqh"
 #include "../../structs/SSOrderHistory.mqh"
@@ -7,7 +7,7 @@
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 
-class SEReportOfStrategySnapshots {
+class SRReportOfStrategySnapshots {
 private:
 	SELogger logger;
 	SEDb database;
@@ -20,7 +20,7 @@ private:
 	string strategyPrefix;
 
 public:
-	SEReportOfStrategySnapshots(string symbol, string name, string prefix, string customReportName) {
+	SRReportOfStrategySnapshots(string symbol, string name, string prefix, string customReportName) {
 		reportSymbol = symbol;
 		strategyName = name;
 		strategyPrefix = prefix;

@@ -1,18 +1,18 @@
-#ifndef __SE_REPORT_OF_LOGS_MQH__
-#define __SE_REPORT_OF_LOGS_MQH__
+#ifndef __SR_REPORT_OF_LOGS_MQH__
+#define __SR_REPORT_OF_LOGS_MQH__
 
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 
-class SEReportOfLogs {
+class SRReportOfLogs {
 private:
 	SELogger logger;
 	SEDb database;
 	bool initialized;
 
 public:
-	SEReportOfLogs() {
-		logger.SetPrefix("SEReportOfLogs");
+	SRReportOfLogs() {
+		logger.SetPrefix("SRReportOfLogs");
 		initialized = false;
 	}
 
