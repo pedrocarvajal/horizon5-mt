@@ -26,5 +26,8 @@
     "editor.formatOnType": false,
     "editor.formatOnPaste": false
   },
-  "clangd.enable": false
+  "clangd.enable": false,
+  "files.exclude": {
+    "**/*.ex5": true
+  }
 }

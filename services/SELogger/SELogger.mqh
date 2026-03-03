@@ -96,7 +96,7 @@ private:
 		}
 
 		isSendingToRemote = true;
-		remoteLogger.InsertLog(level, prefix + ": " + message);
+		remoteLogger.StoreLog(level, prefix + ": " + message);
 		isSendingToRemote = false;
 	}
 

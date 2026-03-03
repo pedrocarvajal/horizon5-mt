@@ -12,10 +12,10 @@
 #include "../services/SRReportOfMarketSnapshots/SRReportOfMarketSnapshots.mqh"
 #include "../services/SEStrategyAllocator/SEStrategyAllocator.mqh"
 #include "../strategies/Strategy.mqh"
-#include "../integrations/WARRoom/WARRoom.mqh"
+#include "../integrations/HorizonAPI/HorizonAPI.mqh"
 
 extern SEDateTime dtime;
-extern WARRoom warroom;
+extern HorizonAPI horizonAPI;
 
 class SEAsset:
 public IAsset {
@@ -237,8 +237,8 @@ public:
 			balance
 		));
 
-		SyncToWARRoom();
-		SendWARRoomHeartbeats(HEARTBEAT_INIT);
+		SyncToHorizonAPI();
+		SendHeartbeats(HEARTBEAT_INIT);
 
 		return INIT_SUCCEEDED;
 	}
@@ -267,7 +267,7 @@ public:
 	}
 
 	virtual void OnStartHour() {
-		SendWARRoomHeartbeats(HEARTBEAT_ONLINE);
+		SendHeartbeats(HEARTBEAT_RUNNING);
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartHour();
@@ -311,7 +311,7 @@ public:
 	}
 
 	virtual void OnDeinit() {
-		SendWARRoomHeartbeats(HEARTBEAT_DEINIT);
+		SendHeartbeats(HEARTBEAT_DEINIT);
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnDeinit();
@@ -533,32 +533,68 @@ public:
 		allocatorRebalanceFrequency = days;
 	}
 
-	void SyncToWARRoom() {
-		if (!warroom.IsEnabled()) {
+	void SyncToHorizonAPI() {
+		if (!horizonAPI.IsEnabled()) {
 			return;
 		}
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			warroom.InsertOrUpdateStrategy(
+			horizonAPI.UpsertStrategy(
 				strategies[i].GetName(),
 				strategies[i].GetSymbol(),
 				strategies[i].GetPrefix(),
 				strategies[i].GetMagicNumber(),
-				strategies[i].GetWeight(),
 				strategies[i].GetBalance()
 			);
 
-			strategies[i].SyncOrdersToWARRoom();
+			strategies[i].SyncOrders();
+			strategies[i].SyncSnapshot();
 		}
 	}
 
-	void SendWARRoomHeartbeats(ENUM_HEARTBEAT_EVENT event) {
-		if (!warroom.IsEnabled()) {
+	void SendHeartbeats(ENUM_HEARTBEAT_EVENT event) {
+		if (!horizonAPI.IsEnabled()) {
 			return;
 		}
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			warroom.InsertHeartbeat(strategies[i].GetMagicNumber(), event);
+			horizonAPI.StoreHeartbeat(strategies[i].GetMagicNumber(), event);
+		}
+	}
+
+	void AggregateSnapshotData(
+		double &drawdownPct,
+		double &dailyPnl,
+		double &floatingPnl,
+		int &openOrderCount,
+		double &exposureLots
+	) {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			double stratFloatingPnl = 0;
+			double stratExposureLots = 0;
+
+			for (int j = 0; j < strategies[i].GetOrdersCount(); j++) {
+				EOrder *order = strategies[i].GetOrderAtIndex(j);
+				if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
+					stratFloatingPnl += order.GetFloatingPnL();
+					stratExposureLots += order.GetVolume();
+				}
+			}
+
+			SEStatistics *stats = strategies[i].GetStatistics();
+			if (stats != NULL) {
+				dailyPnl += stats.GetDailyPerformance();
+
+				double nav = stats.GetNav();
+				double peak = stats.GetNavPeak();
+				if (peak > 0 && nav < peak) {
+					drawdownPct += (peak - nav) / peak;
+				}
+			}
+
+			floatingPnl += stratFloatingPnl;
+			openOrderCount += strategies[i].GetOpenOrderCount();
+			exposureLots += stratExposureLots;
 		}
 	}
 };
