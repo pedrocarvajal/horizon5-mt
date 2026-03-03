@@ -19,10 +19,10 @@ input group "Risk management";
 input bool EquityAtRiskCompounded = false; // [1] > Equity at risk compounded
 input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
-input group "WARRoom Integration";
-input bool EnableWARRoom = true; // [1] > Enable WARRoom API integration
-input string WARRoomUrl = ""; // [1] > WARRoom PostgREST API URL
-input string WARRoomApiKey = ""; // [1] > WARRoom JWT API key (required)
+input group "HorizonAPI Integration";
+input bool EnableHorizonAPI = true; // [1] > Enable HorizonAPI integration
+input string HorizonAPIUrl = ""; // [1] > HorizonAPI base URL
+input string HorizonAPIKey = ""; // [1] > HorizonAPI key (required)
 
 input group "Strategy Allocator";
 input bool EnableStrategyAllocator = false; // [1] > Enable KNN strategy allocator
@@ -39,10 +39,10 @@ input string AllocatorModelPath = "Models"; // [1] > Model directory path (in co
 #include "services/SEDateTime/SEDateTime.mqh"
 #include "helpers/HGetLogsPath.mqh"
 #include "services/SRReportOfLogs/SRReportOfLogs.mqh"
-#include "integrations/WARRoom/WARRoom.mqh"
+#include "integrations/HorizonAPI/HorizonAPI.mqh"
 SEDateTime dtime;
 SELogger hlogger;
-WARRoom warroom;
+HorizonAPI horizonAPI;
 STradingStatus tradingStatus;
 
 int lastCheckedDay = -1;
@@ -58,12 +58,12 @@ int OnInit() {
 	hlogger.SetPrefix("Horizon");
 	SELogger::SetGlobalDebugLevel(DebugLevel);
 
-	if (!warroom.Initialize(WARRoomUrl, WARRoomApiKey, EnableWARRoom && IsLiveTrading())) {
+	if (!horizonAPI.Initialize(HorizonAPIUrl, HorizonAPIKey, EnableHorizonAPI && IsLiveTrading())) {
 		return INIT_FAILED;
 	}
 
-	if (warroom.IsEnabled()) {
-		SELogger::SetRemoteLogger(GetPointer(warroom));
+	if (horizonAPI.IsEnabled()) {
+		SELogger::SetRemoteLogger(GetPointer(horizonAPI));
 	}
 
 	lastCheckedDay = dtime.Today().dayOfYear;
@@ -148,7 +148,7 @@ int OnInit() {
 		return INIT_FAILED;
 	}
 
-	warroom.InsertOrUpdateAccount();
+	horizonAPI.UpsertAccount();
 	return INIT_SUCCEEDED;
 }
 
@@ -230,12 +230,32 @@ void OnTimer() {
 	}
 
 	if (isStartHour) {
-		warroom.InsertOrUpdateAccount();
-		warroom.InsertAccountSnapshot();
+		horizonAPI.UpsertAccount();
+
+		double totalDrawdownPct = 0;
+		double totalDailyPnl = 0;
+		double totalFloatingPnl = 0;
+		int totalOpenOrderCount = 0;
+		double totalExposureLots = 0;
 
 		for (int i = 0; i < ArraySize(assets); i++) {
-			assets[i].SyncToWARRoom();
+			assets[i].SyncToHorizonAPI();
+			assets[i].AggregateSnapshotData(
+				totalDrawdownPct,
+				totalDailyPnl,
+				totalFloatingPnl,
+				totalOpenOrderCount,
+				totalExposureLots
+			);
 		}
+
+		horizonAPI.StoreAccountSnapshot(
+			totalDrawdownPct,
+			totalDailyPnl,
+			totalFloatingPnl,
+			totalOpenOrderCount,
+			totalExposureLots
+		);
 	}
 }
 

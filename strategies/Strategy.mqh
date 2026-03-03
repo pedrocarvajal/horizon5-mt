@@ -19,14 +19,14 @@ class SEAsset;
 #include "../services/SRReportOfStrategySnapshots/SRReportOfStrategySnapshots.mqh"
 #include "../services/SRPersistenceOfOrders/SRPersistenceOfOrders.mqh"
 #include "../services/SRPersistenceOfStatistics/SRPersistenceOfStatistics.mqh"
-#include "../integrations/WARRoom/WARRoom.mqh"
+#include "../integrations/HorizonAPI/HorizonAPI.mqh"
 #include "../structs/STradingStatus.mqh"
 
 #define ORDER_TYPE_ANY    -1
 #define ORDER_STATUS_ANY  -1
 
 extern SEDateTime dtime;
-extern WARRoom warroom;
+extern HorizonAPI horizonAPI;
 extern STradingStatus tradingStatus;
 
 class SEStrategy:
@@ -254,7 +254,7 @@ public:
 			statisticsPersistence.Save(statistics);
 		}
 
-		warroom.InsertOrUpdateOrder(order);
+		horizonAPI.UpsertOrder(order);
 
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
@@ -314,7 +314,7 @@ public:
 
 	virtual void OnOpenOrder(EOrder& order) {
 		statistics.OnOpenOrder(order, orders);
-		warroom.InsertOrUpdateOrder(order);
+		horizonAPI.UpsertOrder(order);
 	}
 
 	virtual void OnStartDay() {
@@ -338,16 +338,16 @@ public:
 	virtual void OnStartMinute() {
 	}
 
-	void SyncOrdersToWARRoom() {
+	void SyncOrders() {
 		for (int i = 0; i < ArraySize(orders); i++) {
 			if (orders[i].GetStatus() == ORDER_STATUS_OPEN ||
 			    orders[i].GetStatus() == ORDER_STATUS_PENDING) {
-				warroom.InsertOrUpdateOrder(orders[i]);
+				horizonAPI.UpsertOrder(orders[i]);
 			}
 		}
 	}
 
-	void SyncSnapshotToWARRoom() {
+	void SyncSnapshot() {
 		double floatingPnl = 0;
 		double exposureLots = 0;
 
@@ -364,7 +364,7 @@ public:
 			? (peak - nav) / peak
 			: 0.0;
 
-		warroom.InsertStrategySnapshot(
+		horizonAPI.StoreStrategySnapshot(
 			strategyMagicNumber,
 			nav,
 			drawdownPct,

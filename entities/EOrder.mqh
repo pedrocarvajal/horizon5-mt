@@ -7,6 +7,7 @@
 #include "../services/SEDateTime/SEDateTime.mqh"
 #include "../services/SEDateTime/structs/SDateTime.mqh"
 #include "../helpers/HIsMarketClosed.mqh"
+#include "../helpers/HGenerateUuid.mqh"
 
 #define MAX_RETRY_COUNT 3
 
@@ -146,11 +147,7 @@ private:
 	}
 
 	void refreshId() {
-		string uuid = "";
-		for (int i = 0; i < 8; i++) {
-			uuid += IntegerToString(MathRand() % 10);
-		}
-		id = StringFormat("%s_%s", source, uuid);
+		id = GenerateUuid();
 	}
 
 	bool validateMinimumVolume() {
