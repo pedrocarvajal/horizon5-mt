@@ -30,11 +30,6 @@ public:
 	}
 
 	void Export() {
-		logger.Debug(StringFormat(
-			"Exporting %d market snapshots to %s\\%s.json",
-			marketCollection.Count(), GetCurrentReportsPath(), reportName
-		));
-
 		marketCollection.Flush();
 
 		logger.Info(StringFormat(

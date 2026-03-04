@@ -1,5 +1,5 @@
 #property copyright "Horizon5, by Pedro Carvajal"
-#property version "1.00"
+#property version "1.01"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 #include "enums/EAllocatorMode.mqh"
@@ -23,6 +23,8 @@ input group "HorizonAPI Integration";
 input bool EnableHorizonAPI = true; // [1] > Enable HorizonAPI integration
 input string HorizonAPIUrl = ""; // [1] > HorizonAPI base URL
 input string HorizonAPIKey = ""; // [1] > HorizonAPI key (required)
+input int HorizonAPIMaxEventsPerPoll = 10; // [1] > Max events per ConsumeEvents call
+input int HorizonAPIEventPollInterval = 3; // [1] > Event poll interval in seconds (0 = every tick)
 
 input group "Strategy Allocator";
 input bool EnableStrategyAllocator = false; // [1] > Enable KNN strategy allocator
@@ -148,6 +150,7 @@ int OnInit() {
 		return INIT_FAILED;
 	}
 
+	hlogger.Info("Horizon EA started | built " + (string)__DATETIME__);
 	horizonAPI.UpsertAccount();
 	return INIT_SUCCEEDED;
 }
@@ -195,7 +198,7 @@ void OnTimer() {
 	if (isStartDay) {
 		lastCheckedDay = now.dayOfYear;
 
-		if (tradingStatus.isPaused) {
+		if (tradingStatus.isPaused && tradingStatus.reason != TRADING_PAUSE_REASON_HORIZON_API_REQUEST) {
 			hlogger.Info("Trading pause cleared - new day started");
 			tradingStatus.isPaused = false;
 			tradingStatus.reason = TRADING_PAUSE_REASON_NONE;
@@ -306,11 +309,6 @@ void OnTradeTransaction(
 								order,
 								DEAL_REASON_EXPERT
 							);
-
-							hlogger.Debug(StringFormat(
-								"OnTradeTransaction: Order cancelled with orderId=%llu",
-								orderId
-							));
 						}
 
 						break;
@@ -363,19 +361,7 @@ void OnTradeTransaction(
 			ulong orderId = transaction.order;
 			ulong dealId = transaction.deal;
 
-			hlogger.Debug(StringFormat(
-				"OnTradeTransaction: comment=%s, positionId=%llu, orderId=%llu, dealId=%llu",
-				comment,
-				positionId,
-				orderId,
-				dealId
-			));
 
-			hlogger.Debug(StringFormat(
-				"OnTradeTransaction: entry=%d, reason=%d",
-				entry,
-				reason
-			));
 
 			if (entry == DEAL_ENTRY_OUT) {
 				SDateTime dealTime = dtime.Now();
@@ -390,11 +376,6 @@ void OnTradeTransaction(
 						DEAL_REASON
 					);
 
-				hlogger.Debug(StringFormat(
-					"OnTradeTransaction: Closing order with dealId=%llu, positionId=%llu",
-					dealId,
-					positionId
-				));
 
 				int strategyIndex = -1;
 				int orderIndex = -1;
@@ -469,11 +450,6 @@ void OnTradeTransaction(
 								order
 							);
 
-							hlogger.Debug(StringFormat(
-								"OnTradeTransaction: Updated order with dealId=%llu, positionId=%llu",
-								dealId,
-								positionId
-							));
 
 							isFound = true;
 						}

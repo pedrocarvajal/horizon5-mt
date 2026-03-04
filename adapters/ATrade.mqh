@@ -57,7 +57,6 @@ public:
 			return Close(ticket);
 		}
 
-		logger.Debug(StringFormat("Order/Position not found: %llu", ticket));
 		return false;
 	}
 
@@ -134,6 +133,10 @@ public:
 		return Modify(0, 0, takeProfit, magicNumber);
 	}
 
+	bool ModifyStopLossAndTakeProfit(double stopLoss, double takeProfit, ulong magicNumber = 0) {
+		return Modify(0, stopLoss, takeProfit, magicNumber);
+	}
+
 	MqlTradeResult Open(
 		string symbol,
 		string id,
@@ -206,17 +209,6 @@ public:
 		}
 
 		logger.Separator("Trade request");
-		logger.Debug(StringFormat("Comment: %s", request.comment));
-		logger.Debug(StringFormat("Action: %s", EnumToString(request.action)));
-		logger.Debug(StringFormat("Symbol: %s", request.symbol));
-		logger.Debug(StringFormat("Volume: %f", request.volume));
-		logger.Debug(StringFormat("Deviation: %d", request.deviation));
-		logger.Debug(StringFormat("Magic: %d", request.magic));
-		logger.Debug(StringFormat("Type filling: %s",
-			EnumToString(request.type_filling)));
-		logger.Debug(StringFormat("Price: %f", request.price));
-		logger.Debug(StringFormat("Stop loss: %f", request.sl));
-		logger.Debug(StringFormat("Take profit: %f", request.tp));
 
 		if (!OrderSend(request, result)) {
 			logger.Error(StringFormat("Error opening order: %d", GetLastError()));

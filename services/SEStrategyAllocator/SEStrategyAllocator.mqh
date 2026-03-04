@@ -88,15 +88,6 @@ private:
 		}
 
 		normalizedCount++;
-
-		logger.Debug(StringFormat(
-			"Norm window=[%d..%d] | mean=[%.4f,%.4f,%.4f] std=[%.4f,%.4f,%.4f] | z=[%.4f,%.4f,%.4f]",
-			windowStart,
-			totalDays - 1,
-			means[0], means[1], means[2],
-			stdevs[0], stdevs[1], stdevs[2],
-			normalizedDay[0], normalizedDay[1], normalizedDay[2]
-		));
 	}
 
 public:
@@ -184,13 +175,6 @@ public:
 
 		totalDays++;
 
-		logger.Debug(StringFormat(
-			"Day %d | Features: return=%.4f vol=%.4f dd=%.4f",
-			totalDays,
-			rollingReturn,
-			rollingVolatility,
-			rollingDrawdown
-		));
 
 		if (totalDays <= normalizationWindow) {
 			return;
@@ -202,15 +186,6 @@ public:
 			return;
 		}
 
-		logger.Debug(StringFormat(
-			"Inference day %d | raw=[%.4f,%.4f,%.4f] | normIdx=%d candidateRange=[0..%d]",
-			totalDays,
-			featureHistory[featureIndex(totalDays - 1, 0)],
-			featureHistory[featureIndex(totalDays - 1, 1)],
-			featureHistory[featureIndex(totalDays - 1, 2)],
-			normalizedCount - 1,
-			maxCandidateCount - 1
-		));
 
 		inference.ComputeActivations(normalizedFeatures, normalizedCount, activeStrategies);
 	}
@@ -219,12 +194,6 @@ public:
 		ArrayResize(strategyPrefixes, strategyCount + 1);
 		strategyPrefixes[strategyCount] = prefix;
 		strategyCount++;
-
-		logger.Debug(StringFormat(
-			"Registered strategy: %s (total: %d)",
-			prefix,
-			strategyCount
-		));
 	}
 
 	bool SaveModel(string databasePath, string collectionName) {

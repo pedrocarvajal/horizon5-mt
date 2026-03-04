@@ -8,6 +8,7 @@ interface IAsset {
 	int OnTesterInit();
 
 	void OnTimer();
+	void OnPollEvents();
 	void OnTick();
 	void OnStartMinute();
 	void OnStartHour();

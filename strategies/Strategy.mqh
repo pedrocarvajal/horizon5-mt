@@ -338,6 +338,12 @@ public:
 	virtual void OnStartMinute() {
 	}
 
+	virtual void OnTimer() {
+	}
+
+	virtual void OnPollEvents() {
+	}
+
 	void SyncOrders() {
 		for (int i = 0; i < ArraySize(orders); i++) {
 			if (orders[i].GetStatus() == ORDER_STATUS_OPEN ||
@@ -391,12 +397,10 @@ public:
 		double stopLoss = 0
 	) {
 		if (tradingStatus.isPaused) {
-			logger.Debug("New order blocked - trading paused (manual close)");
 			return NULL;
 		}
 
 		if (balance <= 0) {
-			logger.Debug("New order blocked - no balance allocated");
 			return NULL;
 		}
 
