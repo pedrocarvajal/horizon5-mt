@@ -9,7 +9,6 @@ interface IStrategy {
 	int OnTesterInit();
 
 	void OnTimer();
-	void OnPollEvents();
 	void OnTick();
 	void OnStartMinute();
 	void OnStartHour();

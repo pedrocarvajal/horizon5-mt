@@ -14,7 +14,11 @@ struct SHorizonEvent {
 	double takeProfit;
 	string comment;
 
+	string orderId;
 	long positionId;
+
+	string side;
+	string status;
 
 	SHorizonEvent() {
 		id = "";
@@ -27,7 +31,10 @@ struct SHorizonEvent {
 		stopLoss = 0;
 		takeProfit = 0;
 		comment = "";
+		orderId = "";
 		positionId = 0;
+		side = "";
+		status = "";
 	}
 };
 

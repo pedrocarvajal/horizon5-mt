@@ -312,6 +312,9 @@ public:
 		return INIT_SUCCEEDED;
 	}
 
+	virtual void OnCancelOrder(EOrder& order) {
+	}
+
 	virtual void OnOpenOrder(EOrder& order) {
 		statistics.OnOpenOrder(order, orders);
 		horizonAPI.UpsertOrder(order);
@@ -339,9 +342,6 @@ public:
 	}
 
 	virtual void OnTimer() {
-	}
-
-	virtual void OnPollEvents() {
 	}
 
 	void SyncOrders() {
@@ -446,8 +446,13 @@ public:
 			if (orders[i].GetStatus() == ORDER_STATUS_PENDING) {
 				if (tradingStatus.isPaused) {
 					orders[i].Cancel();
+					OnCancelOrder(orders[i]);
 				} else {
 					orders[i].CheckToOpen(marketStatus);
+
+					if (orders[i].GetStatus() == ORDER_STATUS_CANCELLED) {
+						OnCancelOrder(orders[i]);
+					}
 				}
 			}
 
