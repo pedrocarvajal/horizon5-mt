@@ -31,7 +31,7 @@ private:
 		return baseUrl + path;
 	}
 
-	SRequestResponse execute(const string method, const string url, const char &data[], int effectiveTimeout, const string headers = "") {
+	SRequestResponse execute(const string method, const string url, const char &data[], int effectiveTimeout, const string headers = "", int slowThreshold = 1000) {
 		SRequestResponse response;
 		char result[];
 		string resultHeaders;
@@ -44,7 +44,7 @@ private:
 		response.delay = GetTickCount64() - startTime;
 		response.status = status;
 
-		if (response.delay > 1000) {
+		if (slowThreshold > 0 && response.delay > (ulong)slowThreshold) {
 			logger.Warning(StringFormat("Slow request: %dms %s %s", response.delay, method, url));
 		}
 
@@ -73,16 +73,16 @@ public:
 		logger.SetPrefix("SERequest");
 	}
 
-	SRequestResponse Get(const string path, int customTimeout = 0) {
+	SRequestResponse Get(const string path, int customTimeout = 0, int slowThreshold = 1000) {
 		string url = buildUrl(path);
 		char data[];
 		ArrayResize(data, 0);
 		int effectiveTimeout = (customTimeout > 0) ? customTimeout : timeout;
 
-		return execute("GET", url, data, effectiveTimeout);
+		return execute("GET", url, data, effectiveTimeout, "", slowThreshold);
 	}
 
-	SRequestResponse Post(const string path, JSON::Object &body, int customTimeout = 0, const string extraHeaders = "") {
+	SRequestResponse Post(const string path, JSON::Object &body, int customTimeout = 0, const string extraHeaders = "", int slowThreshold = 1000) {
 		string url = buildUrl(path);
 		string bodyString = body.toString();
 		int effectiveTimeout = (customTimeout > 0) ? customTimeout : timeout;
@@ -91,10 +91,10 @@ public:
 		char data[];
 		StringToCharArray(bodyString, data, 0, StringLen(bodyString), CP_UTF8);
 
-		return execute("POST", url, data, effectiveTimeout, headers);
+		return execute("POST", url, data, effectiveTimeout, headers, slowThreshold);
 	}
 
-	SRequestResponse Patch(const string path, JSON::Object &body, int customTimeout = 0) {
+	SRequestResponse Patch(const string path, JSON::Object &body, int customTimeout = 0, int slowThreshold = 1000) {
 		string url = buildUrl(path);
 		string bodyString = body.toString();
 		int effectiveTimeout = (customTimeout > 0) ? customTimeout : timeout;
@@ -102,7 +102,7 @@ public:
 		char data[];
 		StringToCharArray(bodyString, data, 0, StringLen(bodyString), CP_UTF8);
 
-		return execute("PATCH", url, data, effectiveTimeout);
+		return execute("PATCH", url, data, effectiveTimeout, "", slowThreshold);
 	}
 
 	void AddHeader(const string key, const string value) {

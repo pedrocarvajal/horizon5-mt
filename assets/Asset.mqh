@@ -255,14 +255,6 @@ public:
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnTimer();
 		}
-
-		OnPollEvents();
-	}
-
-	virtual void OnPollEvents() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnPollEvents();
-		}
 	}
 
 	virtual void OnTick() {

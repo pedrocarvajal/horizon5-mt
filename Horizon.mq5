@@ -50,9 +50,10 @@ STradingStatus tradingStatus;
 int lastCheckedDay = -1;
 int lastCheckedHour = -1;
 int lastCheckedMinute = -1;
+datetime lastTickTime = 0;
 
 int OnInit() {
-	EventSetTimer(TickIntervalTime);
+	EventSetTimer(1);
 
 	// Variables
 	dtime = SEDateTime();
@@ -194,6 +195,7 @@ void OnTimer() {
 	bool isStartDay = (now.dayOfYear != lastCheckedDay);
 	bool isStartHour = (now.hour != lastCheckedHour);
 	bool isStartMinute = (now.minute != lastCheckedMinute);
+	bool isTickInterval = (now.timestamp - lastTickTime) >= TickIntervalTime;
 
 	if (isStartDay) {
 		lastCheckedDay = now.dayOfYear;
@@ -215,20 +217,29 @@ void OnTimer() {
 
 	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].OnTimer();
+	}
 
-		if (isStartDay) {
-			assets[i].OnStartDay();
+	if (isTickInterval) {
+		lastTickTime = now.timestamp;
+
+		for (int i = 0; i < ArraySize(assets); i++) {
+			if (isStartDay) {
+				assets[i].OnStartDay();
+			}
+
+			if (isStartHour) {
+				assets[i].OnStartHour();
+			}
+
+			if (isStartMinute) {
+				assets[i].OnStartMinute();
+			}
+
+			assets[i].OnTick();
 		}
+	}
 
-		if (isStartHour) {
-			assets[i].OnStartHour();
-		}
-
-		if (isStartMinute) {
-			assets[i].OnStartMinute();
-		}
-
-		assets[i].OnTick();
+	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].ProcessOrders();
 	}
 
