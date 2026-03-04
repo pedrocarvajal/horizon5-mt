@@ -651,10 +651,8 @@ public:
 			return false;
 		}
 
-		takeProfitPrice = newTakeProfitPrice;
-
 		if (status == ORDER_STATUS_OPEN) {
-			if (!ATrade::ModifyTakeProfit(takeProfitPrice, magicNumber)) {
+			if (!ATrade::ModifyTakeProfit(newTakeProfitPrice, magicNumber)) {
 				logger.Error(StringFormat("[%s] Failed to modify take profit on open position", GetId()));
 				return false;
 			}
@@ -663,10 +661,11 @@ public:
 				"[%s] Take profit modified to: %.*f",
 				GetId(),
 				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
-				takeProfitPrice
+				newTakeProfitPrice
 			));
 		}
 
+		takeProfitPrice = newTakeProfitPrice;
 		return true;
 	}
 
@@ -675,10 +674,8 @@ public:
 			return false;
 		}
 
-		stopLossPrice = newStopLossPrice;
-
 		if (status == ORDER_STATUS_OPEN) {
-			if (!ATrade::ModifyStopLoss(stopLossPrice, magicNumber)) {
+			if (!ATrade::ModifyStopLoss(newStopLossPrice, magicNumber)) {
 				logger.Error(StringFormat("[%s] Failed to modify stop loss on open position", GetId()));
 				return false;
 			}
@@ -687,8 +684,41 @@ public:
 				"[%s] Stop loss modified to: %.*f",
 				GetId(),
 				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
-				stopLossPrice
+				newStopLossPrice
 			));
+		}
+
+		stopLossPrice = newStopLossPrice;
+		return true;
+	}
+
+	bool SetStopLossAndTakeProfit(double newStopLossPrice, double newTakeProfitPrice) {
+		if (newStopLossPrice <= 0 && newTakeProfitPrice <= 0) {
+			return false;
+		}
+
+		if (status == ORDER_STATUS_OPEN) {
+			if (!ATrade::ModifyStopLossAndTakeProfit(newStopLossPrice, newTakeProfitPrice, magicNumber)) {
+				logger.Error(StringFormat("[%s] Failed to modify SL/TP on open position", GetId()));
+				return false;
+			}
+
+			logger.Info(StringFormat(
+				"[%s] SL/TP modified to: sl=%.*f tp=%.*f",
+				GetId(),
+				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
+				newStopLossPrice,
+				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
+				newTakeProfitPrice
+			));
+		}
+
+		if (newStopLossPrice > 0) {
+			stopLossPrice = newStopLossPrice;
+		}
+
+		if (newTakeProfitPrice > 0) {
+			takeProfitPrice = newTakeProfitPrice;
 		}
 
 		return true;

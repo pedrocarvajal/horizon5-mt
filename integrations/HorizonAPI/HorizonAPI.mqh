@@ -8,6 +8,10 @@
 #include "../../helpers/HClampNumeric.mqh"
 #include "../../helpers/HGenerateUuid.mqh"
 #include "enums/EHeartbeatEvent.mqh"
+#include "structs/SHorizonEvent.mqh"
+
+#define VALID_YEAR_MIN 2020
+#define VALID_YEAR_MAX 2100
 
 class HorizonAPI:
 public IRemoteLogger {
@@ -16,11 +20,13 @@ private:
 	SELogger logger;
 	long accountId;
 	bool isEnabled;
+	string storedBaseUrl;
+	string storedApiKey;
 
 	ulong registeredMagicNumbers[];
 	string registeredStrategyUUIDs[];
 
-	string OrderStatusToString(ENUM_ORDER_STATUSES status) {
+	string orderStatusToString(ENUM_ORDER_STATUSES status) {
 		if (status == ORDER_STATUS_PENDING) {
 			return "pending";
 		}
@@ -44,7 +50,7 @@ private:
 		return "unknown";
 	}
 
-	string HeartbeatEventToString(ENUM_HEARTBEAT_EVENT event) {
+	string heartbeatEventToString(ENUM_HEARTBEAT_EVENT event) {
 		if (event == HEARTBEAT_INIT) {
 			return "on_init";
 		}
@@ -64,7 +70,7 @@ private:
 		return "unknown";
 	}
 
-	string OrderSideToString(int side) {
+	string orderSideToString(int side) {
 		if (side == ORDER_TYPE_BUY) {
 			return "buy";
 		}
@@ -72,7 +78,7 @@ private:
 		return "sell";
 	}
 
-	double GetSafeMarginLevel() {
+	double getSafeMarginLevel() {
 		if (AccountInfoDouble(ACCOUNT_MARGIN) > 0) {
 			return NormalizeDouble(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 2);
 		}
@@ -80,11 +86,11 @@ private:
 		return 0.0;
 	}
 
-	bool IsValidDateTime(SDateTime &dt) {
-		return dt.timestamp > 0 && dt.year >= 2020 && dt.year <= 2100;
+	bool isValidDateTime(SDateTime &dt) {
+		return dt.timestamp > 0 && dt.year >= VALID_YEAR_MIN && dt.year <= VALID_YEAR_MAX;
 	}
 
-	string CloseReasonToString(ENUM_DEAL_REASON reason) {
+	string closeReasonToString(ENUM_DEAL_REASON reason) {
 		if (reason == DEAL_REASON_TP) {
 			return "tp";
 		}
@@ -112,7 +118,21 @@ private:
 		return "unknown";
 	}
 
+	bool refreshAuth() {
+		if (!authenticate(storedBaseUrl, storedApiKey)) {
+			logger.Error("Token refresh failed — disabling HorizonAPI");
+			isEnabled = false;
+			return false;
+		}
+		return true;
+	}
+
 	bool authenticate(string baseUrl, string apiKey) {
+		if (request != NULL && CheckPointer(request) == POINTER_DYNAMIC) {
+			delete request;
+			request = NULL;
+		}
+
 		SERequest authRequest(baseUrl);
 		authRequest.AddHeader("Content-Type", "application/json");
 
@@ -134,12 +154,6 @@ private:
 		}
 
 		JSON::Object *dataObject = root.getObject("data");
-
-		if (dataObject == NULL) {
-			logger.Error("Authentication 'data' field is not an object");
-			return false;
-		}
-
 		string accessToken = dataObject.getString("access");
 
 		if (accessToken == "") {
@@ -154,7 +168,7 @@ private:
 		return true;
 	}
 
-	void RegisterStrategy(ulong magicNumber) {
+	void registerStrategy(ulong magicNumber) {
 		for (int i = 0; i < ArraySize(registeredMagicNumbers); i++) {
 			if (registeredMagicNumbers[i] == magicNumber) {
 				return;
@@ -168,7 +182,7 @@ private:
 		registeredStrategyUUIDs[size] = MagicNumberToUuid(magicNumber);
 	}
 
-	string GetStrategyUUID(ulong magicNumber) {
+	string getStrategyUUID(ulong magicNumber) {
 		for (int i = 0; i < ArraySize(registeredMagicNumbers); i++) {
 			if (registeredMagicNumbers[i] == magicNumber) {
 				return registeredStrategyUUIDs[i];
@@ -184,7 +198,7 @@ private:
 			body.setProperty("gross_profit", ClampNumeric(order.GetGrossProfit(), 13, 2));
 			body.setProperty("commission", ClampNumeric(order.GetCommission(), 13, 2));
 			body.setProperty("swap", ClampNumeric(order.GetSwap(), 13, 2));
-			body.setProperty("close_reason", CloseReasonToString(order.GetCloseReason()));
+			body.setProperty("close_reason", closeReasonToString(order.GetCloseReason()));
 		} else {
 			body.setProperty("profit", ClampNumeric(order.GetFloatingPnL(), 13, 2));
 		}
@@ -195,17 +209,76 @@ private:
 		SDateTime openTime = order.GetOpenAt();
 		SDateTime closeTime = order.GetCloseAt();
 
-		if (IsValidDateTime(signalTime)) {
+		if (isValidDateTime(signalTime)) {
 			body.setProperty("signal_at", signalTime.ToUTCISO());
 		}
 
-		if (IsValidDateTime(openTime)) {
+		if (isValidDateTime(openTime)) {
 			body.setProperty("opened_at", openTime.ToUTCISO());
 		}
 
-		if (IsValidDateTime(closeTime)) {
+		if (isValidDateTime(closeTime)) {
 			body.setProperty("closed_at", closeTime.ToUTCISO());
 		}
+	}
+
+	void parseHorizonEvent(JSON::Object *eventObject, SHorizonEvent &event) {
+		event.id = eventObject.getString("id");
+		event.key = eventObject.getString("key");
+
+		JSON::Object *payload = eventObject.getObject("payload");
+
+		if (payload == NULL) {
+			return;
+		}
+
+		event.payloadRaw = payload.toString();
+
+		if (event.key == "post.order") {
+			event.symbol = payload.getString("symbol");
+			event.type = payload.getString("type");
+			event.volume = payload.getNumber("volume");
+			event.price = payload.getNumber("price");
+			event.stopLoss = payload.getNumber("stop_loss");
+			event.takeProfit = payload.getNumber("take_profit");
+			event.comment = payload.getString("comment");
+		} else if (event.key == "delete.order") {
+			event.positionId = (long)payload.getNumber("id");
+		} else if (event.key == "put.order") {
+			event.positionId = (long)payload.getNumber("id");
+			event.stopLoss = payload.getNumber("stop_loss");
+			event.takeProfit = payload.getNumber("take_profit");
+		} else if (event.key == "get.ticker") {
+			event.symbol = payload.getString("symbols");
+		}
+	}
+
+	int fillEventsFromArray(JSON::Array *dataArray, SHorizonEvent &events[]) {
+		int eventCount = dataArray.getLength();
+
+		if (eventCount == 0) {
+			return 0;
+		}
+
+		ArrayResize(events, eventCount);
+		int filledCount = 0;
+
+		for (int i = 0; i < eventCount; i++) {
+			JSON::Object *eventObject = dataArray.getObject(i);
+
+			if (eventObject == NULL) {
+				continue;
+			}
+
+			parseHorizonEvent(eventObject, events[filledCount]);
+			filledCount++;
+		}
+
+		if (filledCount < eventCount) {
+			ArrayResize(events, filledCount);
+		}
+
+		return filledCount;
 	}
 
 public:
@@ -238,6 +311,8 @@ public:
 		}
 
 		accountId = AccountInfoInteger(ACCOUNT_LOGIN);
+		storedBaseUrl = baseUrl;
+		storedApiKey = apiKey;
 
 		if (!authenticate(baseUrl, apiKey)) {
 			return false;
@@ -271,7 +346,7 @@ public:
 		body.setProperty("margin", ClampNumeric(AccountInfoDouble(ACCOUNT_MARGIN), 13, 2));
 		body.setProperty("free_margin", ClampNumeric(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 13, 2));
 		body.setProperty("profit", ClampNumeric(AccountInfoDouble(ACCOUNT_PROFIT), 13, 2));
-		body.setProperty("margin_level", ClampNumeric(GetSafeMarginLevel(), 8, 2));
+		body.setProperty("margin_level", ClampNumeric(getSafeMarginLevel(), 8, 2));
 
 		request.Post("api/v1/account/", body);
 	}
@@ -287,10 +362,10 @@ public:
 			return;
 		}
 
-		RegisterStrategy(magicNumber);
+		registerStrategy(magicNumber);
 
 		JSON::Object body;
-		body.setProperty("id", GetStrategyUUID(magicNumber));
+		body.setProperty("id", getStrategyUUID(magicNumber));
 		body.setProperty("account_id", accountId);
 		body.setProperty("name", strategyName);
 		body.setProperty("symbol", symbol);
@@ -301,16 +376,29 @@ public:
 		request.Post("api/v1/strategy/", body);
 	}
 
-	void StoreHeartbeat(ulong magicNumber, ENUM_HEARTBEAT_EVENT event, string system = "strategy") {
+	void StoreHeartbeat(ulong magicNumber, ENUM_HEARTBEAT_EVENT event, string systemName = "strategy") {
 		if (!isEnabled) {
 			return;
 		}
 
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
-		body.setProperty("strategy_id", GetStrategyUUID(magicNumber));
-		body.setProperty("event", HeartbeatEventToString(event));
-		body.setProperty("system", system);
+		body.setProperty("strategy_id", getStrategyUUID(magicNumber));
+		body.setProperty("event", heartbeatEventToString(event));
+		body.setProperty("system", systemName);
+
+		request.Post("api/v1/heartbeat/", body);
+	}
+
+	void StoreSystemHeartbeat(ENUM_HEARTBEAT_EVENT event) {
+		if (!isEnabled) {
+			return;
+		}
+
+		JSON::Object body;
+		body.setProperty("account_id", accountId);
+		body.setProperty("event", heartbeatEventToString(event));
+		body.setProperty("system", "system");
 
 		request.Post("api/v1/heartbeat/", body);
 	}
@@ -323,14 +411,14 @@ public:
 		JSON::Object body;
 		body.setProperty("id", order.GetId());
 		body.setProperty("account_id", accountId);
-		body.setProperty("strategy_id", GetStrategyUUID(order.GetMagicNumber()));
+		body.setProperty("strategy_id", getStrategyUUID(order.GetMagicNumber()));
 		body.setProperty("ticket", (long)order.GetOrderId());
 		body.setProperty("deal_id", (long)order.GetDealId());
 		body.setProperty("position_id", (long)order.GetPositionId());
 		body.setProperty("source", order.GetSource());
 		body.setProperty("symbol", order.GetSymbol());
-		body.setProperty("side", OrderSideToString(order.GetSide()));
-		body.setProperty("status", OrderStatusToString(order.GetStatus()));
+		body.setProperty("side", orderSideToString(order.GetSide()));
+		body.setProperty("status", orderStatusToString(order.GetStatus()));
 		body.setProperty("is_market_order", order.IsMarketOrder());
 		body.setProperty("volume", ClampNumeric(order.GetVolume(), 6, 4));
 		body.setProperty("signal_price", ClampNumeric(order.GetSignalPrice(), 10, 5));
@@ -356,7 +444,7 @@ public:
 		body.setProperty("message", message);
 
 		if (magicNumber > 0) {
-			body.setProperty("strategy_id", GetStrategyUUID(magicNumber));
+			body.setProperty("strategy_id", getStrategyUUID(magicNumber));
 		}
 
 		request.Post("api/v1/log/", body);
@@ -381,7 +469,7 @@ public:
 		body.setProperty("balance", balance);
 		body.setProperty("equity", equity);
 		body.setProperty("profit", ClampNumeric(AccountInfoDouble(ACCOUNT_PROFIT), 13, 2));
-		body.setProperty("margin_level", ClampNumeric(GetSafeMarginLevel(), 8, 2));
+		body.setProperty("margin_level", ClampNumeric(getSafeMarginLevel(), 8, 2));
 		body.setProperty("open_positions", PositionsTotal());
 		body.setProperty("drawdown_pct", ClampNumeric(drawdownPct, 4, 4));
 		body.setProperty("daily_pnl", ClampNumeric(dailyPnl, 13, 2));
@@ -389,7 +477,7 @@ public:
 		body.setProperty("open_order_count", openOrderCount);
 		body.setProperty("exposure_lots", ClampNumeric(exposureLots, 6, 4));
 
-		request.Post("api/v1/account-snapshot/", body);
+		request.Post("api/v1/accounts/snapshots/", body);
 	}
 
 	void StoreStrategySnapshot(
@@ -407,7 +495,7 @@ public:
 
 		JSON::Object body;
 		body.setProperty("account_id", accountId);
-		body.setProperty("strategy_id", GetStrategyUUID(magicNumber));
+		body.setProperty("strategy_id", getStrategyUUID(magicNumber));
 		body.setProperty("nav", ClampNumeric(nav, 13, 2));
 		body.setProperty("drawdown_pct", ClampNumeric(drawdownPct, 4, 4));
 		body.setProperty("daily_pnl", ClampNumeric(dailyPnl, 13, 2));
@@ -415,7 +503,74 @@ public:
 		body.setProperty("open_order_count", openOrderCount);
 		body.setProperty("exposure_lots", ClampNumeric(exposureLots, 6, 4));
 
-		request.Post("api/v1/strategy-snapshot/", body);
+		request.Post("api/v1/strategies/snapshots/", body);
+	}
+
+	int ConsumeEvents(const string keys, const string symbolFilter, SHorizonEvent &events[], int limit = 10, int strategyFilter = 0) {
+		if (!isEnabled) {
+			return 0;
+		}
+
+		string path = StringFormat(
+			"api/v1/account/%d/events/consume/?key=%s&limit=%d",
+			accountId, keys, limit
+		);
+
+		if (symbolFilter != "") {
+			path += "&symbol=" + symbolFilter;
+		}
+
+		if (strategyFilter > 0) {
+			path += "&strategy=" + IntegerToString(strategyFilter);
+		}
+
+		JSON::Object emptyBody;
+		SRequestResponse response = request.Post(path, emptyBody);
+
+		if (response.status == 401) {
+			if (!refreshAuth()) {
+				return 0;
+			}
+			response = request.Post(path, emptyBody);
+		}
+
+		if (response.status != 200 || response.body == "") {
+			return 0;
+		}
+
+		JSON::Object root(response.body);
+
+		if (!root.isArray("data")) {
+			return 0;
+		}
+
+		JSON::Array *dataArray = root.getArray("data");
+		return fillEventsFromArray(dataArray, events);
+	}
+
+	bool AckEvent(const string eventId, JSON::Object &responseBody) {
+		if (!isEnabled) {
+			return false;
+		}
+
+		string path = StringFormat(
+			"api/v1/account/%d/event/%s/ack/",
+			accountId, eventId
+		);
+
+		JSON::Object wrapper;
+		wrapper.setProperty("response", &responseBody);
+
+		SRequestResponse response = request.Patch(path, wrapper);
+
+		if (response.status == 401) {
+			if (!refreshAuth()) {
+				return false;
+			}
+			response = request.Patch(path, wrapper);
+		}
+
+		return response.status == 200;
 	}
 };
 

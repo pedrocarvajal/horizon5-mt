@@ -314,6 +314,11 @@ private:
 		while (i < StringLen(json)) {
 			JSON::_skipWhitespace(json, i);
 
+			if (json[i] == '}') {
+				i++;
+				break;
+			}
+
 			string key = JSON::_parseKey(json, i, isSuccess);
 			if (!isSuccess) {
 				return;
