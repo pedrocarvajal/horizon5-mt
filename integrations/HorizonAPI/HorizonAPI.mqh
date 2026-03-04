@@ -20,8 +20,6 @@ private:
 	SELogger logger;
 	long accountId;
 	bool isEnabled;
-	string storedBaseUrl;
-	string storedApiKey;
 
 	ulong registeredMagicNumbers[];
 	string registeredStrategyUUIDs[];
@@ -75,6 +73,11 @@ private:
 			return "buy";
 		}
 
+		if (side == ORDER_TYPE_SELL) {
+			return "sell";
+		}
+
+		logger.Warning(StringFormat("orderSideToString: unexpected side value %d — defaulting to sell", side));
 		return "sell";
 	}
 
@@ -118,15 +121,6 @@ private:
 		return "unknown";
 	}
 
-	bool refreshAuth() {
-		if (!authenticate(storedBaseUrl, storedApiKey)) {
-			logger.Error("Token refresh failed — disabling HorizonAPI");
-			isEnabled = false;
-			return false;
-		}
-		return true;
-	}
-
 	bool authenticate(string baseUrl, string apiKey) {
 		if (request != NULL && CheckPointer(request) == POINTER_DYNAMIC) {
 			delete request;
@@ -165,6 +159,7 @@ private:
 		request.AddHeader("Content-Type", "application/json");
 		request.AddHeader("Authorization", "Bearer " + accessToken);
 
+		logger.Info("Authentication successful");
 		return true;
 	}
 
@@ -243,11 +238,15 @@ private:
 			event.takeProfit = payload.getNumber("take_profit");
 			event.comment = payload.getString("comment");
 		} else if (event.key == "delete.order") {
-			event.positionId = (long)payload.getNumber("id");
+			event.orderId = payload.getString("id");
 		} else if (event.key == "put.order") {
-			event.positionId = (long)payload.getNumber("id");
+			event.orderId = payload.getString("id");
 			event.stopLoss = payload.getNumber("stop_loss");
 			event.takeProfit = payload.getNumber("take_profit");
+		} else if (event.key == "get.orders") {
+			event.symbol = payload.getString("symbol");
+			event.side = payload.getString("side");
+			event.status = payload.getString("status");
 		} else if (event.key == "get.ticker") {
 			event.symbol = payload.getString("symbols");
 		}
@@ -311,8 +310,6 @@ public:
 		}
 
 		accountId = AccountInfoInteger(ACCOUNT_LOGIN);
-		storedBaseUrl = baseUrl;
-		storedApiKey = apiKey;
 
 		if (!authenticate(baseUrl, apiKey)) {
 			return false;
@@ -525,13 +522,12 @@ public:
 		}
 
 		JSON::Object emptyBody;
-		SRequestResponse response = request.Post(path, emptyBody);
+		SRequestResponse response = request.Post(path, emptyBody, 0, "", 0);
 
 		if (response.status == 401) {
-			if (!refreshAuth()) {
-				return 0;
-			}
-			response = request.Post(path, emptyBody);
+			logger.Error("Unauthorized (401) on ConsumeEvents — check API key. Disabling HorizonAPI.");
+			isEnabled = false;
+			return 0;
 		}
 
 		if (response.status != 200 || response.body == "") {
@@ -564,10 +560,9 @@ public:
 		SRequestResponse response = request.Patch(path, wrapper);
 
 		if (response.status == 401) {
-			if (!refreshAuth()) {
-				return false;
-			}
-			response = request.Patch(path, wrapper);
+			logger.Error("Unauthorized (401) on AckEvent — check API key. Disabling HorizonAPI.");
+			isEnabled = false;
+			return false;
 		}
 
 		return response.status == 200;
