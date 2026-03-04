@@ -53,7 +53,6 @@ private:
 		int candidateCount = maxCandidateCount;
 
 		if (candidateCount < 1) {
-			logger.Debug("KNN skipped: no training candidates available");
 			return 0;
 		}
 
@@ -74,13 +73,6 @@ private:
 			weightSum += 1.0 / (distances[n] + epsilon);
 		}
 
-		logger.Debug(StringFormat(
-			"KNN: %d neighbors from %d candidates, distances [%.4f..%.4f]",
-			neighborsCount,
-			candidateCount,
-			distances[0],
-			distances[neighborsCount - 1]
-		));
 
 		string topNeighborsLog = "Top neighbors: ";
 		int logCount = MathMin(5, neighborsCount);
@@ -101,7 +93,6 @@ private:
 			);
 		}
 
-		logger.Debug(topNeighborsLog);
 
 		return neighborsCount;
 	}
@@ -149,8 +140,6 @@ private:
 
 			scoresLog += StringFormat("%s=%.6f", strategyPrefixes[s], strategyScores[s]);
 		}
-
-		logger.Debug(scoresLog);
 	}
 
 	void selectActiveStrategies(double &strategyScores[], string &activeStrategies[]) {

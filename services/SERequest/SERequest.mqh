@@ -52,7 +52,6 @@ private:
 			int errorCode = GetLastError();
 			string reason = errorCode == 4014 ? "URL not in allowed list" : "Connection failed";
 			logger.Error(StringFormat("%s: error=%d %s %s", reason, errorCode, method, url));
-			logger.Debug("Sent: " + CharArrayToString(data));
 			response.body = "";
 			return response;
 		}
@@ -61,8 +60,6 @@ private:
 
 		if (status >= 400) {
 			logger.Error(StringFormat("HTTP %d %s %s", status, method, url));
-			logger.Debug("Sent: " + CharArrayToString(data));
-			logger.Debug("Response: " + response.body);
 		}
 
 		return response;
@@ -95,6 +92,17 @@ public:
 		StringToCharArray(bodyString, data, 0, StringLen(bodyString), CP_UTF8);
 
 		return execute("POST", url, data, effectiveTimeout, headers);
+	}
+
+	SRequestResponse Patch(const string path, JSON::Object &body, int customTimeout = 0) {
+		string url = buildUrl(path);
+		string bodyString = body.toString();
+		int effectiveTimeout = (customTimeout > 0) ? customTimeout : timeout;
+
+		char data[];
+		StringToCharArray(bodyString, data, 0, StringLen(bodyString), CP_UTF8);
+
+		return execute("PATCH", url, data, effectiveTimeout);
 	}
 
 	void AddHeader(const string key, const string value) {
