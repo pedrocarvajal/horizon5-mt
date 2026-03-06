@@ -20,6 +20,10 @@ struct SHorizonEvent {
 	string side;
 	string status;
 
+	string timeframe;
+	string fromDate;
+	string toDate;
+
 	SHorizonEvent() {
 		id = "";
 		key = "";
@@ -35,6 +39,9 @@ struct SHorizonEvent {
 		positionId = 0;
 		side = "";
 		status = "";
+		timeframe = "";
+		fromDate = "";
+		toDate = "";
 	}
 };
 
