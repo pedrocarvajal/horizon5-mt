@@ -5,126 +5,35 @@
 #include "../../services/SELogger/SELogger.mqh"
 #include "../../entities/EOrder.mqh"
 #include "../../interfaces/IRemoteLogger.mqh"
-#include "../../helpers/HClampNumeric.mqh"
-#include "../../helpers/HGenerateUuid.mqh"
-#include "enums/EHeartbeatEvent.mqh"
-#include "structs/SHorizonEvent.mqh"
-
-#define VALID_YEAR_MIN 2020
-#define VALID_YEAR_MAX 2100
+#include "HorizonAPIContext.mqh"
+#include "resources/AccountResource.mqh"
+#include "resources/StrategyResource.mqh"
+#include "resources/OrderResource.mqh"
+#include "resources/HeartbeatResource.mqh"
+#include "resources/LogResource.mqh"
+#include "resources/SnapshotResource.mqh"
+#include "resources/EventResource.mqh"
+#include "resources/MediaResource.mqh"
 
 class HorizonAPI:
 public IRemoteLogger {
 private:
-	SERequest * request;
+	HorizonAPIContext context;
 	SELogger logger;
-	long accountId;
-	bool isEnabled;
 
-	ulong registeredMagicNumbers[];
-	string registeredStrategyUUIDs[];
-
-	string orderStatusToString(ENUM_ORDER_STATUSES status) {
-		if (status == ORDER_STATUS_PENDING) {
-			return "pending";
-		}
-
-		if (status == ORDER_STATUS_OPEN) {
-			return "open";
-		}
-
-		if (status == ORDER_STATUS_CLOSING) {
-			return "closing";
-		}
-
-		if (status == ORDER_STATUS_CLOSED) {
-			return "closed";
-		}
-
-		if (status == ORDER_STATUS_CANCELLED) {
-			return "cancelled";
-		}
-
-		return "unknown";
-	}
-
-	string heartbeatEventToString(ENUM_HEARTBEAT_EVENT event) {
-		if (event == HEARTBEAT_INIT) {
-			return "on_init";
-		}
-
-		if (event == HEARTBEAT_DEINIT) {
-			return "on_deinit";
-		}
-
-		if (event == HEARTBEAT_RUNNING) {
-			return "on_running";
-		}
-
-		if (event == HEARTBEAT_ERROR) {
-			return "on_error";
-		}
-
-		return "unknown";
-	}
-
-	string orderSideToString(int side) {
-		if (side == ORDER_TYPE_BUY) {
-			return "buy";
-		}
-
-		if (side == ORDER_TYPE_SELL) {
-			return "sell";
-		}
-
-		logger.Warning(StringFormat("orderSideToString: unexpected side value %d — defaulting to sell", side));
-		return "sell";
-	}
-
-	double getSafeMarginLevel() {
-		if (AccountInfoDouble(ACCOUNT_MARGIN) > 0) {
-			return NormalizeDouble(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 2);
-		}
-
-		return 0.0;
-	}
-
-	bool isValidDateTime(SDateTime &dt) {
-		return dt.timestamp > 0 && dt.year >= VALID_YEAR_MIN && dt.year <= VALID_YEAR_MAX;
-	}
-
-	string closeReasonToString(ENUM_DEAL_REASON reason) {
-		if (reason == DEAL_REASON_TP) {
-			return "tp";
-		}
-
-		if (reason == DEAL_REASON_SL) {
-			return "sl";
-		}
-
-		if (reason == DEAL_REASON_EXPERT) {
-			return "expert";
-		}
-
-		if (reason == DEAL_REASON_CLIENT) {
-			return "client";
-		}
-
-		if (reason == DEAL_REASON_MOBILE) {
-			return "mobile";
-		}
-
-		if (reason == DEAL_REASON_WEB) {
-			return "web";
-		}
-
-		return "unknown";
-	}
+	AccountResource *accounts;
+	StrategyResource *strategies;
+	OrderResource *orders;
+	HeartbeatResource *heartbeats;
+	LogResource *logs;
+	SnapshotResource *snapshots;
+	EventResource *events;
+	MediaResource *media;
 
 	bool authenticate(string baseUrl, string apiKey) {
-		if (request != NULL && CheckPointer(request) == POINTER_DYNAMIC) {
-			delete request;
-			request = NULL;
+		if (context.request != NULL && CheckPointer(context.request) == POINTER_DYNAMIC) {
+			delete context.request;
+			context.request = NULL;
 		}
 
 		SERequest authRequest(baseUrl);
@@ -155,142 +64,81 @@ private:
 			return false;
 		}
 
-		request = new SERequest(baseUrl);
-		request.AddHeader("Content-Type", "application/json");
-		request.AddHeader("Authorization", "Bearer " + accessToken);
+		context.request = new SERequest(baseUrl);
+		context.request.AddHeader("Content-Type", "application/json");
+		context.request.AddHeader("Authorization", "Bearer " + accessToken);
 
 		logger.Info("Authentication successful");
 		return true;
 	}
 
-	void registerStrategy(ulong magicNumber) {
-		for (int i = 0; i < ArraySize(registeredMagicNumbers); i++) {
-			if (registeredMagicNumbers[i] == magicNumber) {
-				return;
-			}
-		}
-
-		int size = ArraySize(registeredMagicNumbers);
-		ArrayResize(registeredMagicNumbers, size + 1);
-		ArrayResize(registeredStrategyUUIDs, size + 1);
-		registeredMagicNumbers[size] = magicNumber;
-		registeredStrategyUUIDs[size] = MagicNumberToUuid(magicNumber);
+	void initResources() {
+		HorizonAPIContext *ctx = GetPointer(context);
+		accounts = new AccountResource(ctx);
+		strategies = new StrategyResource(ctx);
+		orders = new OrderResource(ctx, strategies);
+		heartbeats = new HeartbeatResource(ctx, strategies);
+		logs = new LogResource(ctx, strategies);
+		snapshots = new SnapshotResource(ctx, strategies);
+		events = new EventResource(ctx);
+		media = new MediaResource(ctx);
 	}
 
-	string getStrategyUUID(ulong magicNumber) {
-		for (int i = 0; i < ArraySize(registeredMagicNumbers); i++) {
-			if (registeredMagicNumbers[i] == magicNumber) {
-				return registeredStrategyUUIDs[i];
-			}
+	void deleteResources() {
+		if (orders != NULL && CheckPointer(orders) == POINTER_DYNAMIC) {
+			delete orders;
+		}
+		if (heartbeats != NULL && CheckPointer(heartbeats) == POINTER_DYNAMIC) {
+			delete heartbeats;
+		}
+		if (logs != NULL && CheckPointer(logs) == POINTER_DYNAMIC) {
+			delete logs;
+		}
+		if (snapshots != NULL && CheckPointer(snapshots) == POINTER_DYNAMIC) {
+			delete snapshots;
+		}
+		if (media != NULL && CheckPointer(media) == POINTER_DYNAMIC) {
+			delete media;
+		}
+		if (events != NULL && CheckPointer(events) == POINTER_DYNAMIC) {
+			delete events;
+		}
+		if (strategies != NULL && CheckPointer(strategies) == POINTER_DYNAMIC) {
+			delete strategies;
+		}
+		if (accounts != NULL && CheckPointer(accounts) == POINTER_DYNAMIC) {
+			delete accounts;
 		}
 
-		return MagicNumberToUuid(magicNumber);
-	}
-
-	void buildOrderProfitFields(JSON::Object &body, EOrder &order) {
-		if (order.GetStatus() == ORDER_STATUS_CLOSED) {
-			body.setProperty("profit", ClampNumeric(order.GetProfitInDollars(), 13, 2));
-			body.setProperty("gross_profit", ClampNumeric(order.GetGrossProfit(), 13, 2));
-			body.setProperty("commission", ClampNumeric(order.GetCommission(), 13, 2));
-			body.setProperty("swap", ClampNumeric(order.GetSwap(), 13, 2));
-			body.setProperty("close_reason", closeReasonToString(order.GetCloseReason()));
-		} else {
-			body.setProperty("profit", ClampNumeric(order.GetFloatingPnL(), 13, 2));
-		}
-	}
-
-	void buildOrderDateTimeFields(JSON::Object &body, EOrder &order) {
-		SDateTime signalTime = order.GetSignalAt();
-		SDateTime openTime = order.GetOpenAt();
-		SDateTime closeTime = order.GetCloseAt();
-
-		if (isValidDateTime(signalTime)) {
-			body.setProperty("signal_at", signalTime.ToUTCISO());
-		}
-
-		if (isValidDateTime(openTime)) {
-			body.setProperty("opened_at", openTime.ToUTCISO());
-		}
-
-		if (isValidDateTime(closeTime)) {
-			body.setProperty("closed_at", closeTime.ToUTCISO());
-		}
-	}
-
-	void parseHorizonEvent(JSON::Object *eventObject, SHorizonEvent &event) {
-		event.id = eventObject.getString("id");
-		event.key = eventObject.getString("key");
-
-		JSON::Object *payload = eventObject.getObject("payload");
-
-		if (payload == NULL) {
-			return;
-		}
-
-		event.payloadRaw = payload.toString();
-
-		if (event.key == "post.order") {
-			event.symbol = payload.getString("symbol");
-			event.type = payload.getString("type");
-			event.volume = payload.getNumber("volume");
-			event.price = payload.getNumber("price");
-			event.stopLoss = payload.getNumber("stop_loss");
-			event.takeProfit = payload.getNumber("take_profit");
-			event.comment = payload.getString("comment");
-		} else if (event.key == "delete.order") {
-			event.orderId = payload.getString("id");
-		} else if (event.key == "put.order") {
-			event.orderId = payload.getString("id");
-			event.stopLoss = payload.getNumber("stop_loss");
-			event.takeProfit = payload.getNumber("take_profit");
-		} else if (event.key == "get.orders") {
-			event.symbol = payload.getString("symbol");
-			event.side = payload.getString("side");
-			event.status = payload.getString("status");
-		} else if (event.key == "get.ticker") {
-			event.symbol = payload.getString("symbols");
-		}
-	}
-
-	int fillEventsFromArray(JSON::Array *dataArray, SHorizonEvent &events[]) {
-		int eventCount = dataArray.getLength();
-
-		if (eventCount == 0) {
-			return 0;
-		}
-
-		ArrayResize(events, eventCount);
-		int filledCount = 0;
-
-		for (int i = 0; i < eventCount; i++) {
-			JSON::Object *eventObject = dataArray.getObject(i);
-
-			if (eventObject == NULL) {
-				continue;
-			}
-
-			parseHorizonEvent(eventObject, events[filledCount]);
-			filledCount++;
-		}
-
-		if (filledCount < eventCount) {
-			ArrayResize(events, filledCount);
-		}
-
-		return filledCount;
+		orders = NULL;
+		heartbeats = NULL;
+		logs = NULL;
+		snapshots = NULL;
+		media = NULL;
+		events = NULL;
+		strategies = NULL;
+		accounts = NULL;
 	}
 
 public:
 	HorizonAPI() {
-		request = NULL;
-		accountId = 0;
-		isEnabled = false;
+		accounts = NULL;
+		strategies = NULL;
+		orders = NULL;
+		heartbeats = NULL;
+		logs = NULL;
+		snapshots = NULL;
+		events = NULL;
+		media = NULL;
 		logger.SetPrefix("HorizonAPI");
 	}
 
 	~HorizonAPI() {
-		if (request != NULL && CheckPointer(request) == POINTER_DYNAMIC) {
-			delete request;
+		deleteResources();
+
+		if (context.request != NULL && CheckPointer(context.request) == POINTER_DYNAMIC) {
+			delete context.request;
+			context.request = NULL;
 		}
 	}
 
@@ -304,48 +152,40 @@ public:
 			return false;
 		}
 
-		if (request != NULL && CheckPointer(request) == POINTER_DYNAMIC) {
-			delete request;
-			request = NULL;
-		}
-
-		accountId = AccountInfoInteger(ACCOUNT_LOGIN);
+		context.SetAccountId(AccountInfoInteger(ACCOUNT_LOGIN));
 
 		if (!authenticate(baseUrl, apiKey)) {
 			return false;
 		}
 
-		isEnabled = true;
-		logger.Info("Initialized for account " + IntegerToString(accountId));
+		context.Enable();
+		initResources();
+
+		logger.Info("Initialized for account " + IntegerToString(context.GetAccountId()));
 		return true;
 	}
 
 	bool IsEnabled() {
-		return isEnabled;
+		return context.IsEnabled();
 	}
 
 	void UpsertAccount() {
-		if (!isEnabled) {
+		if (!context.IsEnabled()) {
 			return;
 		}
 
-		double balance = ClampNumeric(AccountInfoDouble(ACCOUNT_BALANCE), 13, 2);
-		double equity = ClampNumeric(AccountInfoDouble(ACCOUNT_EQUITY), 13, 2);
+		accounts.Upsert();
+	}
 
-		JSON::Object body;
-		body.setProperty("account_id", accountId);
-		body.setProperty("broker", AccountInfoString(ACCOUNT_COMPANY));
-		body.setProperty("server", AccountInfoString(ACCOUNT_SERVER));
-		body.setProperty("currency", AccountInfoString(ACCOUNT_CURRENCY));
-		body.setProperty("leverage", (int)AccountInfoInteger(ACCOUNT_LEVERAGE));
-		body.setProperty("balance", balance);
-		body.setProperty("equity", equity);
-		body.setProperty("margin", ClampNumeric(AccountInfoDouble(ACCOUNT_MARGIN), 13, 2));
-		body.setProperty("free_margin", ClampNumeric(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 13, 2));
-		body.setProperty("profit", ClampNumeric(AccountInfoDouble(ACCOUNT_PROFIT), 13, 2));
-		body.setProperty("margin_level", ClampNumeric(getSafeMarginLevel(), 8, 2));
+	SHorizonAccount FetchAccount() {
+		SHorizonAccount account;
 
-		request.Post("api/v1/account/", body);
+		if (!context.IsEnabled()) {
+			account.status = "active";
+			return account;
+		}
+
+		return accounts.Fetch();
 	}
 
 	void UpsertStrategy(
@@ -355,96 +195,43 @@ public:
 		ulong magicNumber,
 		double balance
 	) {
-		if (!isEnabled) {
+		if (!context.IsEnabled()) {
 			return;
 		}
 
-		registerStrategy(magicNumber);
-
-		JSON::Object body;
-		body.setProperty("id", getStrategyUUID(magicNumber));
-		body.setProperty("account_id", accountId);
-		body.setProperty("name", strategyName);
-		body.setProperty("symbol", symbol);
-		body.setProperty("prefix", prefix);
-		body.setProperty("magic_number", (long)magicNumber);
-		body.setProperty("balance", ClampNumeric(balance, 13, 2));
-
-		request.Post("api/v1/strategy/", body);
+		strategies.Upsert(strategyName, symbol, prefix, magicNumber, balance);
 	}
 
 	void StoreHeartbeat(ulong magicNumber, ENUM_HEARTBEAT_EVENT event, string systemName = "strategy") {
-		if (!isEnabled) {
+		if (!context.IsEnabled()) {
 			return;
 		}
 
-		JSON::Object body;
-		body.setProperty("account_id", accountId);
-		body.setProperty("strategy_id", getStrategyUUID(magicNumber));
-		body.setProperty("event", heartbeatEventToString(event));
-		body.setProperty("system", systemName);
-
-		request.Post("api/v1/heartbeat/", body);
+		heartbeats.Store(magicNumber, event, systemName);
 	}
 
 	void StoreSystemHeartbeat(ENUM_HEARTBEAT_EVENT event) {
-		if (!isEnabled) {
+		if (!context.IsEnabled()) {
 			return;
 		}
 
-		JSON::Object body;
-		body.setProperty("account_id", accountId);
-		body.setProperty("event", heartbeatEventToString(event));
-		body.setProperty("system", "system");
-
-		request.Post("api/v1/heartbeat/", body);
+		heartbeats.StoreSystem(event);
 	}
 
 	void UpsertOrder(EOrder &order) {
-		if (!isEnabled) {
+		if (!context.IsEnabled()) {
 			return;
 		}
 
-		JSON::Object body;
-		body.setProperty("id", order.GetId());
-		body.setProperty("account_id", accountId);
-		body.setProperty("strategy_id", getStrategyUUID(order.GetMagicNumber()));
-		body.setProperty("ticket", (long)order.GetOrderId());
-		body.setProperty("deal_id", (long)order.GetDealId());
-		body.setProperty("position_id", (long)order.GetPositionId());
-		body.setProperty("source", order.GetSource());
-		body.setProperty("symbol", order.GetSymbol());
-		body.setProperty("side", orderSideToString(order.GetSide()));
-		body.setProperty("status", orderStatusToString(order.GetStatus()));
-		body.setProperty("is_market_order", order.IsMarketOrder());
-		body.setProperty("volume", ClampNumeric(order.GetVolume(), 6, 4));
-		body.setProperty("signal_price", ClampNumeric(order.GetSignalPrice(), 10, 5));
-		body.setProperty("open_at_price", ClampNumeric(order.GetOpenAtPrice(), 10, 5));
-		body.setProperty("open_price", ClampNumeric(order.GetOpenPrice(), 10, 5));
-		body.setProperty("close_price", ClampNumeric(order.GetClosePrice(), 10, 5));
-		body.setProperty("take_profit", ClampNumeric(order.GetTakeProfitPrice(), 10, 5));
-		body.setProperty("stop_loss", ClampNumeric(order.GetStopLossPrice(), 10, 5));
-		buildOrderProfitFields(body, order);
-		buildOrderDateTimeFields(body, order);
-
-		request.Post("api/v1/order/", body);
+		orders.Upsert(order);
 	}
 
 	void StoreLog(string level, string message, ulong magicNumber = 0) {
-		if (!isEnabled) {
+		if (!context.IsEnabled()) {
 			return;
 		}
 
-		JSON::Object body;
-		body.setProperty("account_id", accountId);
-		body.setProperty("level", level);
-		body.setProperty("message", message);
-
-		if (magicNumber > 0) {
-			body.setProperty("strategy_id", getStrategyUUID(magicNumber));
-		}
-
-		request.Post("api/v1/log/", body);
+		logs.Store(level, message, magicNumber);
 	}
 
 	void StoreAccountSnapshot(
@@ -454,27 +241,11 @@ public:
 		int openOrderCount,
 		double exposureLots
 	) {
-		if (!isEnabled) {
+		if (!context.IsEnabled()) {
 			return;
 		}
 
-		double balance = ClampNumeric(AccountInfoDouble(ACCOUNT_BALANCE), 13, 2);
-		double equity = ClampNumeric(AccountInfoDouble(ACCOUNT_EQUITY), 13, 2);
-
-		JSON::Object body;
-		body.setProperty("account_id", accountId);
-		body.setProperty("balance", balance);
-		body.setProperty("equity", equity);
-		body.setProperty("profit", ClampNumeric(AccountInfoDouble(ACCOUNT_PROFIT), 13, 2));
-		body.setProperty("margin_level", ClampNumeric(getSafeMarginLevel(), 8, 2));
-		body.setProperty("open_positions", PositionsTotal());
-		body.setProperty("drawdown_pct", ClampNumeric(drawdownPct, 4, 4));
-		body.setProperty("daily_pnl", ClampNumeric(dailyPnl, 13, 2));
-		body.setProperty("floating_pnl", ClampNumeric(floatingPnl, 13, 2));
-		body.setProperty("open_order_count", openOrderCount);
-		body.setProperty("exposure_lots", ClampNumeric(exposureLots, 6, 4));
-
-		request.Post("api/v1/accounts/snapshots/", body);
+		snapshots.StoreAccount(drawdownPct, dailyPnl, floatingPnl, openOrderCount, exposureLots);
 	}
 
 	void StoreStrategySnapshot(
@@ -486,86 +257,35 @@ public:
 		int openOrderCount,
 		double exposureLots
 	) {
-		if (!isEnabled) {
+		if (!context.IsEnabled()) {
 			return;
 		}
 
-		JSON::Object body;
-		body.setProperty("account_id", accountId);
-		body.setProperty("strategy_id", getStrategyUUID(magicNumber));
-		body.setProperty("nav", ClampNumeric(nav, 13, 2));
-		body.setProperty("drawdown_pct", ClampNumeric(drawdownPct, 4, 4));
-		body.setProperty("daily_pnl", ClampNumeric(dailyPnl, 13, 2));
-		body.setProperty("floating_pnl", ClampNumeric(floatingPnl, 13, 2));
-		body.setProperty("open_order_count", openOrderCount);
-		body.setProperty("exposure_lots", ClampNumeric(exposureLots, 6, 4));
-
-		request.Post("api/v1/strategies/snapshots/", body);
+		snapshots.StoreStrategy(magicNumber, nav, drawdownPct, dailyPnl, floatingPnl, openOrderCount, exposureLots);
 	}
 
-	int ConsumeEvents(const string keys, const string symbolFilter, SHorizonEvent &events[], int limit = 10, int strategyFilter = 0) {
-		if (!isEnabled) {
+	int ConsumeEvents(const string keys, const string symbolFilter, SHorizonEvent &eventList[], int limit = 10, int strategyFilter = 0) {
+		if (!context.IsEnabled()) {
 			return 0;
 		}
 
-		string path = StringFormat(
-			"api/v1/account/%d/events/consume/?key=%s&limit=%d",
-			accountId, keys, limit
-		);
-
-		if (symbolFilter != "") {
-			path += "&symbol=" + symbolFilter;
-		}
-
-		if (strategyFilter > 0) {
-			path += "&strategy=" + IntegerToString(strategyFilter);
-		}
-
-		JSON::Object emptyBody;
-		SRequestResponse response = request.Post(path, emptyBody, 0, "", 0);
-
-		if (response.status == 401) {
-			logger.Error("Unauthorized (401) on ConsumeEvents — check API key. Disabling HorizonAPI.");
-			isEnabled = false;
-			return 0;
-		}
-
-		if (response.status != 200 || response.body == "") {
-			return 0;
-		}
-
-		JSON::Object root(response.body);
-
-		if (!root.isArray("data")) {
-			return 0;
-		}
-
-		JSON::Array *dataArray = root.getArray("data");
-		return fillEventsFromArray(dataArray, events);
+		return events.Consume(keys, symbolFilter, eventList, limit, strategyFilter);
 	}
 
 	bool AckEvent(const string eventId, JSON::Object &responseBody) {
-		if (!isEnabled) {
+		if (!context.IsEnabled()) {
 			return false;
 		}
 
-		string path = StringFormat(
-			"api/v1/account/%d/event/%s/ack/",
-			accountId, eventId
-		);
+		return events.Ack(eventId, responseBody);
+	}
 
-		JSON::Object wrapper;
-		wrapper.setProperty("response", &responseBody);
-
-		SRequestResponse response = request.Patch(path, wrapper);
-
-		if (response.status == 401) {
-			logger.Error("Unauthorized (401) on AckEvent — check API key. Disabling HorizonAPI.");
-			isEnabled = false;
-			return false;
+	string UploadMedia(string fileName, char &fileData[], string contentType = "text/csv") {
+		if (!context.IsEnabled()) {
+			return "";
 		}
 
-		return response.status == 200;
+		return media.Upload(fileName, fileData, contentType);
 	}
 };
 

@@ -105,6 +105,53 @@ public:
 		return execute("PATCH", url, data, effectiveTimeout, "", slowThreshold);
 	}
 
+	SRequestResponse PostMultipart(const string path, const string fieldName, const string fileName, char &fileData[], const string contentType = "text/csv") {
+		string url = buildUrl(path);
+		string boundary = "----HorizonBoundary9876543210";
+
+		string preamble =
+			"--" + boundary + "\r\n" +
+			"Content-Disposition: form-data; name=\"" + fieldName + "\"; filename=\"" + fileName + "\"\r\n" +
+			"Content-Type: " + contentType + "\r\n" +
+			"\r\n";
+
+		string closing = "\r\n--" + boundary + "--\r\n";
+
+		char preambleData[];
+		StringToCharArray(preamble, preambleData, 0, StringLen(preamble), CP_UTF8);
+
+		char closingData[];
+		StringToCharArray(closing, closingData, 0, StringLen(closing), CP_UTF8);
+
+		int preambleSize = ArraySize(preambleData);
+		int fileSize = ArraySize(fileData);
+		int closingSize = ArraySize(closingData);
+
+		char data[];
+		ArrayResize(data, preambleSize + fileSize + closingSize);
+		ArrayCopy(data, preambleData, 0, 0, preambleSize);
+		ArrayCopy(data, fileData, preambleSize, 0, fileSize);
+		ArrayCopy(data, closingData, preambleSize + fileSize, 0, closingSize);
+
+		string headers = "";
+		int searchPos = 0;
+		while (searchPos < StringLen(defaultHeaders)) {
+			int lineEnd = StringFind(defaultHeaders, "\r\n", searchPos);
+			if (lineEnd < 0) {
+				break;
+			}
+			string line = StringSubstr(defaultHeaders, searchPos, lineEnd - searchPos);
+			searchPos = lineEnd + 2;
+			if (StringFind(line, "Content-Type:") == 0) {
+				continue;
+			}
+			headers += line + "\r\n";
+		}
+		headers += "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n";
+
+		return execute("POST", url, data, timeout, headers);
+	}
+
 	void AddHeader(const string key, const string value) {
 		defaultHeaders += key + ": " + value + "\r\n";
 	}
