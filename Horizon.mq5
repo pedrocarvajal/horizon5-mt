@@ -1,5 +1,5 @@
 #property copyright "Horizon5, by Pedro Carvajal"
-#property version "1.01"
+#property version "1.1.0"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 #include "enums/EAllocatorMode.mqh"
@@ -152,7 +152,19 @@ int OnInit() {
 	}
 
 	hlogger.Info("Horizon EA started | built " + (string)__DATETIME__);
-	horizonAPI.UpsertAccount();
+
+	if (horizonAPI.IsEnabled()) {
+		horizonAPI.UpsertAccount();
+
+		SHorizonAccount remoteAccount = horizonAPI.FetchAccount();
+
+		if (!remoteAccount.IsActive()) {
+			hlogger.Warning("Account is inactive — trading paused.");
+			tradingStatus.isPaused = true;
+			tradingStatus.reason = TRADING_PAUSE_REASON_ACCOUNT_INACTIVE;
+		}
+	}
+
 	return INIT_SUCCEEDED;
 }
 
@@ -200,7 +212,9 @@ void OnTimer() {
 	if (isStartDay) {
 		lastCheckedDay = now.dayOfYear;
 
-		if (tradingStatus.isPaused && tradingStatus.reason != TRADING_PAUSE_REASON_HORIZON_API_REQUEST) {
+		if (tradingStatus.isPaused
+		    && tradingStatus.reason != TRADING_PAUSE_REASON_HORIZON_API_REQUEST
+		    && tradingStatus.reason != TRADING_PAUSE_REASON_ACCOUNT_INACTIVE) {
 			hlogger.Info("Trading pause cleared - new day started");
 			tradingStatus.isPaused = false;
 			tradingStatus.reason = TRADING_PAUSE_REASON_NONE;
@@ -243,7 +257,7 @@ void OnTimer() {
 		assets[i].ProcessOrders();
 	}
 
-	if (isStartHour) {
+	if (isStartHour && horizonAPI.IsEnabled()) {
 		horizonAPI.UpsertAccount();
 
 		double totalDrawdownPct = 0;
