@@ -1,8 +1,7 @@
 #property copyright "Horizon5, by Pedro Carvajal"
-#property version "1.1.0"
+#property version "1.12"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
-#include "enums/EAllocatorMode.mqh"
 #include "enums/EDebugLevel.mqh"
 #include "structs/STradingStatus.mqh"
 
@@ -25,11 +24,6 @@ input string HorizonAPIUrl = ""; // [1] > HorizonAPI base URL
 input string HorizonAPIKey = ""; // [1] > HorizonAPI key (required)
 input int HorizonAPIMaxEventsPerPoll = 10; // [1] > Max events per ConsumeEvents call
 input int HorizonAPIEventPollInterval = 3; // [1] > Event poll interval in seconds (0 = every tick)
-
-input group "Strategy Allocator";
-input bool EnableStrategyAllocator = false; // [1] > Enable KNN strategy allocator
-input ENUM_ALLOCATOR_MODE AllocatorMode = ALLOCATOR_MODE_TRAIN; // [1] > Allocator mode (Train = collect data, Inference = use model)
-input string AllocatorModelPath = "Models"; // [1] > Model directory path (in common files)
 
 #include <Trade/Trade.mqh>
 
@@ -518,13 +512,6 @@ double OnTester() {
 
 	for (int i = 0; i < ArraySize(assets); i++) {
 		assets[i].ExportMarketSnapshots();
-	}
-
-	if (EnableStrategyAllocator && AllocatorMode == ALLOCATOR_MODE_TRAIN) {
-		for (int i = 0; i < ArraySize(assets); i++) {
-			assets[i].ExportAllocatorModel();
-			assets[i].ExportAllocatorAnalysis();
-		}
 	}
 
 	return quality;

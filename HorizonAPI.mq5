@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "1.2.0"
+#property version   "1.20"
 #property strict
 
 #define SERVICE_VERSION "1.2.0"
