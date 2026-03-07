@@ -8,9 +8,7 @@
 #include "../indicators/INRollingReturn.mqh"
 #include "../indicators/INDrawdownFromPeak.mqh"
 #include "../indicators/INVolatility.mqh"
-#include "../indicators/INMaxDrawdownInWindow.mqh"
 #include "../services/SRReportOfMarketSnapshots/SRReportOfMarketSnapshots.mqh"
-#include "../services/SEStrategyAllocator/SEStrategyAllocator.mqh"
 #include "../strategies/Strategy.mqh"
 #include "../integrations/HorizonAPI/HorizonAPI.mqh"
 
@@ -22,107 +20,13 @@ public IAsset {
 private:
 	SELogger logger;
 	SRReportOfMarketSnapshots *marketSnapshotsReporter;
-	SEStrategyAllocator *allocator;
 
 	string name;
 	double weight;
 	bool isEnabled;
 	double balance;
 
-	int allocatorRollingWindow;
-	int allocatorNormalizationWindow;
-	int allocatorKNeighbors;
-	int allocatorMaxActiveStrategies;
-	double allocatorScoreThreshold;
-	int allocatorForwardWindow;
-	int allocatorRebalanceFrequency;
-	int daysSinceLastRebalance;
-
 	SEStrategy *strategies[];
-
-	void collectDailyPerformances(double &dailyPerformances[]) {
-		int strategyCount = ArraySize(strategies);
-		ArrayResize(dailyPerformances, strategyCount);
-
-		for (int i = 0; i < strategyCount; i++) {
-			dailyPerformances[i] = strategies[i].GetStatistics().GetDailyPerformancePercent();
-		}
-	}
-
-	void redistributeBalances(string &activeStrategyPrefixes[]) {
-		int activeCount = ArraySize(activeStrategyPrefixes);
-		int strategyCount = ArraySize(strategies);
-		double balancePerActive = (activeCount > 0) ? balance / activeCount : 0;
-
-		for (int i = 0; i < strategyCount; i++) {
-			bool shouldBeActive = false;
-
-			for (int j = 0; j < activeCount; j++) {
-				if (strategies[i].GetPrefix() == activeStrategyPrefixes[j]) {
-					shouldBeActive = true;
-					break;
-				}
-			}
-
-			double previousBalance = strategies[i].GetBalance();
-			double newBalance = shouldBeActive ? balancePerActive : 0;
-
-			if (previousBalance != newBalance) {
-				strategies[i].SetBalance(newBalance);
-
-				if (newBalance > 0) {
-					logger.Info(StringFormat(
-						"(SEStrategyAllocator) %s allocated: %.2f (was %.2f)",
-						strategies[i].GetPrefix(),
-						newBalance,
-						previousBalance
-					));
-				} else {
-					logger.Info(StringFormat(
-						"(SEStrategyAllocator) %s deallocated (was %.2f)",
-						strategies[i].GetPrefix(),
-						previousBalance
-					));
-				}
-			}
-		}
-	}
-
-	void runAllocator() {
-		if (CheckPointer(allocator) == POINTER_INVALID) {
-			return;
-		}
-
-		double dailyPerformances[];
-		collectDailyPerformances(dailyPerformances);
-
-		double rollingReturn = RollingReturn(symbol, PERIOD_D1, allocatorRollingWindow, 0);
-		double rollingVolatility = Volatility(symbol, PERIOD_D1, allocatorRollingWindow, 0);
-		double rollingDrawdown = MaxDrawdownInWindow(symbol, PERIOD_D1, allocatorRollingWindow, 0);
-
-		allocator.OnStartDay(
-			rollingReturn,
-			rollingVolatility,
-			rollingDrawdown,
-			dailyPerformances
-		);
-
-		if (!allocator.IsWarmupComplete()) {
-			return;
-		}
-
-		daysSinceLastRebalance++;
-
-		if (daysSinceLastRebalance < allocatorRebalanceFrequency) {
-			return;
-		}
-
-		daysSinceLastRebalance = 0;
-
-		string activeStrategyPrefixes[];
-		allocator.GetActiveStrategies(activeStrategyPrefixes);
-		redistributeBalances(activeStrategyPrefixes);
-	}
 
 	SSMarketSnapshot BuildMarketSnapshot() {
 		SSMarketSnapshot snapshot;
@@ -144,23 +48,11 @@ public:
 		logger.SetPrefix("SEAsset");
 		weight = 0;
 		isEnabled = false;
-		allocatorRollingWindow = 150;
-		allocatorNormalizationWindow = 365;
-		allocatorKNeighbors = 20;
-		allocatorMaxActiveStrategies = 1;
-		allocatorScoreThreshold = 0.0;
-		allocatorForwardWindow = 5;
-		allocatorRebalanceFrequency = 1;
-		daysSinceLastRebalance = 0;
 	}
 
 	~SEAsset() {
 		if (CheckPointer(marketSnapshotsReporter) == POINTER_DYNAMIC) {
 			delete marketSnapshotsReporter;
-		}
-
-		if (CheckPointer(allocator) == POINTER_DYNAMIC) {
-			delete allocator;
 		}
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
@@ -205,27 +97,6 @@ public:
 		if (EnableMarketHistoryReport) {
 			string marketReportName = StringFormat("%s_MARKET_Snapshots", symbol);
 			marketSnapshotsReporter = new SRReportOfMarketSnapshots(symbol, marketReportName);
-		}
-
-		if (EnableStrategyAllocator) {
-			allocator = new SEStrategyAllocator(AllocatorMode, allocatorRollingWindow, allocatorNormalizationWindow, allocatorKNeighbors, allocatorMaxActiveStrategies, allocatorScoreThreshold, allocatorForwardWindow);
-
-			for (int i = 0; i < strategyCount; i++) {
-				allocator.RegisterStrategy(strategies[i].GetPrefix());
-			}
-
-			if (AllocatorMode == ALLOCATOR_MODE_INFERENCE) {
-				string collectionName = StringFormat("%s_Allocator", symbol);
-
-				if (!allocator.LoadModel(AllocatorModelPath, collectionName)) {
-					logger.Error("Failed to load allocator model");
-					return INIT_FAILED;
-				}
-
-				for (int i = 0; i < strategyCount; i++) {
-					strategies[i].SetBalance(0);
-				}
-			}
 		}
 
 		logger.Info(StringFormat(
@@ -278,8 +149,6 @@ public:
 	}
 
 	virtual void OnStartDay() {
-		runAllocator();
-
 		if (CheckPointer(marketSnapshotsReporter) != POINTER_INVALID) {
 			marketSnapshotsReporter.AddSnapshot(BuildMarketSnapshot());
 		}
@@ -356,23 +225,6 @@ public:
 		}
 
 		return quality;
-	}
-
-	void ExportAllocatorModel() {
-		if (CheckPointer(allocator) == POINTER_INVALID) {
-			return;
-		}
-
-		string collectionName = StringFormat("%s_Allocator", symbol);
-		allocator.SaveModel(AllocatorModelPath, collectionName);
-	}
-
-	void ExportAllocatorAnalysis() {
-		if (CheckPointer(allocator) == POINTER_INVALID) {
-			return;
-		}
-
-		allocator.RunAnalysis(symbol);
 	}
 
 	void ExportMarketSnapshots() {
@@ -506,34 +358,6 @@ public:
 
 	void SetWeight(double newWeight) {
 		weight = newWeight;
-	}
-
-	void SetAllocatorRollingWindow(int window) {
-		allocatorRollingWindow = window;
-	}
-
-	void SetAllocatorNormalizationWindow(int window) {
-		allocatorNormalizationWindow = window;
-	}
-
-	void SetAllocatorKNeighbors(int neighbors) {
-		allocatorKNeighbors = neighbors;
-	}
-
-	void SetAllocatorMaxActiveStrategies(int maxActive) {
-		allocatorMaxActiveStrategies = maxActive;
-	}
-
-	void SetAllocatorScoreThreshold(double threshold) {
-		allocatorScoreThreshold = threshold;
-	}
-
-	void SetAllocatorForwardWindow(int window) {
-		allocatorForwardWindow = window;
-	}
-
-	void SetAllocatorRebalanceFrequency(int days) {
-		allocatorRebalanceFrequency = days;
 	}
 
 	void SyncToHorizonAPI() {

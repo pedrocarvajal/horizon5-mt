@@ -41,10 +41,7 @@ public:
 		SHorizonAccount account;
 		account.status = "active";
 
-		string path = StringFormat(
-			"api/v1/accounts/?filter_by=id&filter_value=%d",
-			context.GetAccountId()
-		);
+		string path = StringFormat("api/v1/account/%d/", context.GetAccountId());
 
 		SRequestResponse response = context.Get(path);
 
@@ -55,19 +52,12 @@ public:
 
 		JSON::Object root(response.body);
 
-		if (!root.isArray("data")) {
-			logger.Warning("Fetch: response missing 'data' array — assuming account is active");
+		if (!root.isObject("data")) {
+			logger.Warning("Fetch: response missing 'data' object — assuming account is active");
 			return account;
 		}
 
-		JSON::Array *dataArray = root.getArray("data");
-
-		if (dataArray.getLength() == 0) {
-			logger.Warning("Fetch: no account found in response — assuming account is active");
-			return account;
-		}
-
-		JSON::Object *accountObject = dataArray.getObject(0);
+		JSON::Object *accountObject = root.getObject("data");
 
 		if (accountObject == NULL) {
 			logger.Warning("Fetch: failed to parse account object — assuming account is active");
