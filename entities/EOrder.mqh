@@ -3,20 +3,23 @@
 
 #include "../enums/EOrderStatuses.mqh"
 #include "../structs/SSOrderHistory.mqh"
-#include "../adapters/ATrade.mqh"
 #include "../services/SEDateTime/SEDateTime.mqh"
 #include "../services/SEDateTime/structs/SDateTime.mqh"
-#include "../helpers/HIsMarketClosed.mqh"
+#include "../services/SELogger/SELogger.mqh"
 #include "../helpers/HGenerateUuid.mqh"
-
-#define MAX_RETRY_COUNT 3
 
 class SRPersistenceOfOrders;
 
-extern SEDateTime dtime;
+class EOrder {
+private:
+	ulong dealId;
+	ulong orderId;
+	ulong positionId;
 
-class EOrder:
-public ATrade {
+	void refreshId() {
+		id = GenerateUuid();
+	}
+
 public:
 	SRPersistenceOfOrders * persistence;
 	bool isInitialized;
@@ -70,9 +73,27 @@ public:
 		retryCount = 0;
 		retryAfter = 0;
 		id = "";
-		SetDealId(0);
-		SetOrderId(0);
-		SetPositionId(0);
+		source = "";
+
+		status = ORDER_STATUS_PENDING;
+		side = ORDER_TYPE_BUY;
+		orderCloseReason = (ENUM_DEAL_REASON)0;
+
+		volume = 0;
+		signalPrice = 0;
+		openAtPrice = 0;
+		openPrice = 0;
+		closePrice = 0;
+		profitInDollars = 0;
+		takeProfitPrice = 0;
+		stopLossPrice = 0;
+		commission = 0;
+		swap = 0;
+		grossProfit = 0;
+
+		dealId = 0;
+		orderId = 0;
+		positionId = 0;
 	}
 
 	EOrder(const EOrder& other) {
@@ -117,13 +138,29 @@ public:
 
 		snapshot = other.snapshot;
 
-		SetDealId(other.GetDealId());
-		SetOrderId(other.GetOrderId());
-		SetPositionId(other.GetPositionId());
+		dealId = other.dealId;
+		orderId = other.orderId;
+		positionId = other.positionId;
 	}
 
-private:
-	void buildSnapshot() {
+	void OnInit() {
+		if (isInitialized) {
+			logger.Info(StringFormat("[%s] Order already initialized", GetId()));
+			return;
+		}
+
+		isInitialized = true;
+	}
+
+	void OnDeinit() {
+		id = "";
+		source = "";
+		status = ORDER_STATUS_CLOSED;
+		isInitialized = false;
+		isProcessed = false;
+	}
+
+	void BuildSnapshot() {
 		snapshot.orderId = GetId();
 		snapshot.symbol = symbol;
 		snapshot.strategyName = source;
@@ -144,365 +181,6 @@ private:
 		snapshot.closeTime = closeAt.timestamp;
 		snapshot.closePrice = closePrice;
 		snapshot.profitInDollars = profitInDollars;
-	}
-
-	void refreshId() {
-		id = GenerateUuid();
-	}
-
-	bool validateMinimumVolume() {
-		double minLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
-		double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
-		double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
-
-		if (volume <= 0) {
-			logger.Info(StringFormat(
-				"[%s] Validation failed - Volume is zero or negative: %.5f",
-				GetId(),
-				volume
-			));
-			return false;
-		}
-
-		if (volume < minLot) {
-			logger.Info(StringFormat(
-				"[%s] Validation failed - Volume %.5f is below minimum lot size: %.5f",
-				GetId(),
-				volume,
-				minLot
-			));
-			return false;
-		}
-
-		if (volume > maxLot) {
-			logger.Info(StringFormat(
-				"[%s] Validation failed - Volume %.5f exceeds maximum lot size: %.5f",
-				GetId(),
-				volume,
-				maxLot
-			));
-			return false;
-		}
-
-		double normalizedVolume = MathFloor(volume / lotStep) * lotStep;
-		if (normalizedVolume < minLot) {
-			logger.Info(StringFormat(
-				"[%s] Validation failed - Normalized volume %.5f is below minimum after lot step adjustment",
-				GetId(),
-				normalizedVolume
-			));
-			return false;
-		}
-
-		return true;
-	}
-
-public:
-	void OnInit() {
-		if (isInitialized) {
-			logger.Info(StringFormat("[%s] Order already initialized", GetId()));
-			return;
-		}
-
-		isInitialized = true;
-	}
-
-	void CheckToOpen(SMarketStatus &marketStatus) {
-		if (!pendingToOpen || isProcessed) {
-			return;
-		}
-
-		datetime currentTime = dtime.Timestamp();
-
-		if (retryAfter > 0 && currentTime < retryAfter) {
-			return;
-		}
-
-		if (retryCount >= MAX_RETRY_COUNT) {
-			logger.Warning(StringFormat("[%s] Max retry count reached, cancelling order", GetId()));
-			Cancel();
-			return;
-		}
-
-		if (marketStatus.isClosed) {
-			retryAfter = currentTime + marketStatus.opensInSeconds;
-			logger.Info(StringFormat(
-				"[%s] Open pending: Market closed, will retry in %d seconds",
-				GetId(),
-				marketStatus.opensInSeconds
-			));
-			return;
-		}
-
-		logger.Info(StringFormat("[%s] Opening order, id: %s", GetId(), GetId()));
-		Open();
-	}
-
-	void CheckToClose(SMarketStatus &marketStatus) {
-		if (!pendingToClose) {
-			return;
-		}
-
-		datetime currentTime = dtime.Timestamp();
-
-		if (retryAfter > 0 && currentTime < retryAfter) {
-			return;
-		}
-
-		if (retryCount >= MAX_RETRY_COUNT) {
-			logger.Warning(StringFormat("[%s] Max retry count reached for close, giving up", GetId()));
-			pendingToClose = false;
-			retryCount = 0;
-			return;
-		}
-
-		if (marketStatus.isClosed) {
-			logger.Info(StringFormat(
-				"[%s] Close pending: Market closed, will retry in %d seconds",
-				GetId(),
-				marketStatus.opensInSeconds
-			));
-			retryAfter = currentTime + marketStatus.opensInSeconds;
-			return;
-		}
-
-		Close();
-	}
-
-	void Open() {
-		SMarketStatus marketStatus = GetMarketStatus(symbol);
-
-		if (marketStatus.isClosed) {
-			retryAfter = dtime.Timestamp() + marketStatus.opensInSeconds;
-			return;
-		}
-
-		if (!validateMinimumVolume()) {
-			logger.Info(StringFormat("[%s] Order cancelled - Volume does not meet minimum requirements", GetId()));
-			Cancel();
-			return;
-		}
-
-		bool isBuy = (side == ORDER_TYPE_BUY);
-
-		MqlTradeResult result = ATrade::Open(
-			symbol,
-			GetId(),
-			isBuy,
-			isMarketOrder,
-			openAtPrice,
-			volume,
-			takeProfitPrice,
-			stopLossPrice,
-			magicNumber
-		);
-
-		OnOpen(result);
-	}
-
-	void Close() {
-		if (status == ORDER_STATUS_OPEN) {
-			SMarketStatus marketStatus = GetMarketStatus(symbol);
-
-			if (marketStatus.isClosed) {
-				pendingToClose = true;
-				retryAfter = dtime.Timestamp() + marketStatus.opensInSeconds;
-				logger.Info(StringFormat(
-					"[%s] Close pending: Market closed, will retry in %d seconds",
-					GetId(),
-					marketStatus.opensInSeconds
-				));
-				return;
-			}
-
-			logger.Info(StringFormat(
-				"[%s] Closing open position, position_id: %llu",
-				GetId(),
-				GetPositionId()
-			));
-
-			if (!ATrade::Close(GetPositionId())) {
-				retryCount++;
-				logger.Error(StringFormat(
-					"[%s] Failed to close open position, retry %d/%d",
-					GetId(),
-					retryCount,
-					MAX_RETRY_COUNT
-				));
-				return;
-			}
-
-			logger.Info(StringFormat("[%s] Close order sent to broker, waiting for confirmation...", GetId()));
-			status = ORDER_STATUS_CLOSING;
-			pendingToClose = false;
-			retryCount = 0;
-			return;
-		}
-
-		if (status == ORDER_STATUS_PENDING) {
-			if (GetOrderId() == 0) {
-				logger.Info(StringFormat("[%s] Cannot cancel order: invalid orderId", GetId()));
-				Cancel();
-				return;
-			}
-
-			if (!OrderSelect(GetOrderId())) {
-				logger.Info(StringFormat(
-					"[%s] Order no longer exists (orderId: %llu), updating status to cancelled",
-					GetId(),
-					GetOrderId()
-				));
-				Cancel();
-				return;
-			}
-
-			if (!ATrade::Cancel(GetOrderId())) {
-				logger.Error(StringFormat(
-					"[%s] Failed to cancel pending order, orderId: %llu",
-					GetId(),
-					GetOrderId()
-				));
-				return;
-			}
-
-			logger.Info(StringFormat("[%s] Cancel order sent to broker, waiting for confirmation...", GetId()));
-			status = ORDER_STATUS_CLOSING;
-			pendingToOpen = false;
-			return;
-		}
-	}
-
-	void OnOpen(const MqlTradeResult &result) {
-		if (result.retcode != 0 && result.retcode != TRADE_RETCODE_DONE &&
-		    result.retcode != TRADE_RETCODE_DONE_PARTIAL) {
-			retryCount++;
-			logger.Error(StringFormat(
-				"[%s] Error opening order: %d, retry %d/%d",
-				GetId(),
-				result.retcode,
-				retryCount,
-				MAX_RETRY_COUNT
-			));
-
-			if (retryCount >= MAX_RETRY_COUNT) {
-				Cancel();
-			}
-
-			return;
-		}
-
-		bool wasPending = (status == ORDER_STATUS_PENDING);
-		isProcessed = true;
-		pendingToOpen = false;
-		retryCount = 0;
-		openAt = dtime.Now();
-		openPrice = result.price;
-		SetDealId(result.deal);
-		SetOrderId(result.order);
-
-		if (GetDealId() > 0) {
-			HistoryDealSelect(GetDealId());
-			SetPositionId(HistoryDealGetInteger(GetDealId(), DEAL_POSITION_ID));
-		}
-
-		if (GetDealId() == 0) {
-			status = ORDER_STATUS_PENDING;
-			logger.Info(StringFormat(
-				"[%s] Order opened as pending, orderId: %llu",
-				GetId(),
-				GetOrderId()
-			));
-		} else {
-			if (wasPending) {
-				logger.Info(StringFormat(
-					"[%s] Pending order has opened, dealId: %llu, positionId: %llu",
-					GetId(),
-					GetDealId(),
-					GetPositionId()
-				));
-			} else {
-				logger.Info(StringFormat(
-					"[%s] Order opened immediately, dealId: %llu, positionId: %llu",
-					GetId(),
-					GetDealId(),
-					GetPositionId()
-				));
-			}
-
-			status = ORDER_STATUS_OPEN;
-		}
-
-		buildSnapshot();
-
-		if (CheckPointer(persistence) != POINTER_INVALID) {
-			persistence.SaveOrder(this);
-		}
-	}
-
-	void OnClose(
-		const SDateTime &time,
-		double price,
-		double profits,
-		ENUM_DEAL_REASON reason
-	) {
-		closeAt = time;
-		closePrice = price;
-		profitInDollars = profits;
-		status = ORDER_STATUS_CLOSED;
-
-		if (profits == 0.0 && price == 0.0) {
-			status = ORDER_STATUS_CANCELLED;
-			logger.Info(StringFormat("[%s] Order cancelled", GetId()));
-		}
-
-		orderCloseReason = reason;
-		buildSnapshot();
-
-		if (reason == DEAL_REASON_TP) {
-			logger.Info(StringFormat("[%s] Order closed by Take Profit", GetId()));
-		}
-
-		if (reason == DEAL_REASON_EXPERT) {
-			logger.Info(StringFormat("[%s] Order closed by Expert", GetId()));
-		}
-
-		if (reason == DEAL_REASON_CLIENT) {
-			logger.Info(StringFormat("[%s] Order closed by Client", GetId()));
-		}
-
-		if (reason == DEAL_REASON_MOBILE) {
-			logger.Info(StringFormat("[%s] Order closed by Mobile", GetId()));
-		}
-
-		if (reason == DEAL_REASON_WEB) {
-			logger.Info(StringFormat("[%s] Order closed by Web", GetId()));
-		}
-
-		if (reason == DEAL_REASON_SL) {
-			logger.Info(StringFormat("[%s] Order closed by Stop Loss", GetId()));
-		}
-
-		if (CheckPointer(persistence) != POINTER_INVALID) {
-			persistence.SaveOrder(this);
-		}
-	}
-
-	void OnDeinit() {
-		id = "";
-		source = "";
-		status = ORDER_STATUS_CLOSED;
-		isInitialized = false;
-		isProcessed = false;
-	}
-
-	void Cancel() {
-		status = ORDER_STATUS_CANCELLED;
-		pendingToOpen = false;
-		isProcessed = true;
-
-		if (CheckPointer(persistence) != POINTER_INVALID) {
-			persistence.SaveOrder(this);
-		}
 	}
 
 	string GetId() {
@@ -594,8 +272,7 @@ public:
 			return 0.0;
 		}
 
-		return PositionGetDouble(POSITION_PROFIT) +
-		       PositionGetDouble(POSITION_SWAP);
+		return PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
 	}
 
 	SDateTime GetSignalAt() {
@@ -642,86 +319,20 @@ public:
 		return retryAfter;
 	}
 
+	ulong GetDealId() const {
+		return dealId;
+	}
+
+	ulong GetOrderId() const {
+		return orderId;
+	}
+
+	ulong GetPositionId() const {
+		return positionId;
+	}
+
 	void SetId(string newId) {
 		id = newId;
-	}
-
-	bool SetTakeProfit(double newTakeProfitPrice = 0) {
-		if (newTakeProfitPrice <= 0) {
-			return false;
-		}
-
-		if (status == ORDER_STATUS_OPEN) {
-			if (!ATrade::ModifyTakeProfit(newTakeProfitPrice, magicNumber)) {
-				logger.Error(StringFormat("[%s] Failed to modify take profit on open position", GetId()));
-				return false;
-			}
-
-			logger.Info(StringFormat(
-				"[%s] Take profit modified to: %.*f",
-				GetId(),
-				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
-				newTakeProfitPrice
-			));
-		}
-
-		takeProfitPrice = newTakeProfitPrice;
-		return true;
-	}
-
-	bool SetStopLoss(double newStopLossPrice = 0) {
-		if (newStopLossPrice <= 0) {
-			return false;
-		}
-
-		if (status == ORDER_STATUS_OPEN) {
-			if (!ATrade::ModifyStopLoss(newStopLossPrice, magicNumber)) {
-				logger.Error(StringFormat("[%s] Failed to modify stop loss on open position", GetId()));
-				return false;
-			}
-
-			logger.Info(StringFormat(
-				"[%s] Stop loss modified to: %.*f",
-				GetId(),
-				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
-				newStopLossPrice
-			));
-		}
-
-		stopLossPrice = newStopLossPrice;
-		return true;
-	}
-
-	bool SetStopLossAndTakeProfit(double newStopLossPrice, double newTakeProfitPrice) {
-		if (newStopLossPrice <= 0 && newTakeProfitPrice <= 0) {
-			return false;
-		}
-
-		if (status == ORDER_STATUS_OPEN) {
-			if (!ATrade::ModifyStopLossAndTakeProfit(newStopLossPrice, newTakeProfitPrice, magicNumber)) {
-				logger.Error(StringFormat("[%s] Failed to modify SL/TP on open position", GetId()));
-				return false;
-			}
-
-			logger.Info(StringFormat(
-				"[%s] SL/TP modified to: sl=%.*f tp=%.*f",
-				GetId(),
-				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
-				newStopLossPrice,
-				(int)SymbolInfoInteger(symbol, SYMBOL_DIGITS),
-				newTakeProfitPrice
-			));
-		}
-
-		if (newStopLossPrice > 0) {
-			stopLossPrice = newStopLossPrice;
-		}
-
-		if (newTakeProfitPrice > 0) {
-			takeProfitPrice = newTakeProfitPrice;
-		}
-
-		return true;
 	}
 
 	void SetSource(string newSource) {
@@ -810,6 +421,18 @@ public:
 
 	void SetPersistence(SRPersistenceOfOrders *value) {
 		persistence = value;
+	}
+
+	void SetDealId(ulong newDealId) {
+		dealId = newDealId;
+	}
+
+	void SetOrderId(ulong newOrderId) {
+		orderId = newOrderId;
+	}
+
+	void SetPositionId(ulong newPositionId) {
+		positionId = newPositionId;
 	}
 };
 
