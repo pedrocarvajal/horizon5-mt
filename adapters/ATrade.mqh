@@ -68,9 +68,9 @@ public:
 		return PositionSelectByTicket(ticket);
 	}
 
-	bool Modify(double price = 0, double stopLoss = 0, double takeProfit = 0,
+	bool Modify(double stopLoss = 0, double takeProfit = 0,
 		    ulong magicNumber = 0) {
-		logger.Info(StringFormat("Modifying order, position_id=%d, order_id=%d",
+		logger.Info(StringFormat("Modifying order, position_id=%llu, order_id=%llu",
 			GetPositionId(), GetOrderId()));
 
 		if (stopLoss == 0 && takeProfit == 0) {
@@ -85,7 +85,6 @@ public:
 		string positionSymbol = PositionGetString(POSITION_SYMBOL);
 		double currentSl = PositionGetDouble(POSITION_SL);
 		double currentTp = PositionGetDouble(POSITION_TP);
-		double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
 
 		MqlTradeRequest request;
 		MqlTradeResult result;
@@ -96,7 +95,6 @@ public:
 		request.position = GetPositionId();
 		request.symbol = positionSymbol;
 		request.magic = magicNumber;
-		request.price = (price > 0) ? price : openPrice;
 		request.sl = (stopLoss > 0) ? NormalizeDouble(stopLoss,
 			(int)SymbolInfoInteger(
 				positionSymbol,
@@ -121,29 +119,24 @@ public:
 		return true;
 	}
 
-	bool ModifyPrice(double price, ulong magicNumber = 0) {
-		return Modify(price, 0, 0, magicNumber);
-	}
-
 	bool ModifyStopLoss(double stopLoss, ulong magicNumber = 0) {
-		return Modify(0, stopLoss, 0, magicNumber);
+		return Modify(stopLoss, 0, magicNumber);
 	}
 
 	bool ModifyTakeProfit(double takeProfit, ulong magicNumber = 0) {
-		return Modify(0, 0, takeProfit, magicNumber);
+		return Modify(0, takeProfit, magicNumber);
 	}
 
 	bool ModifyStopLossAndTakeProfit(double stopLoss, double takeProfit, ulong magicNumber = 0) {
-		return Modify(0, stopLoss, takeProfit, magicNumber);
+		return Modify(stopLoss, takeProfit, magicNumber);
 	}
 
 	MqlTradeResult Open(
 		string symbol,
 		string id,
-		bool isBuy,
-		bool isMarketOrder,
-		double openAtPrice,
-		double lot,
+		ENUM_ORDER_TYPE orderType,
+		double price,
+		double volume,
 		double takeProfit,
 		double stopLoss,
 		ulong magicNumber) {
@@ -152,66 +145,32 @@ public:
 		ZeroMemory(request);
 		ZeroMemory(result);
 
-		double currentPrice = (isBuy) ? SymbolInfoDouble(symbol,
-			SYMBOL_ASK) :
-				      SymbolInfoDouble(symbol, SYMBOL_BID);
-		double minDistance = (double)SymbolInfoInteger(symbol,
-			SYMBOL_TRADE_STOPS_LEVEL)
-				     * SymbolInfoDouble(symbol, SYMBOL_POINT);
-		double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-		double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+		int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+		bool isMarketOrder = (orderType == ORDER_TYPE_BUY || orderType == ORDER_TYPE_SELL);
 
-		if (isMarketOrder) {
-			request.type = isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
-		} else {
-			request.type = isBuy ? (openAtPrice <
-						currentPrice ? ORDER_TYPE_BUY_LIMIT :
-						ORDER_TYPE_BUY_STOP) : (openAtPrice >
-									currentPrice ?
-									ORDER_TYPE_SELL_LIMIT
-	    : ORDER_TYPE_SELL_STOP);
-
-			if (request.type == ORDER_TYPE_BUY_STOP) {
-				if (openAtPrice <= ask + minDistance) {
-					openAtPrice = ask + minDistance +
-						      (5 * SymbolInfoDouble(symbol, SYMBOL_POINT));
-				}
-			}
-
-			if (request.type == ORDER_TYPE_SELL_STOP) {
-				if (openAtPrice >= bid - minDistance) {
-					openAtPrice = bid - minDistance -
-						      (5 * SymbolInfoDouble(symbol, SYMBOL_POINT));
-				}
-			}
-		}
-
+		request.action = isMarketOrder ? TRADE_ACTION_DEAL : TRADE_ACTION_PENDING;
+		request.type = orderType;
 		request.comment = id;
-		request.action =
-			(isMarketOrder) ? TRADE_ACTION_DEAL : TRADE_ACTION_PENDING;
 		request.symbol = symbol;
-		request.volume = Volume(symbol, lot);
+		request.volume = volume;
 		request.deviation = SLIPPAGE_POINTS;
 		request.magic = magicNumber;
 		request.type_filling = getFillingMode(symbol);
-		request.price = (isMarketOrder) ? currentPrice : openAtPrice;
+		request.price = NormalizeDouble(price, digits);
 
 		if (stopLoss > 0) {
-			request.sl = NormalizeDouble(stopLoss,
-				(int)SymbolInfoInteger(symbol,
-					SYMBOL_DIGITS));
+			request.sl = NormalizeDouble(stopLoss, digits);
 		}
 
 		if (takeProfit > 0) {
-			request.tp = NormalizeDouble(takeProfit,
-				(int)SymbolInfoInteger(symbol,
-					SYMBOL_DIGITS));
+			request.tp = NormalizeDouble(takeProfit, digits);
 		}
 
 		logger.Separator("Trade request");
 
 		if (!OrderSend(request, result)) {
-			logger.Error(StringFormat("Error opening order: %d", GetLastError()));
+			logger.Error(StringFormat("Error opening order: %s (%d)",
+				DescribeRetcode(result.retcode), GetLastError()));
 			return result;
 		}
 
@@ -225,31 +184,47 @@ public:
 		}
 
 		logger.Info(StringFormat(
-			"Order opened, deal_id=%d, order_id=%d, position_id=%d",
+			"Order opened, deal_id=%llu, order_id=%llu, position_id=%llu",
 			GetDealId(), GetOrderId(), GetPositionId()));
 		return result;
 	}
 
-	double Volume(string symbol, double lot) {
-		double minLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
-		double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
-		double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
-
-		if (lot < minLot) {
-			lot = minLot;
-		} else {
-			lot = MathFloor(lot / lotStep) * lotStep;
+	static string DescribeRetcode(uint retcode) {
+		switch (retcode) {
+		case TRADE_RETCODE_REQUOTE: return "Requote";
+		case TRADE_RETCODE_REJECT: return "Request rejected";
+		case TRADE_RETCODE_CANCEL: return "Request canceled by trader";
+		case TRADE_RETCODE_PLACED: return "Order placed";
+		case TRADE_RETCODE_DONE: return "Request completed";
+		case TRADE_RETCODE_DONE_PARTIAL: return "Partially completed";
+		case TRADE_RETCODE_ERROR: return "Request processing error";
+		case TRADE_RETCODE_TIMEOUT: return "Request timeout";
+		case TRADE_RETCODE_INVALID: return "Invalid request";
+		case TRADE_RETCODE_INVALID_VOLUME: return "Invalid volume";
+		case TRADE_RETCODE_INVALID_PRICE: return "Invalid price";
+		case TRADE_RETCODE_INVALID_STOPS: return "Invalid stops (SL/TP)";
+		case TRADE_RETCODE_TRADE_DISABLED: return "Trade disabled";
+		case TRADE_RETCODE_MARKET_CLOSED: return "Market closed";
+		case TRADE_RETCODE_NO_MONEY: return "Insufficient funds";
+		case TRADE_RETCODE_PRICE_CHANGED: return "Price changed";
+		case TRADE_RETCODE_PRICE_OFF: return "No quotes for processing";
+		case TRADE_RETCODE_INVALID_EXPIRATION: return "Invalid expiration";
+		case TRADE_RETCODE_ORDER_CHANGED: return "Order state changed";
+		case TRADE_RETCODE_TOO_MANY_REQUESTS: return "Too many requests";
+		case TRADE_RETCODE_NO_CHANGES: return "No changes in request";
+		case TRADE_RETCODE_SERVER_DISABLES_AT: return "Autotrading disabled by server";
+		case TRADE_RETCODE_CLIENT_DISABLES_AT: return "Autotrading disabled by client";
+		case TRADE_RETCODE_LOCKED: return "Request locked for processing";
+		case TRADE_RETCODE_FROZEN: return "Order/position frozen";
+		case TRADE_RETCODE_INVALID_FILL: return "Invalid fill type";
+		case TRADE_RETCODE_CONNECTION: return "No connection to server";
+		case TRADE_RETCODE_ONLY_REAL: return "Only real accounts allowed";
+		case TRADE_RETCODE_LIMIT_ORDERS: return "Order limit reached";
+		case TRADE_RETCODE_LIMIT_VOLUME: return "Volume limit reached";
+		case TRADE_RETCODE_INVALID_ORDER: return "Invalid or prohibited order type";
+		case TRADE_RETCODE_POSITION_CLOSED: return "Position already closed";
+		default: return StringFormat("Unknown retcode (%d)", retcode);
 		}
-
-		if (lot < minLot) {
-			lot = 0;
-		}
-
-		if (lot > maxLot) {
-			lot = maxLot;
-		}
-
-		return NormalizeDouble(lot, 2);
 	}
 
 	void SetDealId(ulong newDealId) {

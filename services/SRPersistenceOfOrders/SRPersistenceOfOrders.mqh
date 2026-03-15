@@ -98,6 +98,15 @@ public:
 		return result;
 	}
 
+	int QueryOrders(SEDbQuery &query, JSON::Object *&results[]) {
+		if (ordersCollection == NULL) {
+			ArrayResize(results, 0);
+			return 0;
+		}
+
+		return ordersCollection.Find(query, results);
+	}
+
 private:
 	int loadAndValidateOrder(JSON::Object *document, EOrder &restoredOrders[], string &idsToDelete[], int index) {
 		EOrder order;
