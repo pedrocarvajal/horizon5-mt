@@ -190,6 +190,127 @@ public:
 		}
 	}
 
+	bool HandleOrderCancellation(ulong orderId) {
+		int strategyIndex = -1;
+		int orderIndex = -1;
+
+		if (!FindOrderByOrderId(orderId, strategyIndex, orderIndex)) {
+			return false;
+		}
+
+		SEOrderBook *book = strategies[strategyIndex].GetOrderBook();
+		EOrder *order = book.GetOrderAtIndex(orderIndex);
+
+		if (order == NULL) {
+			return false;
+		}
+
+		if (order.GetStatus() != ORDER_STATUS_CLOSING &&
+		    order.GetStatus() != ORDER_STATUS_PENDING) {
+			return false;
+		}
+
+		book.CancelOrder(order);
+		strategies[strategyIndex].OnCancelOrder(order);
+
+		return true;
+	}
+
+	bool HandleDealOpen(ulong orderId, ulong dealId, double dealPrice) {
+		int strategyIndex = -1;
+		int orderIndex = -1;
+
+		if (!FindOrderByOrderId(orderId, strategyIndex, orderIndex)) {
+			return false;
+		}
+
+		SEOrderBook *book = strategies[strategyIndex].GetOrderBook();
+		EOrder *order = book.GetOrderAtIndex(orderIndex);
+
+		if (order == NULL) {
+			return false;
+		}
+
+		if (order.GetStatus() == ORDER_STATUS_CANCELLED) {
+			ulong positionId = HistoryDealGetInteger(dealId, DEAL_POSITION_ID);
+
+			logger.Warning(StringFormat(
+				"Rejected fill for cancelled order orderId=%llu, closing orphan positionId=%llu",
+				orderId,
+				positionId
+			));
+
+			if (positionId > 0) {
+				book.ForceClosePosition(positionId);
+			}
+
+			return true;
+		}
+
+		if (order.GetStatus() != ORDER_STATUS_OPEN) {
+			MqlTradeResult openResult;
+			ZeroMemory(openResult);
+			openResult.deal = dealId;
+			openResult.order = orderId;
+			openResult.price = dealPrice;
+			openResult.retcode = TRADE_RETCODE_DONE;
+			book.OnOpenOrder(order, openResult);
+		}
+
+		strategies[strategyIndex].OnOpenOrder(order);
+
+		return true;
+	}
+
+	bool HandleDealClose(
+		ulong positionId,
+		SDateTime &dealTime,
+		double dealPrice,
+		double netProfit,
+		double dealProfit,
+		double dealCommission,
+		double dealSwap,
+		ENUM_DEAL_REASON reason
+	) {
+		int strategyIndex = -1;
+		int orderIndex = -1;
+
+		if (!FindOrderByPositionId(positionId, strategyIndex, orderIndex)) {
+			return false;
+		}
+
+		SEOrderBook *book = strategies[strategyIndex].GetOrderBook();
+		EOrder *order = book.GetOrderAtIndex(orderIndex);
+
+		if (order == NULL) {
+			return false;
+		}
+
+		order.SetGrossProfit(dealProfit);
+		order.SetCommission(dealCommission);
+		order.SetSwap(dealSwap);
+		book.OnCloseOrder(order, dealTime, dealPrice, netProfit, reason);
+		strategies[strategyIndex].OnCloseOrder(order, reason);
+
+		logger.Info(StringFormat(
+			"Order closed with positionId=%llu, profit=%.2f",
+			positionId,
+			netProfit
+		));
+
+		return true;
+	}
+
+	bool HasMagicNumber(ulong magic) {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			if (strategies[i].GetMagicNumber() == magic) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	void AddStrategy(SEStrategy *strategy) {
 		strategy.SetAsset(GetPointer(this));
 		strategy.SetSymbol(symbol);
@@ -254,7 +375,8 @@ public:
 
 	bool FindOrderById(string id, int &strategyIndex, int &orderIndex) {
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			int idx = strategies[i].FindOrderIndexById(id);
+			SEOrderBook *book = strategies[i].GetOrderBook();
+			int idx = book.FindOrderIndexById(id);
 
 			if (idx != -1) {
 				strategyIndex = i;
@@ -272,7 +394,8 @@ public:
 		int &orderIndex
 	) {
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			int idx = strategies[i].FindOrderIndexByOrderId(orderId);
+			SEOrderBook *book = strategies[i].GetOrderBook();
+			int idx = book.FindOrderIndexByOrderId(orderId);
 
 			if (idx != -1) {
 				strategyIndex = i;
@@ -290,7 +413,8 @@ public:
 		int &orderIndex
 	) {
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			int idx = strategies[i].FindOrderIndexByPositionId(positionId);
+			SEOrderBook *book = strategies[i].GetOrderBook();
+			int idx = book.FindOrderIndexByPositionId(positionId);
 
 			if (idx != -1) {
 				strategyIndex = i;
@@ -399,11 +523,12 @@ public:
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			double stratFloatingPnl = 0;
 			double stratExposureLots = 0;
+			SEOrderBook *book = strategies[i].GetOrderBook();
 
-			for (int j = 0; j < strategies[i].GetOrdersCount(); j++) {
-				EOrder *order = strategies[i].GetOrderAtIndex(j);
+			for (int j = 0; j < book.GetOrdersCount(); j++) {
+				EOrder *order = book.GetOrderAtIndex(j);
 				if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
-					stratFloatingPnl += order.GetFloatingPnL();
+					stratFloatingPnl += book.GetFloatingProfitAndLoss(order);
 					stratExposureLots += order.GetVolume();
 				}
 			}
@@ -420,7 +545,7 @@ public:
 			}
 
 			floatingPnl += stratFloatingPnl;
-			openOrderCount += strategies[i].GetOpenOrderCount();
+			openOrderCount += book.GetOpenOrderCount();
 			exposureLots += stratExposureLots;
 		}
 	}

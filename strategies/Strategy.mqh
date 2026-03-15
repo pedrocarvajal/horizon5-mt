@@ -13,31 +13,33 @@ class SEAsset;
 #include "../services/SEDateTime/SEDateTime.mqh"
 #include "../services/SEDateTime/structs/SDateTime.mqh"
 #include "../entities/EOrder.mqh"
+#include "../services/SEOrderBook/SEOrderBook.mqh"
 #include "../services/SEStatistics/SEStatistics.mqh"
 #include "../services/SELotSize/SELotSize.mqh"
 #include "../services/SRReportOfOrderHistory/SRReportOfOrderHistory.mqh"
 #include "../services/SRReportOfStrategySnapshots/SRReportOfStrategySnapshots.mqh"
 #include "../services/SRPersistenceOfOrders/SRPersistenceOfOrders.mqh"
 #include "../services/SRPersistenceOfStatistics/SRPersistenceOfStatistics.mqh"
+#include "../services/SRPersistenceOfState/SRPersistenceOfState.mqh"
 #include "../integrations/HorizonAPI/HorizonAPI.mqh"
 #include "../structs/STradingStatus.mqh"
-
-#define ORDER_TYPE_ANY    -1
-#define ORDER_STATUS_ANY  -1
+#include "../constants/time.mqh"
 
 extern SEDateTime dtime;
 extern HorizonAPI horizonAPI;
 extern STradingStatus tradingStatus;
+
+void SEOrderBook::NotifyOrderCancelled(EOrder &order) {
+	if (CheckPointer(listener) != POINTER_INVALID) {
+		listener.OnCancelOrder(order);
+	}
+}
 
 class SEStrategy:
 public IStrategy {
 private:
 	double weight;
 	double balance;
-	int todayOrderCount;
-	int openOrderCount;
-	int closedOrderCount;
-	EOrder orders[];
 
 	SEAsset *asset;
 	SEStatistics *statistics;
@@ -46,14 +48,77 @@ private:
 	SRReportOfStrategySnapshots *strategySnapshotsReporter;
 	SRPersistenceOfOrders *orderPersistence;
 	SRPersistenceOfStatistics *statisticsPersistence;
+	SRPersistenceOfState *statePersistence;
 
 protected:
 	SELogger logger;
+	SEOrderBook *orderBook;
 
 	string name;
 	string symbol;
 	string prefix;
 	ulong strategyMagicNumber;
+	double maxLotsByOrder;
+
+	void SetStateDouble(string key, double value) {
+		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+			statePersistence.SetDouble(key, value);
+		}
+	}
+
+	void GetStateDouble(string key, double &value, double defaultValue = 0.0) {
+		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+			statePersistence.GetDouble(key, value, defaultValue);
+		}
+	}
+
+	void SetStateInt(string key, int value) {
+		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+			statePersistence.SetInt(key, value);
+		}
+	}
+
+	void GetStateInt(string key, int &value, int defaultValue = 0) {
+		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+			statePersistence.GetInt(key, value, defaultValue);
+		}
+	}
+
+	void SetStateString(string key, string value) {
+		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+			statePersistence.SetString(key, value);
+		}
+	}
+
+	void GetStateString(string key, string &value, string defaultValue = "") {
+		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+			statePersistence.GetString(key, value, defaultValue);
+		}
+	}
+
+	void SetStateBool(string key, bool value) {
+		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+			statePersistence.SetBool(key, value);
+		}
+	}
+
+	void GetStateBool(string key, bool &value, bool defaultValue = false) {
+		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+			statePersistence.GetBool(key, value, defaultValue);
+		}
+	}
+
+	void SetStateDatetime(string key, datetime value) {
+		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+			statePersistence.SetDatetime(key, value);
+		}
+	}
+
+	void GetStateDatetime(string key, datetime &value, datetime defaultValue = 0) {
+		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+			statePersistence.GetDatetime(key, value, defaultValue);
+		}
+	}
 
 public:
 	virtual ~SEStrategy() {
@@ -80,23 +145,18 @@ public:
 		if (CheckPointer(statisticsPersistence) == POINTER_DYNAMIC) {
 			delete statisticsPersistence;
 		}
-	}
 
-	void AddOrder(EOrder &order) {
-		order.SetPersistence(orderPersistence);
-		int count = ArraySize(orders);
-		ArrayResize(orders, count + 1, 16);
-		orders[count] = order;
-	}
-
-	void CloseAllActiveOrders() {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetStatus() == ORDER_STATUS_OPEN) {
-				orders[i].Close();
-			} else if (orders[i].GetStatus() == ORDER_STATUS_PENDING) {
-				orders[i].Cancel();
-			}
+		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+			delete statePersistence;
 		}
+
+		if (CheckPointer(orderBook) == POINTER_DYNAMIC) {
+			delete orderBook;
+		}
+	}
+
+	SEOrderBook * GetOrderBook() {
+		return orderBook;
 	}
 
 	void ExportOrderHistory() {
@@ -117,6 +177,10 @@ public:
 			return;
 		}
 
+		if (CheckPointer(statistics) != POINTER_DYNAMIC) {
+			return;
+		}
+
 		strategySnapshotsReporter.AddSnapshot(statistics.GetDailySnapshot());
 		strategySnapshotsReporter.Export();
 
@@ -126,42 +190,8 @@ public:
 		));
 	}
 
-	int FindOrderIndexById(string id) {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetId() == id) {
-				return i;
-			}
-		}
-
-		return -1;
-	}
-
-	int FindOrderIndexByOrderId(ulong orderId) {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetOrderId() == orderId) {
-				return i;
-			}
-		}
-
-		return -1;
-	}
-
-	int FindOrderIndexByPositionId(ulong positionId) {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetPositionId() == positionId) {
-				return i;
-			}
-		}
-
-		return -1;
-	}
-
 	double GetBalance() {
 		return balance;
-	}
-
-	int GetClosedOrderCount() {
-		return closedOrderCount;
 	}
 
 	double GetLotSizeByStopLoss(double stopLossDistance) {
@@ -173,45 +203,25 @@ public:
 			? statistics.GetNav()
 			: balance;
 
-		return lotSize.CalculateByStopLoss(nav, stopLossDistance, EquityAtRisk / 100.0);
+		double result = lotSize.CalculateByStopLoss(nav, stopLossDistance, EquityAtRisk / 100.0);
+
+		if (maxLotsByOrder > 0 && result > maxLotsByOrder) {
+			result = maxLotsByOrder;
+		}
+
+		return result;
 	}
 
 	ulong GetMagicNumber() {
 		return strategyMagicNumber;
 	}
 
+	double GetMaxLotsByOrder() {
+		return maxLotsByOrder;
+	}
+
 	string GetName() {
 		return name;
-	}
-
-	int GetOpenOrderCount() {
-		return openOrderCount;
-	}
-
-	void GetOpenOrders(
-		EOrder& resultOrders[],
-		ENUM_ORDER_TYPE side = ORDER_TYPE_ANY,
-		ENUM_ORDER_STATUSES status = ORDER_STATUS_ANY
-	) {
-		filterOrders(
-			resultOrders,
-			side,
-			status,
-			ORDER_STATUS_OPEN,
-			ORDER_STATUS_PENDING
-		);
-	}
-
-	EOrder * GetOrderAtIndex(int index) {
-		if (index < 0 || index >= ArraySize(orders)) {
-			return NULL;
-		}
-
-		return GetPointer(orders[index]);
-	}
-
-	int GetOrdersCount() {
-		return ArraySize(orders);
 	}
 
 	string GetPrefix() {
@@ -226,29 +236,13 @@ public:
 		return symbol;
 	}
 
-	int GetTodayOrderCount() {
-		return todayOrderCount;
-	}
-
 	double GetWeight() {
 		return weight;
 	}
 
-	bool HasActiveOrders() {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetStatus() == ORDER_STATUS_OPEN ||
-			    orders[i].GetStatus() == ORDER_STATUS_PENDING) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
 	virtual void OnCloseOrder(EOrder& order, ENUM_DEAL_REASON reason) {
-		statistics.OnCloseOrder(order, reason, orders);
-		openOrderCount--;
-		closedOrderCount++;
+		statistics.OnCloseOrder(order, reason, orderBook.orders);
+		orderBook.OnOrderClosed();
 
 		if (CheckPointer(statisticsPersistence) == POINTER_DYNAMIC) {
 			statisticsPersistence.Save(statistics);
@@ -260,15 +254,7 @@ public:
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
 		}
 
-		if (!tradingStatus.isPaused && (
-			    reason == DEAL_REASON_CLIENT ||
-			    reason == DEAL_REASON_MOBILE ||
-			    reason == DEAL_REASON_WEB
-		    )) {
-			tradingStatus.isPaused = true;
-			tradingStatus.reason = TRADING_PAUSE_REASON_MANUAL_CLOSE;
-			logger.Warning("Manual close detected - trading paused until next day");
-		}
+		detectManualClose(reason);
 	}
 
 	virtual void OnDeinit() {
@@ -276,11 +262,9 @@ public:
 			statisticsPersistence.Save(statistics);
 		}
 
-		for (int i = 0; i < ArraySize(orders); i++) {
-			orders[i].OnDeinit();
+		if (CheckPointer(orderBook) == POINTER_DYNAMIC) {
+			orderBook.OnDeinit();
 		}
-
-		ArrayResize(orders, 0);
 	}
 
 	virtual void OnEnd() {
@@ -298,6 +282,8 @@ public:
 		if (IsLiveTrading()) {
 			orderPersistence = new SRPersistenceOfOrders();
 			orderPersistence.Initialize(prefix);
+			orderBook.SetPersistence(orderPersistence);
+
 			int restored = restoreOrders();
 
 			if (restored == -1) {
@@ -307,31 +293,43 @@ public:
 			statisticsPersistence = new SRPersistenceOfStatistics();
 			statisticsPersistence.Initialize(prefix);
 			statisticsPersistence.Load(statistics);
+
+			statePersistence = new SRPersistenceOfState();
+			statePersistence.Initialize(prefix);
+			statePersistence.Load();
 		}
 
 		return INIT_SUCCEEDED;
 	}
 
 	virtual void OnCancelOrder(EOrder& order) {
+		orderBook.OnOrderCancelled();
+		horizonAPI.UpsertOrder(order);
+
+		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
+			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
+		}
 	}
 
 	virtual void OnOpenOrder(EOrder& order) {
-		statistics.OnOpenOrder(order, orders);
+		statistics.OnOpenOrder(order, orderBook.orders);
 		horizonAPI.UpsertOrder(order);
 	}
 
 	virtual void OnStartDay() {
+		orderBook.PurgeClosedOrders();
+
 		if (CheckPointer(strategySnapshotsReporter) != POINTER_INVALID) {
 			strategySnapshotsReporter.AddSnapshot(statistics.GetDailySnapshot());
 		}
 
-		statistics.OnStartDay(orders);
+		statistics.OnStartDay(orderBook.orders);
 
 		if (CheckPointer(statisticsPersistence) == POINTER_DYNAMIC) {
 			statisticsPersistence.Save(statistics);
 		}
 
-		todayOrderCount = 0;
+		orderBook.ResetTodayOrderCount();
 	}
 
 	virtual void OnStartHour() {
@@ -345,10 +343,11 @@ public:
 	}
 
 	void SyncOrders() {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetStatus() == ORDER_STATUS_OPEN ||
-			    orders[i].GetStatus() == ORDER_STATUS_PENDING) {
-				horizonAPI.UpsertOrder(orders[i]);
+		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
+			EOrder *order = orderBook.GetOrderAtIndex(i);
+			if (order != NULL && (order.GetStatus() == ORDER_STATUS_OPEN ||
+					      order.GetStatus() == ORDER_STATUS_PENDING)) {
+				horizonAPI.UpsertOrder(order);
 			}
 		}
 	}
@@ -357,10 +356,11 @@ public:
 		double floatingPnl = 0;
 		double exposureLots = 0;
 
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetStatus() == ORDER_STATUS_OPEN) {
-				floatingPnl += orders[i].GetFloatingPnL();
-				exposureLots += orders[i].GetVolume();
+		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
+			EOrder *order = orderBook.GetOrderAtIndex(i);
+			if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
+				floatingPnl += orderBook.GetFloatingProfitAndLoss(order);
+				exposureLots += order.GetVolume();
 			}
 		}
 
@@ -376,7 +376,7 @@ public:
 			drawdownPct,
 			statistics.GetDailyPerformance(),
 			floatingPnl,
-			openOrderCount,
+			orderBook.GetOpenOrderCount(),
 			exposureLots
 		);
 	}
@@ -388,78 +388,8 @@ public:
 	virtual void OnTick() {
 	}
 
-	EOrder * OpenNewOrder(
-		ENUM_ORDER_TYPE side,
-		double openAtPrice,
-		double volume,
-		bool isMarketOrder = true,
-		double takeProfit = 0,
-		double stopLoss = 0
-	) {
-		if (tradingStatus.isPaused) {
-			return NULL;
-		}
-
-		if (balance <= 0) {
-			return NULL;
-		}
-
-		EOrder order(strategyMagicNumber, symbol);
-		double askPrice = SymbolInfoDouble(symbol, SYMBOL_ASK);
-		double bidPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
-		double currentPrice = (side == ORDER_TYPE_BUY) ? askPrice : bidPrice;
-
-		order.SetStatus(ORDER_STATUS_PENDING);
-		order.SetSource(prefix);
-		order.SetSide(side);
-		order.SetVolume(volume);
-		order.SetSignalPrice(currentPrice);
-		order.SetOpenAtPrice(openAtPrice);
-		SDateTime signalTime = dtime.Now();
-		order.SetSignalAt(signalTime);
-		order.SetIsMarketOrder(isMarketOrder);
-
-		if (stopLoss > 0) {
-			order.SetStopLoss(stopLoss);
-		}
-
-		if (takeProfit > 0) {
-			order.SetTakeProfit(takeProfit);
-		}
-
-		order.GetId();
-		AddOrder(order);
-		todayOrderCount++;
-		openOrderCount++;
-
-		return GetOrderAtIndex(GetOrdersCount() - 1);
-	}
-
 	void ProcessOrders() {
-		SMarketStatus marketStatus = GetMarketStatus(symbol);
-
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (!orders[i].IsInitialized()) {
-				orders[i].OnInit();
-			}
-
-			if (orders[i].GetStatus() == ORDER_STATUS_PENDING) {
-				if (tradingStatus.isPaused) {
-					orders[i].Cancel();
-					OnCancelOrder(orders[i]);
-				} else {
-					orders[i].CheckToOpen(marketStatus);
-
-					if (orders[i].GetStatus() == ORDER_STATUS_CANCELLED) {
-						OnCancelOrder(orders[i]);
-					}
-				}
-			}
-
-			if (orders[i].GetStatus() == ORDER_STATUS_OPEN) {
-				orders[i].CheckToClose(marketStatus);
-			}
-		}
+		orderBook.ProcessOrders();
 	}
 
 	void SetAsset(SEAsset *assetReference) {
@@ -472,6 +402,10 @@ public:
 
 	void SetMagicNumber(ulong magic) {
 		strategyMagicNumber = magic;
+	}
+
+	void SetMaxLotsByOrder(double lots) {
+		maxLotsByOrder = lots;
 	}
 
 	void SetName(string strategyName) {
@@ -495,35 +429,20 @@ public:
 	}
 
 private:
-	void filterOrders(
-		EOrder& resultOrders[],
-		ENUM_ORDER_TYPE side,
-		ENUM_ORDER_STATUSES status,
-		ENUM_ORDER_STATUSES defaultStatus1,
-		ENUM_ORDER_STATUSES defaultStatus2 = ORDER_STATUS_ANY) {
-		ArrayResize(resultOrders, 0, ArraySize(orders));
-
-		int resultCount = 0;
-
-		for (int i = 0; i < ArraySize(orders); i++) {
-			bool isSideMatch = (side == ORDER_TYPE_ANY) || (orders[i].GetSide() == side);
-			bool isStatusMatch = false;
-
-			if (status == ORDER_STATUS_ANY) {
-				isStatusMatch = (orders[i].GetStatus() == defaultStatus1);
-				if (defaultStatus2 != ORDER_STATUS_ANY) {
-					isStatusMatch = isStatusMatch || (orders[i].GetStatus() == defaultStatus2);
-				}
-			} else {
-				isStatusMatch = (orders[i].GetStatus() == status);
-			}
-
-			if (isSideMatch && isStatusMatch) {
-				resultCount++;
-				ArrayResize(resultOrders, resultCount);
-				resultOrders[resultCount - 1] = orders[i];
-			}
+	void detectManualClose(ENUM_DEAL_REASON reason) {
+		if (tradingStatus.isPaused) {
+			return;
 		}
+
+		if (reason != DEAL_REASON_CLIENT &&
+		    reason != DEAL_REASON_MOBILE &&
+		    reason != DEAL_REASON_WEB) {
+			return;
+		}
+
+		tradingStatus.isPaused = true;
+		tradingStatus.reason = TRADING_PAUSE_REASON_MANUAL_CLOSE;
+		logger.Warning("Manual close detected - trading paused until next day");
 	}
 
 	void initializeDefaultThresholds() {
@@ -549,12 +468,13 @@ private:
 	}
 
 	void initializeServices() {
-		todayOrderCount = 0;
-		openOrderCount = 0;
-		closedOrderCount = 0;
 		logger.SetPrefix(name);
 		statistics = new SEStatistics(symbol, name, prefix, balance);
 		lotSize = new SELotSize(symbol);
+
+		orderBook = new SEOrderBook();
+		orderBook.Initialize(symbol, prefix, strategyMagicNumber);
+		orderBook.SetListener(GetPointer(this));
 
 		if (EnableOrderHistoryReport) {
 			string reportName = StringFormat("%s_%s_Orders", symbol, prefix);
@@ -568,49 +488,22 @@ private:
 	}
 
 	int restoreOrders() {
-		if (CheckPointer(orderPersistence) == POINTER_INVALID) {
-			return 0;
-		}
+		int totalRestored = orderBook.RestoreOrders();
 
-		EOrder restoredOrders[];
-		int restoredCount = orderPersistence.LoadOrders(restoredOrders);
-
-		if (restoredCount == -1) {
-			logger.Error(StringFormat(
-				"Failed to restore orders for strategy: %s",
-				prefix
-			));
-
+		if (totalRestored == -1) {
 			return -1;
 		}
 
-		int totalRestored = 0;
+		for (int i = orderBook.GetOrdersCount() - totalRestored; i < orderBook.GetOrdersCount(); i++) {
+			EOrder *addedOrder = orderBook.GetOrderAtIndex(i);
 
-		for (int i = 0; i < restoredCount; i++) {
-			if (FindOrderIndexById(restoredOrders[i].GetId()) != -1) {
-				continue;
-			}
-
-			restoredOrders[i].OnInit();
-			AddOrder(restoredOrders[i]);
-			totalRestored++;
-
-			ENUM_ORDER_STATUSES orderStatus = restoredOrders[i].GetStatus();
-
-			if (orderStatus == ORDER_STATUS_CLOSED || orderStatus == ORDER_STATUS_CANCELLED) {
-				closedOrderCount++;
-			} else {
-				openOrderCount++;
-				EOrder *addedOrder = GetOrderAtIndex(GetOrdersCount() - 1);
-
-				if (addedOrder != NULL) {
-					OnOpenOrder(addedOrder);
-				}
+			if (addedOrder != NULL) {
+				OnOpenOrder(addedOrder);
 			}
 		}
 
 		if (totalRestored > 0) {
-			logger.Info(StringFormat("Restored %d orders from JSON", totalRestored));
+			logger.Info(StringFormat("Restored %d active orders from JSON", totalRestored));
 		}
 
 		return totalRestored;

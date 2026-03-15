@@ -17,15 +17,6 @@ interface IAsset {
 	void OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason);
 	void OnEnd();
 	void OnDeinit();
-
-	double CalculateQualityProduct();
-	void PerformStatistics();
-
-	int GetStrategyCount();
-
-	void SetBalance(double assetBalance);
-	void SetName(string assetName);
-	void SetSymbol(string assetSymbol);
 };
 
 #endif
