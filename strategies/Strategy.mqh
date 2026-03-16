@@ -3,16 +3,19 @@
 
 class SEAsset;
 
+#include "../constants/time.mqh"
+
 #include "../enums/EOrderStatuses.mqh"
 #include "../structs/SSOrderHistory.mqh"
 #include "../structs/SSStatisticsSnapshot.mqh"
 #include "../structs/SQualityThresholds.mqh"
+#include "../structs/STradingStatus.mqh"
 
 #include "../interfaces/IStrategy.mqh"
+
 #include "../services/SELogger/SELogger.mqh"
 #include "../services/SEDateTime/SEDateTime.mqh"
 #include "../services/SEDateTime/structs/SDateTime.mqh"
-#include "../entities/EOrder.mqh"
 #include "../services/SEOrderBook/SEOrderBook.mqh"
 #include "../services/SEStatistics/SEStatistics.mqh"
 #include "../services/SELotSize/SELotSize.mqh"
@@ -21,9 +24,10 @@ class SEAsset;
 #include "../services/SRPersistenceOfOrders/SRPersistenceOfOrders.mqh"
 #include "../services/SRPersistenceOfStatistics/SRPersistenceOfStatistics.mqh"
 #include "../services/SRPersistenceOfState/SRPersistenceOfState.mqh"
+
 #include "../integrations/HorizonAPI/HorizonAPI.mqh"
-#include "../structs/STradingStatus.mqh"
-#include "../constants/time.mqh"
+
+#include "../entities/EOrder.mqh"
 
 extern SEDateTime dtime;
 extern HorizonAPI horizonAPI;
@@ -281,7 +285,7 @@ public:
 
 		if (IsLiveTrading()) {
 			orderPersistence = new SRPersistenceOfOrders();
-			orderPersistence.Initialize(prefix);
+			orderPersistence.Initialize(symbol, prefix);
 			orderBook.SetPersistence(orderPersistence);
 
 			int restored = restoreOrders();
@@ -291,11 +295,11 @@ public:
 			}
 
 			statisticsPersistence = new SRPersistenceOfStatistics();
-			statisticsPersistence.Initialize(prefix);
+			statisticsPersistence.Initialize(symbol, prefix);
 			statisticsPersistence.Load(statistics);
 
 			statePersistence = new SRPersistenceOfState();
-			statePersistence.Initialize(prefix);
+			statePersistence.Initialize(symbol, prefix);
 			statePersistence.Load();
 		}
 
@@ -364,8 +368,13 @@ public:
 			}
 		}
 
-		double nav = statistics.GetNav();
+		double nav = statistics.GetClosedNav() + floatingPnl;
 		double peak = statistics.GetNavPeak();
+
+		if (nav > peak) {
+			peak = nav;
+		}
+
 		double drawdownPct = (peak > 0 && nav < peak)
 			? (peak - nav) / peak
 			: 0.0;
@@ -488,7 +497,8 @@ private:
 	}
 
 	int restoreOrders() {
-		int totalRestored = orderBook.RestoreOrders();
+		EOrder reconciledOrders[];
+		int totalRestored = orderBook.RestoreOrders(reconciledOrders);
 
 		if (totalRestored == -1) {
 			return -1;
@@ -500,6 +510,14 @@ private:
 			if (addedOrder != NULL) {
 				OnOpenOrder(addedOrder);
 			}
+		}
+
+		for (int i = 0; i < ArraySize(reconciledOrders); i++) {
+			horizonAPI.UpsertOrder(reconciledOrders[i]);
+			logger.Info(StringFormat(
+				"Synced reconciled order to HorizonAPI: %s",
+				reconciledOrders[i].GetId()
+			));
 		}
 
 		if (totalRestored > 0) {

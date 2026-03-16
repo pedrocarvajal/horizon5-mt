@@ -1,16 +1,22 @@
 #ifndef __SE_ASSET_MQH__
 #define __SE_ASSET_MQH__
 
-#include "../entities/EOrder.mqh"
-#include "../helpers/HStringToNumber.mqh"
 #include "../interfaces/IAsset.mqh"
+
+#include "../helpers/HStringToNumber.mqh"
+
 #include "../services/SELogger/SELogger.mqh"
+#include "../services/SRReportOfMarketSnapshots/SRReportOfMarketSnapshots.mqh"
+
+#include "../integrations/HorizonAPI/HorizonAPI.mqh"
+
+#include "../entities/EOrder.mqh"
+
 #include "../indicators/INRollingReturn.mqh"
 #include "../indicators/INDrawdownFromPeak.mqh"
 #include "../indicators/INVolatility.mqh"
-#include "../services/SRReportOfMarketSnapshots/SRReportOfMarketSnapshots.mqh"
+
 #include "../strategies/Strategy.mqh"
-#include "../integrations/HorizonAPI/HorizonAPI.mqh"
 
 extern SEDateTime dtime;
 extern HorizonAPI horizonAPI;
@@ -183,8 +189,6 @@ public:
 	}
 
 	virtual void OnDeinit() {
-		SendHeartbeats(HEARTBEAT_DEINIT);
-
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnDeinit();
 		}

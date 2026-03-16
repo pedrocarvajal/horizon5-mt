@@ -2,6 +2,7 @@
 #define __SR_PERSISTENCE_OF_STATISTICS_MQH__
 
 #include "../../helpers/HIsLiveTrading.mqh"
+
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 #include "../SEStatistics/SEStatistics.mqh"
@@ -179,8 +180,8 @@ public:
 		statisticsCollection = NULL;
 	}
 
-	void Initialize(string strategyPrefix) {
-		string basePath = StringFormat("Live/%s/%s", _Symbol, strategyPrefix);
+	void Initialize(string symbolName, string strategyPrefix) {
+		string basePath = StringFormat("Live/%s/%s", symbolName, strategyPrefix);
 		database.Initialize(basePath, true);
 		statisticsCollection = database.Collection("statistics");
 	}
@@ -225,7 +226,6 @@ public:
 		JSON::Object *document = statisticsCollection.FindOne("_id", "state");
 
 		if (document == NULL) {
-			logger.Info("No saved statistics found, starting fresh");
 			return true;
 		}
 

@@ -2,8 +2,10 @@
 #define __SE_LOGGER_MQH__
 
 #include "../../enums/EDebugLevel.mqh"
-#include "../../helpers/HIsLiveTrading.mqh"
+
 #include "../../interfaces/IRemoteLogger.mqh"
+
+#include "../../helpers/HIsLiveTrading.mqh"
 
 class SELogger {
 private:
@@ -46,8 +48,8 @@ public:
 		globalDebugLevel = level;
 	}
 
-	static void SetRemoteLogger(IRemoteLogger *logger) {
-		remoteLogger = logger;
+	static void SetRemoteLogger(IRemoteLogger *remoteLoggerInstance) {
+		remoteLogger = remoteLoggerInstance;
 	}
 
 	static void GetGlobalEntries(string &result[]) {

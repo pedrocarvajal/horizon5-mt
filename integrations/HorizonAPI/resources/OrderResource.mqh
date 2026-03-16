@@ -1,14 +1,17 @@
 #ifndef __ORDER_RESOURCE_MQH__
 #define __ORDER_RESOURCE_MQH__
 
+#include "../../../services/SEDateTime/structs/SDateTime.mqh"
+
+#include "../../../helpers/HClampNumeric.mqh"
+
+#include "../../../entities/EOrder.mqh"
+
 #include "../HorizonAPIContext.mqh"
-#include "StrategyResource.mqh"
 #include "../helpers/HGetOrderStatus.mqh"
 #include "../helpers/HGetOrderSide.mqh"
 #include "../helpers/HGetCloseReason.mqh"
-#include "../../../entities/EOrder.mqh"
-#include "../../../helpers/HClampNumeric.mqh"
-#include "../../../services/SEDateTime/structs/SDateTime.mqh"
+#include "StrategyResource.mqh"
 
 #define VALID_ORDER_YEAR_MIN 2020
 #define VALID_ORDER_YEAR_MAX 2100

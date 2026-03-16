@@ -1,10 +1,12 @@
 #ifndef __STRATEGY_RESOURCE_MQH__
 #define __STRATEGY_RESOURCE_MQH__
 
-#include "../HorizonAPIContext.mqh"
 #include "../structs/SStrategyMapping.mqh"
+
 #include "../../../helpers/HClampNumeric.mqh"
 #include "../../../helpers/HGenerateUuid.mqh"
+
+#include "../HorizonAPIContext.mqh"
 
 class StrategyResource {
 private:

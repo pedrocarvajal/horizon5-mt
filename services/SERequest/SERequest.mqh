@@ -1,9 +1,11 @@
 #ifndef __SE_REQUEST_MQH__
 #define __SE_REQUEST_MQH__
 
-#include "../SELogger/SELogger.mqh"
 #include "../../libraries/json/index.mqh"
+
 #include "structs/SRequestResponse.mqh"
+
+#include "../SELogger/SELogger.mqh"
 
 class SERequest {
 private:
@@ -52,6 +54,7 @@ private:
 			int errorCode = GetLastError();
 			string reason = errorCode == 4014 ? "URL not in allowed list" : "Connection failed";
 			logger.Error(StringFormat("%s: error=%d %s %s", reason, errorCode, method, url));
+			logRequestBody(data);
 			response.body = "";
 			return response;
 		}
@@ -60,9 +63,22 @@ private:
 
 		if (status >= 400) {
 			logger.Error(StringFormat("HTTP %d %s %s", status, method, url));
+			logRequestBody(data);
+			logger.Error(StringFormat("Response: %s", response.body));
 		}
 
 		return response;
+	}
+
+	void logRequestBody(const char &data[]) {
+		int dataSize = ArraySize(data);
+
+		if (dataSize == 0) {
+			return;
+		}
+
+		string requestBody = CharArrayToString(data, 0, MathMin(dataSize, 500));
+		logger.Error(StringFormat("Request: %s", requestBody));
 	}
 
 public:

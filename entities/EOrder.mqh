@@ -3,10 +3,12 @@
 
 #include "../enums/EOrderStatuses.mqh"
 #include "../structs/SSOrderHistory.mqh"
+
+#include "../helpers/HGenerateUuid.mqh"
+
 #include "../services/SEDateTime/SEDateTime.mqh"
 #include "../services/SEDateTime/structs/SDateTime.mqh"
 #include "../services/SELogger/SELogger.mqh"
-#include "../helpers/HGenerateUuid.mqh"
 
 class SRPersistenceOfOrders;
 

@@ -2,7 +2,9 @@
 #define __SR_REPORT_OF_MARKET_SNAPSHOTS_MQH__
 
 #include "../../structs/SSMarketSnapshot.mqh"
+
 #include "../../helpers/HGetReportsPath.mqh"
+
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 

@@ -6,14 +6,16 @@
 #include "../../structs/SQualityThresholds.mqh"
 #include "../../structs/SSQualityResult.mqh"
 #include "../../structs/SStatisticsState.mqh"
-#include "../SEDateTime/SEDateTime.mqh"
-#include "../../entities/EOrder.mqh"
 
 #include "helpers/HCalculateRSquared.mqh"
 #include "helpers/HCalculateSharpeRatio.mqh"
 #include "helpers/HCalculateMetricQuality.mqh"
 #include "helpers/HCalculateCAGR.mqh"
 #include "helpers/HCalculateStability.mqh"
+
+#include "../SEDateTime/SEDateTime.mqh"
+
+#include "../../entities/EOrder.mqh"
 
 extern SEDateTime dtime;
 
@@ -353,6 +355,12 @@ public:
 		}
 
 		return nav[ArraySize(nav) - 1];
+	}
+
+	double GetClosedNav() {
+		int lastIndex = ArraySize(performance) - 1;
+		double currentPerformance = (lastIndex >= 0) ? performance[lastIndex] : 0;
+		return initialBalance + currentPerformance + calculatePendingClosedProfit();
 	}
 
 	double GetNavPeak() {

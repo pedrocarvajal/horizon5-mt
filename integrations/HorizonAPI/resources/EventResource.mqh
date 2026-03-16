@@ -1,8 +1,9 @@
 #ifndef __EVENT_RESOURCE_MQH__
 #define __EVENT_RESOURCE_MQH__
 
-#include "../HorizonAPIContext.mqh"
 #include "../structs/SHorizonEvent.mqh"
+
+#include "../HorizonAPIContext.mqh"
 
 #define EVENT_KEY_POST_ORDER   "post.order"
 #define EVENT_KEY_DELETE_ORDER  "delete.order"
@@ -16,9 +17,63 @@ private:
 	HorizonAPIContext * context;
 	SELogger logger;
 
+	void parsePostOrderPayload(JSON::Object *payload, SHorizonEvent &event) {
+		event.symbol = payload.getString("symbol");
+		event.type = payload.getString("type");
+		event.volume = payload.getNumber("volume");
+		event.price = payload.getNumber("price");
+		event.stopLoss = payload.getNumber("stop_loss");
+		event.takeProfit = payload.getNumber("take_profit");
+		event.comment = payload.getString("comment");
+	}
+
+	void parseDeleteOrderPayload(JSON::Object *payload, SHorizonEvent &event) {
+		event.orderId = payload.getString("id");
+	}
+
+	void parsePutOrderPayload(JSON::Object *payload, SHorizonEvent &event) {
+		event.orderId = payload.getString("id");
+		event.stopLoss = payload.getNumber("stop_loss");
+		event.takeProfit = payload.getNumber("take_profit");
+	}
+
+	void parseGetOrdersPayload(JSON::Object *payload, SHorizonEvent &event) {
+		event.symbol = payload.getString("symbol");
+		event.side = payload.getString("side");
+		event.status = payload.getString("status");
+	}
+
+	void parseGetTickerPayload(JSON::Object *payload, SHorizonEvent &event) {
+		event.symbol = payload.getString("symbols");
+	}
+
+	void parseGetKlinesPayload(JSON::Object *payload, SHorizonEvent &event) {
+		event.symbol = payload.getString("symbol");
+		event.timeframe = payload.getString("timeframe");
+		event.fromDate = payload.getString("from_date");
+		event.toDate = payload.getString("to_date");
+	}
+
+	void parseEventPayload(const string key, JSON::Object *payload, SHorizonEvent &event) {
+		if (key == EVENT_KEY_POST_ORDER) {
+			parsePostOrderPayload(payload, event);
+		} else if (key == EVENT_KEY_DELETE_ORDER) {
+			parseDeleteOrderPayload(payload, event);
+		} else if (key == EVENT_KEY_PUT_ORDER) {
+			parsePutOrderPayload(payload, event);
+		} else if (key == EVENT_KEY_GET_ORDERS) {
+			parseGetOrdersPayload(payload, event);
+		} else if (key == EVENT_KEY_GET_TICKER) {
+			parseGetTickerPayload(payload, event);
+		} else if (key == EVENT_KEY_GET_KLINES) {
+			parseGetKlinesPayload(payload, event);
+		}
+	}
+
 	void parseEvent(JSON::Object *eventObject, SHorizonEvent &event) {
 		event.id = eventObject.getString("id");
 		event.key = eventObject.getString("key");
+		event.strategyId = (int)eventObject.getNumber("strategy");
 
 		JSON::Object *payload = eventObject.getObject("payload");
 
@@ -27,33 +82,7 @@ private:
 		}
 
 		event.payloadRaw = payload.toString();
-
-		if (event.key == EVENT_KEY_POST_ORDER) {
-			event.symbol = payload.getString("symbol");
-			event.type = payload.getString("type");
-			event.volume = payload.getNumber("volume");
-			event.price = payload.getNumber("price");
-			event.stopLoss = payload.getNumber("stop_loss");
-			event.takeProfit = payload.getNumber("take_profit");
-			event.comment = payload.getString("comment");
-		} else if (event.key == EVENT_KEY_DELETE_ORDER) {
-			event.orderId = payload.getString("id");
-		} else if (event.key == EVENT_KEY_PUT_ORDER) {
-			event.orderId = payload.getString("id");
-			event.stopLoss = payload.getNumber("stop_loss");
-			event.takeProfit = payload.getNumber("take_profit");
-		} else if (event.key == EVENT_KEY_GET_ORDERS) {
-			event.symbol = payload.getString("symbol");
-			event.side = payload.getString("side");
-			event.status = payload.getString("status");
-		} else if (event.key == EVENT_KEY_GET_TICKER) {
-			event.symbol = payload.getString("symbols");
-		} else if (event.key == EVENT_KEY_GET_KLINES) {
-			event.symbol = payload.getString("symbol");
-			event.timeframe = payload.getString("timeframe");
-			event.fromDate = payload.getString("from_date");
-			event.toDate = payload.getString("to_date");
-		}
+		parseEventPayload(event.key, payload, event);
 	}
 
 	int fillEventsFromArray(JSON::Array *dataArray, SHorizonEvent &events[]) {
@@ -108,7 +137,7 @@ public:
 		SRequestResponse response = context.PostWithResponse(path, emptyBody, 0);
 
 		if (response.status == 401) {
-			logger.Error("Unauthorized (401) on Consume — check API key. Disabling HorizonAPI.");
+			logger.Error("Unauthorized (401) on Consume, check credentials. Disabling HorizonAPI.");
 			context.Disable();
 			return 0;
 		}
@@ -139,7 +168,7 @@ public:
 		SRequestResponse response = context.Patch(path, wrapper);
 
 		if (response.status == 401) {
-			logger.Error("Unauthorized (401) on Ack — check API key. Disabling HorizonAPI.");
+			logger.Error("Unauthorized (401) on Ack, check credentials. Disabling HorizonAPI.");
 			context.Disable();
 			return false;
 		}

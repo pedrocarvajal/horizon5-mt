@@ -595,7 +595,11 @@ public:
 			}
 			if (this.valueType == JSONStringType) {
 				string copy = this.stringValue;
+				StringReplace(copy, "\\", "\\\\");
 				StringReplace(copy, "\"", "\\\"");
+				StringReplace(copy, "\n", "\\n");
+				StringReplace(copy, "\r", "\\r");
+				StringReplace(copy, "\t", "\\t");
 				return "\"" + copy + "\"";
 			}
 			return ""; // JSONUndefinedType , never returns

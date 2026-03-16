@@ -1,9 +1,10 @@
 #ifndef __HEARTBEAT_RESOURCE_MQH__
 #define __HEARTBEAT_RESOURCE_MQH__
 
+#include "../helpers/HGetHeartbeatEvent.mqh"
+
 #include "../HorizonAPIContext.mqh"
 #include "StrategyResource.mqh"
-#include "../helpers/HGetHeartbeatEvent.mqh"
 
 class HeartbeatResource {
 private:
