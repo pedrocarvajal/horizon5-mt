@@ -1,200 +1,198 @@
 #property service
 #property copyright "Horizon5"
-#property version   "1.20"
+#property version   "2.04"
 #property strict
 
-#define SERVICE_VERSION "1.2.0"
-
 #include "enums/EDebugLevel.mqh"
-#include "services/SELogger/SELogger.mqh"
-#include "services/SEDateTime/SEDateTime.mqh"
-#include "helpers/HGetLogsPath.mqh"
-#include "services/SRReportOfLogs/SRReportOfLogs.mqh"
+
 #include "helpers/HIsLiveTrading.mqh"
-#include "services/SRPersistenceOfOrders/SRPersistenceOfOrders.mqh"
-#include "helpers/HMapTimeframe.mqh"
+#include "helpers/HGetLogsPath.mqh"
+
+#include "services/SELogger/SELogger.mqh"
+#include "services/SEMessageBus/SEMessageBus.mqh"
+#include "services/SEMessageBus/SEMessageBusChannels.mqh"
+#include "services/SEDateTime/SEDateTime.mqh"
+#include "services/SRReportOfLogs/SRReportOfLogs.mqh"
+
 #include "integrations/HorizonAPI/HorizonAPI.mqh"
-#include "integrations/HorizonAPI/structs/SEventResponse.mqh"
 
-input group "General Settings";
-input ENUM_DEBUG_LEVEL DebugLevel = DEBUG_LEVEL_ALL; // [1] > Debug log level
+#define SERVICE_VERSION "2.0.0"
+#define MESSAGE_TYPE_HTTP_POST "http_post"
+#define MESSAGE_TYPE_ACK_EVENT "ack_event"
+#define API_ORDER_PATH_PREFIX  "api/v1/order/"
 
-input group "HorizonAPI Integration";
-input bool EnableHorizonAPI = true; // [1] > Enable HorizonAPI integration
-input string HorizonAPIUrl = ""; // [1] > HorizonAPI base URL
-input string HorizonAPIKey = ""; // [1] > HorizonAPI key (required)
-input int HorizonAPIEventPollInterval = 3; // [1] > Event poll interval in seconds
-input int MaxEventsPerPoll = 10; // [1] > Max events per ConsumeEvents call
+#define EVENT_KEYS_TRADING "post.order,delete.order,put.order,get.orders"
+#define EVENT_KEYS_SERVICE "get.account.info,get.ticker,get.klines,patch.account.disable,patch.account.enable"
 
 SEDateTime dtime;
 SELogger hlogger("HorizonAPI");
 HorizonAPI horizonAPI;
 
-void ackError(SHorizonEvent &event, string message) {
-	hlogger.Warning(StringFormat("Event ack | %s | error=%s | id=%s", event.key, message, event.id));
-	JSON::Object ackBody;
-	SEventResponse response;
-	response.Error(message);
-	response.ApplyTo(ackBody);
-	horizonAPI.AckEvent(event.id, ackBody);
+input group "General Settings";
+input ENUM_DEBUG_LEVEL DebugLevel = DEBUG_LEVEL_ALL; // [1] > Debug log level
+
+input group "HorizonAPI Integration";
+input string HorizonAPIUrl = ""; // [1] > HorizonAPI base URL
+input string HorizonAPIEmail = ""; // [1] > HorizonAPI email (required)
+input string HorizonAPIPassword = ""; // [1] > HorizonAPI password (required)
+
+input group "Service Settings";
+input int PollIntervalMs = 100; // [1] > Connector poll interval in milliseconds
+input int HorizonAPIEventPollInterval = 3; // [1] > Event poll interval in seconds
+input int MaxEventsPerPoll = 10; // [1] > Max events per ConsumeEvents call
+
+datetime lastEventPollTime = 0;
+
+bool isOrderEndpoint(string path) {
+	return StringFind(path, API_ORDER_PATH_PREFIX) >= 0;
 }
 
-void handleGetAccountInfo(SHorizonEvent &event) {
-	hlogger.Info(StringFormat("Event received | %s | id=%s", event.key, event.id));
-	double marginLevel = AccountInfoDouble(ACCOUNT_MARGIN) > 0
-		? NormalizeDouble(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 2)
-		: 0.0;
-
-	JSON::Object ackBody;
-	SEventResponse response;
-	response.Success();
-	response.ApplyTo(ackBody);
-	ackBody.setProperty("balance", ClampNumeric(AccountInfoDouble(ACCOUNT_BALANCE), 13, 2));
-	ackBody.setProperty("equity", ClampNumeric(AccountInfoDouble(ACCOUNT_EQUITY), 13, 2));
-	ackBody.setProperty("margin", ClampNumeric(AccountInfoDouble(ACCOUNT_MARGIN), 13, 2));
-	ackBody.setProperty("free_margin", ClampNumeric(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 13, 2));
-	ackBody.setProperty("profit", ClampNumeric(AccountInfoDouble(ACCOUNT_PROFIT), 13, 2));
-	ackBody.setProperty("margin_level", ClampNumeric(marginLevel, 8, 2));
-	ackBody.setProperty("currency", AccountInfoString(ACCOUNT_CURRENCY));
-	ackBody.setProperty("leverage", (int)AccountInfoInteger(ACCOUNT_LEVERAGE));
-
-	hlogger.Info(StringFormat("Event ack | %s | id=%s", event.key, event.id));
-	horizonAPI.AckEvent(event.id, ackBody);
+string extractPath(SMessage &message) {
+	JSON::Object payload(message.payloadJson);
+	return payload.getString("path");
 }
 
-void handleGetTicker(SHorizonEvent &event) {
-	hlogger.Info(StringFormat("Event received | %s | id=%s", event.key, event.id));
-	if (event.symbol == "") {
-		ackError(event, "No symbols provided");
+void processConnectorMessages() {
+	SMessage messages[];
+	int count = SEMessageBus::Poll(MB_CHANNEL_CONNECTOR, messages);
+
+	if (count == 0) {
 		return;
 	}
 
-	string symbols[];
-	int symbolCount = StringSplit(event.symbol, ',', symbols);
+	SMessage priorityMessages[];
+	SMessage normalMessages[];
+	string priorityPaths[];
+	string normalPaths[];
 
-	JSON::Object ackBody;
-	SEventResponse response;
-	response.Success();
-	response.ApplyTo(ackBody);
-
-	for (int i = 0; i < symbolCount; i++) {
-		string symbol = symbols[i];
-		StringTrimRight(symbol);
-		StringTrimLeft(symbol);
-
-		if (symbol == "" || !SymbolSelect(symbol, true)) {
+	for (int i = 0; i < count; i++) {
+		if (messages[i].messageType != MESSAGE_TYPE_HTTP_POST) {
+			SEMessageBus::Ack(MB_CHANNEL_CONNECTOR, messages[i].sequence);
 			continue;
 		}
 
-		ackBody.setProperty(symbol + "_bid", ClampNumeric(SymbolInfoDouble(symbol, SYMBOL_BID), 10, 5));
-		ackBody.setProperty(symbol + "_ask", ClampNumeric(SymbolInfoDouble(symbol, SYMBOL_ASK), 10, 5));
+		string path = extractPath(messages[i]);
+
+		if (path == "") {
+			SEMessageBus::Ack(MB_CHANNEL_CONNECTOR, messages[i].sequence);
+			continue;
+		}
+
+		if (isOrderEndpoint(path)) {
+			int size = ArraySize(priorityMessages);
+			ArrayResize(priorityMessages, size + 1);
+			ArrayResize(priorityPaths, size + 1);
+			priorityMessages[size] = messages[i];
+			priorityPaths[size] = path;
+		} else {
+			int size = ArraySize(normalMessages);
+			ArrayResize(normalMessages, size + 1);
+			ArrayResize(normalPaths, size + 1);
+			normalMessages[size] = messages[i];
+			normalPaths[size] = path;
+		}
 	}
 
-	hlogger.Info(StringFormat("Event ack | %s | id=%s", event.key, event.id));
-	horizonAPI.AckEvent(event.id, ackBody);
+	for (int i = 0; i < ArraySize(priorityMessages); i++) {
+		executeMessage(priorityMessages[i], priorityPaths[i]);
+	}
+
+	for (int i = 0; i < ArraySize(normalMessages); i++) {
+		executeMessage(normalMessages[i], normalPaths[i]);
+	}
 }
 
-void handleGetKlines(SHorizonEvent &event) {
-	hlogger.Info(StringFormat("Event received | %s | id=%s", event.key, event.id));
-	if (event.symbol == "" || event.timeframe == "" || event.fromDate == "" || event.toDate == "") {
-		ackError(event, "symbol, timeframe, from_date and to_date are required");
+void executeMessage(SMessage &message, string path) {
+	JSON::Object payload(message.payloadJson);
+	JSON::Object *bodyObject = payload.getObject("body");
+
+	if (bodyObject == NULL) {
+		SEMessageBus::Ack(MB_CHANNEL_CONNECTOR, message.sequence);
 		return;
 	}
 
-	ENUM_TIMEFRAMES period = MapTimeframe(event.timeframe);
-	if (period == PERIOD_CURRENT) {
-		ackError(event, "Invalid or unsupported timeframe");
-		return;
-	}
+	horizonAPI.PostDirect(path, *bodyObject);
 
-	datetime fromTime = StringToTime(event.fromDate);
-	datetime toTime = StringToTime(event.toDate);
-
-	MqlRates rates[];
-	int copied = CopyRates(event.symbol, period, fromTime, toTime, rates);
-
-	if (copied <= 0) {
-		ackError(event, "No kline data available for the requested range");
-		return;
-	}
-
-	string csvFileName = event.symbol + "_" + event.timeframe + ".csv";
-	string csvPath = StringFormat("/Klines/%lld/%s", AccountInfoInteger(ACCOUNT_LOGIN), csvFileName);
-
-	int fileHandle = FileOpen(csvPath, FILE_WRITE | FILE_ANSI | FILE_COMMON, ",", CP_UTF8);
-
-	if (fileHandle == INVALID_HANDLE) {
-		ackError(event, "Failed to create CSV file");
-		return;
-	}
-
-	int digits = (int)SymbolInfoInteger(event.symbol, SYMBOL_DIGITS);
-
-	FileWrite(fileHandle, "Time", "Open", "High", "Low", "Close", "TickVolume", "Spread", "RealVolume");
-
-	for (int i = 0; i < copied; i++) {
-		FileWrite(fileHandle,
-			TimeToString(rates[i].time, TIME_DATE | TIME_SECONDS),
-			DoubleToString(rates[i].open, digits),
-			DoubleToString(rates[i].high, digits),
-			DoubleToString(rates[i].low, digits),
-			DoubleToString(rates[i].close, digits),
-			IntegerToString(rates[i].tick_volume),
-			IntegerToString(rates[i].spread),
-			IntegerToString(rates[i].real_volume)
-		);
-	}
-
-	FileClose(fileHandle);
-
-	char fileData[];
-	int readHandle = FileOpen(csvPath, FILE_READ | FILE_BIN | FILE_COMMON);
-
-	if (readHandle == INVALID_HANDLE) {
-		FileDelete(csvPath, FILE_COMMON);
-		ackError(event, "Failed to read CSV file for upload");
-		return;
-	}
-
-	FileReadArray(readHandle, fileData);
-	FileClose(readHandle);
-
-	string uploadedFileName = horizonAPI.UploadMedia(csvFileName, fileData);
-
-	FileDelete(csvPath, FILE_COMMON);
-
-	if (uploadedFileName == "") {
-		ackError(event, "Failed to upload CSV file");
-		return;
-	}
-
-	JSON::Object ackBody;
-	SEventResponse response;
-	response.Success();
-	response.ApplyTo(ackBody);
-	ackBody.setProperty("file_name", uploadedFileName);
-	ackBody.setProperty("rows", copied);
-	hlogger.Info(StringFormat("Event ack | %s | rows=%d | id=%s", event.key, copied, event.id));
-	horizonAPI.AckEvent(event.id, ackBody);
+	SEMessageBus::Ack(MB_CHANNEL_CONNECTOR, message.sequence);
 }
 
-void processEvents() {
-	SHorizonEvent accountInfoEvents[];
-	int accountInfoCount = horizonAPI.ConsumeEvents("get.account.info", "", accountInfoEvents, MaxEventsPerPoll);
-	for (int i = 0; i < accountInfoCount; i++) {
-		handleGetAccountInfo(accountInfoEvents[i]);
+bool shouldPollEvents() {
+	datetime now = TimeCurrent();
+
+	if ((now - lastEventPollTime) < HorizonAPIEventPollInterval) {
+		return false;
 	}
 
-	SHorizonEvent tickerEvents[];
-	int tickerCount = horizonAPI.ConsumeEvents("get.ticker", "", tickerEvents, MaxEventsPerPoll);
-	for (int i = 0; i < tickerCount; i++) {
-		handleGetTicker(tickerEvents[i]);
+	lastEventPollTime = now;
+	return true;
+}
+
+void consumeAndForwardTradingEvents() {
+	string tradingKeys = EVENT_KEYS_TRADING;
+
+	SHorizonEvent tradingEvents[];
+	int tradingCount = horizonAPI.ConsumeEvents(tradingKeys, "", tradingEvents, MaxEventsPerPoll);
+
+	for (int i = 0; i < tradingCount; i++) {
+		JSON::Object eventPayload;
+		tradingEvents[i].ToJson(eventPayload);
+		SEMessageBus::Send(MB_CHANNEL_EVENTS_IN, tradingEvents[i].key, eventPayload);
+		hlogger.Info(StringFormat(
+			"Event forwarded to EA | %s | strategy=%d | id=%s",
+			tradingEvents[i].key, tradingEvents[i].strategyId, tradingEvents[i].id
+		));
+	}
+}
+
+void consumeAndForwardServiceEvents() {
+	string serviceKeys = EVENT_KEYS_SERVICE;
+
+	SHorizonEvent serviceEvents[];
+	int serviceCount = horizonAPI.ConsumeEvents(serviceKeys, "", serviceEvents, MaxEventsPerPoll);
+
+	for (int i = 0; i < serviceCount; i++) {
+		JSON::Object eventPayload;
+		serviceEvents[i].ToJson(eventPayload);
+		SEMessageBus::Send(MB_CHANNEL_EVENTS_SERVICE, serviceEvents[i].key, eventPayload);
+		hlogger.Info(StringFormat(
+			"Service event forwarded to EA | %s | id=%s",
+			serviceEvents[i].key, serviceEvents[i].id
+		));
+	}
+}
+
+void processAckResponses() {
+	static double cachedAckCounter = 0;
+
+	if (!SEMessageBus::HasChanges(MB_CHANNEL_EVENTS_OUT, cachedAckCounter)) {
+		return;
 	}
 
-	SHorizonEvent klineEvents[];
-	int klineCount = horizonAPI.ConsumeEvents("get.klines", "", klineEvents, MaxEventsPerPoll);
-	for (int i = 0; i < klineCount; i++) {
-		handleGetKlines(klineEvents[i]);
+	SMessage ackMessages[];
+	int ackCount = SEMessageBus::Poll(MB_CHANNEL_EVENTS_OUT, ackMessages);
+
+	for (int i = 0; i < ackCount; i++) {
+		if (ackMessages[i].messageType != MESSAGE_TYPE_ACK_EVENT) {
+			SEMessageBus::Ack(MB_CHANNEL_EVENTS_OUT, ackMessages[i].sequence);
+			continue;
+		}
+
+		JSON::Object payload(ackMessages[i].payloadJson);
+
+		string eventId = payload.getString("event_id");
+		JSON::Object *responseObject = payload.getObject("response");
+
+		if (eventId == "" || responseObject == NULL) {
+			SEMessageBus::Ack(MB_CHANNEL_EVENTS_OUT, ackMessages[i].sequence);
+			continue;
+		}
+
+		string responseJson = responseObject.toString();
+		JSON::Object responseBody(responseJson);
+		horizonAPI.AckEvent(eventId, responseBody);
+
+		hlogger.Info(StringFormat("Ack forwarded to API | event=%s", eventId));
+		SEMessageBus::Ack(MB_CHANNEL_EVENTS_OUT, ackMessages[i].sequence);
 	}
 }
 
@@ -205,8 +203,8 @@ int OnStart() {
 		Sleep(1000);
 	}
 
-	if (!horizonAPI.Initialize(HorizonAPIUrl, HorizonAPIKey, EnableHorizonAPI && IsLiveTrading())) {
-		hlogger.Warning("HorizonAPI initialization failed — service idle");
+	if (!horizonAPI.Initialize(HorizonAPIUrl, HorizonAPIEmail, HorizonAPIPassword, IsLiveTrading())) {
+		hlogger.Warning("HorizonAPI initialization failed, service idle");
 		return 0;
 	}
 
@@ -216,16 +214,31 @@ int OnStart() {
 		horizonAPI.StoreSystemHeartbeat(HEARTBEAT_INIT);
 	}
 
+	if (!SEMessageBus::Initialize()) {
+		hlogger.Error("MessageBus DLL initialization failed");
+		return 0;
+	}
+
+	SEMessageBus::RegisterService(MB_SERVICE_API);
 	hlogger.Info("Service started | v" + SERVICE_VERSION + " | built " + (string)__DATETIME__);
 
 	while (!IsStopped()) {
-		processEvents();
-		Sleep(HorizonAPIEventPollInterval * 1000);
+		SEMessageBus::WaitForMessage(MB_CHANNEL_CONNECTOR, PollIntervalMs);
+
+		processConnectorMessages();
+
+		if (shouldPollEvents()) {
+			consumeAndForwardTradingEvents();
+			consumeAndForwardServiceEvents();
+		}
+
+		processAckResponses();
 	}
 
+	SELogger::SetRemoteLogger(NULL);
+	SEMessageBus::UnregisterService(MB_SERVICE_API);
+	SEMessageBus::Shutdown();
 	hlogger.Info("Service stopped");
-
-	horizonAPI.StoreSystemHeartbeat(HEARTBEAT_DEINIT);
 
 	if (SELogger::GetGlobalEntryCount() > 0) {
 		string logEntries[];

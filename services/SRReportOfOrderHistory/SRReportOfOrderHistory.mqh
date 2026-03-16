@@ -2,7 +2,9 @@
 #define __SR_REPORT_OF_ORDER_HISTORY_MQH__
 
 #include "../../structs/SSOrderHistory.mqh"
+
 #include "../../helpers/HGetReportsPath.mqh"
+
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 

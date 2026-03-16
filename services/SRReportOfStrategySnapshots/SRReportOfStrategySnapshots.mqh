@@ -3,7 +3,9 @@
 
 #include "../../structs/SSStatisticsSnapshot.mqh"
 #include "../../structs/SSOrderHistory.mqh"
+
 #include "../../helpers/HGetReportsPath.mqh"
+
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 

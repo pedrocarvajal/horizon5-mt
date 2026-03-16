@@ -1,0 +1,20 @@
+LIBRARY HorizonMessageBus
+
+EXPORTS
+    MbInit
+    MbShutdown
+    MbChannelCreate
+    MbChannelFind
+    MbChannelGetOrCreate
+    MbPublish
+    MbPoll
+    MbResultGetSequence
+    MbResultGetType
+    MbResultGetPayload
+    MbResultGetTimestamp
+    MbAck
+    MbGetPendingCount
+    MbWaitForMessage
+    MbServiceRegister
+    MbServiceUnregister
+    MbServiceIsRunning

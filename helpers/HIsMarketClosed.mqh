@@ -1,9 +1,11 @@
 #ifndef __H_IS_MARKET_CLOSED_MQH__
 #define __H_IS_MARKET_CLOSED_MQH__
 
-#include "../services/SEDateTime/SEDateTime.mqh"
-#include "../structs/SMarketStatus.mqh"
 #include "../constants/time.mqh"
+
+#include "../structs/SMarketStatus.mqh"
+
+#include "../services/SEDateTime/SEDateTime.mqh"
 
 extern SEDateTime dtime;
 

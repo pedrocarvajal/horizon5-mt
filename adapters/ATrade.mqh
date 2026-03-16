@@ -2,6 +2,7 @@
 #define __A_TRADE_MQH__
 
 #include <Trade/Trade.mqh>
+
 #include "../services/SELogger/SELogger.mqh"
 
 #define SLIPPAGE_POINTS 5
