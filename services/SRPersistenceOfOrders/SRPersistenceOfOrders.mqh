@@ -2,9 +2,11 @@
 #define __SR_PERSISTENCE_OF_ORDERS_MQH__
 
 #include "../../helpers/HIsLiveTrading.mqh"
+
 #include "../SELogger/SELogger.mqh"
 #include "../SEDateTime/SEDateTime.mqh"
 #include "../SEDb/SEDb.mqh"
+
 #include "../../entities/EOrder.mqh"
 
 extern SEDateTime dtime;
@@ -21,8 +23,8 @@ public:
 		ordersCollection = NULL;
 	}
 
-	void Initialize(string strategyName) {
-		string basePath = StringFormat("Live/%s/%s", _Symbol, strategyName);
+	void Initialize(string symbolName, string strategyName) {
+		string basePath = StringFormat("Live/%s/%s", symbolName, strategyName);
 		database.Initialize(basePath, true);
 		ordersCollection = database.Collection("orders");
 	}
@@ -98,6 +100,24 @@ public:
 		return result;
 	}
 
+	bool DeleteOrder(string orderId) {
+		if (!IsLiveTrading()) {
+			return true;
+		}
+
+		if (ordersCollection == NULL) {
+			return false;
+		}
+
+		bool result = ordersCollection.DeleteOne("_id", orderId);
+
+		if (result) {
+			logger.Info(StringFormat("Order deleted from database: %s", orderId));
+		}
+
+		return result;
+	}
+
 	int QueryOrders(SEDbQuery &query, JSON::Object *&results[]) {
 		if (ordersCollection == NULL) {
 			ArrayResize(results, 0);
@@ -120,8 +140,19 @@ private:
 		}
 
 		if (!validateOrderExists(order)) {
+			if (reconcileClosedOrder(order)) {
+				logger.Info(StringFormat(
+					"Order reconciled from MT5 history: %s (closed while EA was offline)",
+					order.GetId()
+				));
+
+				ArrayResize(restoredOrders, ArraySize(restoredOrders) + 1);
+				restoredOrders[ArraySize(restoredOrders) - 1] = order;
+				return 1;
+			}
+
 			logger.Warning(StringFormat(
-				"Order no longer exists in MetaTrader, cleaning up: %s",
+				"Order no longer exists in MetaTrader and not found in history, cleaning up: %s",
 				order.GetId()
 			));
 
@@ -232,6 +263,61 @@ private:
 		json.setProperty("saved_at", (long)dtime.Timestamp());
 
 		return json;
+	}
+
+	bool reconcileClosedOrder(EOrder &order) {
+		if (order.GetStatus() != ORDER_STATUS_OPEN || order.GetPositionId() == 0) {
+			return false;
+		}
+
+		if (!HistorySelect(0, TimeCurrent())) {
+			logger.Error("Failed to load deal history for order reconciliation");
+			return false;
+		}
+
+		ulong positionId = order.GetPositionId();
+		int totalDeals = HistoryDealsTotal();
+
+		for (int i = totalDeals - 1; i >= 0; i--) {
+			ulong dealTicket = HistoryDealGetTicket(i);
+
+			if (dealTicket == 0) {
+				continue;
+			}
+
+			if (HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID) != (long)positionId) {
+				continue;
+			}
+
+			if ((int)HistoryDealGetInteger(dealTicket, DEAL_ENTRY) != DEAL_ENTRY_OUT) {
+				continue;
+			}
+
+			double dealPrice = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
+			double dealProfit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
+			double dealCommission = HistoryDealGetDouble(dealTicket, DEAL_COMMISSION);
+			double dealSwap = HistoryDealGetDouble(dealTicket, DEAL_SWAP);
+			double netProfit = dealProfit + (dealCommission * COMMISSION_ROUND_TRIP_MULTIPLIER) + dealSwap;
+			ENUM_DEAL_REASON dealReason =
+				(ENUM_DEAL_REASON)HistoryDealGetInteger(dealTicket, DEAL_REASON);
+			datetime dealTimestamp = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
+			SDateTime dealTime = dtime.FromTimestamp(dealTimestamp);
+
+			order.closeAt = dealTime;
+			order.closePrice = dealPrice;
+			order.profitInDollars = netProfit;
+			order.SetGrossProfit(dealProfit);
+			order.SetCommission(dealCommission);
+			order.SetSwap(dealSwap);
+			order.orderCloseReason = dealReason;
+			order.status = ORDER_STATUS_CLOSED;
+
+			ordersCollection.UpdateOne("_id", order.GetId(), serializeOrder(order));
+
+			return true;
+		}
+
+		return false;
 	}
 
 	bool validateOrderExists(EOrder &order) {

@@ -1,10 +1,12 @@
 #ifndef __ACCOUNT_RESOURCE_MQH__
 #define __ACCOUNT_RESOURCE_MQH__
 
-#include "../HorizonAPIContext.mqh"
 #include "../structs/SHorizonAccount.mqh"
-#include "../helpers/HGetSafeMarginLevel.mqh"
+
 #include "../../../helpers/HClampNumeric.mqh"
+
+#include "../HorizonAPIContext.mqh"
+#include "../helpers/HGetSafeMarginLevel.mqh"
 
 class AccountResource {
 private:
@@ -46,21 +48,21 @@ public:
 		SRequestResponse response = context.Get(path);
 
 		if (response.status != 200 || response.body == "") {
-			logger.Warning("Fetch: request failed — assuming account is active");
+			logger.Warning("Fetch: request failed, assuming account is active");
 			return account;
 		}
 
 		JSON::Object root(response.body);
 
 		if (!root.isObject("data")) {
-			logger.Warning("Fetch: response missing 'data' object — assuming account is active");
+			logger.Warning("Fetch: response missing 'data' object, assuming account is active");
 			return account;
 		}
 
 		JSON::Object *accountObject = root.getObject("data");
 
 		if (accountObject == NULL) {
-			logger.Warning("Fetch: failed to parse account object — assuming account is active");
+			logger.Warning("Fetch: failed to parse account object, assuming account is active");
 			return account;
 		}
 

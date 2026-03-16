@@ -18,22 +18,27 @@ public:
 	}
 
 	double CalculateByStopLoss(double nav, double stopLossDistance, double equityAtRisk) {
-		double tickValue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
-		double tickSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+		if (nav <= 0) {
+			logger.Warning("CalculateByStopLoss: nav is required");
+			return 0.0;
+		}
 
 		if (stopLossDistance <= 0) {
 			logger.Warning("CalculateByStopLoss: stopLossDistance is required");
 			return 0.0;
 		}
 
-		if (tickValue <= 0 || tickSize <= 0) {
-			logger.Warning(
-				"CalculateByStopLoss: Invalid tick value or tick size");
+		if (equityAtRisk <= 0) {
+			logger.Warning("CalculateByStopLoss: equityAtRisk is required");
 			return 0.0;
 		}
 
-		if (equityAtRisk <= 0) {
-			logger.Warning("CalculateByStopLoss: equityAtRisk is required");
+		double tickValue = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+		double tickSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+
+		if (tickValue <= 0 || tickSize <= 0) {
+			logger.Warning(
+				"CalculateByStopLoss: Invalid tick value or tick size");
 			return 0.0;
 		}
 

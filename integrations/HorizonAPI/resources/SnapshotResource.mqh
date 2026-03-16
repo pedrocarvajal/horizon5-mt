@@ -1,10 +1,11 @@
 #ifndef __SNAPSHOT_RESOURCE_MQH__
 #define __SNAPSHOT_RESOURCE_MQH__
 
-#include "../HorizonAPIContext.mqh"
-#include "StrategyResource.mqh"
-#include "../helpers/HGetSafeMarginLevel.mqh"
 #include "../../../helpers/HClampNumeric.mqh"
+
+#include "../HorizonAPIContext.mqh"
+#include "../helpers/HGetSafeMarginLevel.mqh"
+#include "StrategyResource.mqh"
 
 class SnapshotResource {
 private:

@@ -1,10 +1,13 @@
 #ifndef __HORIZON_API_MQH__
 #define __HORIZON_API_MQH__
 
+#include "../../interfaces/IRemoteLogger.mqh"
+
 #include "../../services/SERequest/SERequest.mqh"
 #include "../../services/SELogger/SELogger.mqh"
+
 #include "../../entities/EOrder.mqh"
-#include "../../interfaces/IRemoteLogger.mqh"
+
 #include "HorizonAPIContext.mqh"
 #include "resources/AccountResource.mqh"
 #include "resources/StrategyResource.mqh"
@@ -14,6 +17,8 @@
 #include "resources/SnapshotResource.mqh"
 #include "resources/EventResource.mqh"
 #include "resources/MediaResource.mqh"
+
+#define SAFE_DELETE(ptr) if (ptr != NULL && CheckPointer(ptr) == POINTER_DYNAMIC) { delete ptr; } ptr = NULL;
 
 class HorizonAPI:
 public IRemoteLogger {
@@ -30,17 +35,122 @@ private:
 	EventResource *events;
 	MediaResource *media;
 
-	bool authenticate(string baseUrl, string apiKey) {
-		if (context.request != NULL && CheckPointer(context.request) == POINTER_DYNAMIC) {
-			delete context.request;
-			context.request = NULL;
+	void resetResources(bool cleanup = false) {
+		if (cleanup) {
+			SAFE_DELETE(orders);
+			SAFE_DELETE(heartbeats);
+			SAFE_DELETE(logs);
+			SAFE_DELETE(snapshots);
+			SAFE_DELETE(media);
+			SAFE_DELETE(events);
+			SAFE_DELETE(strategies);
+			SAFE_DELETE(accounts);
+		} else {
+			orders = NULL;
+			heartbeats = NULL;
+			logs = NULL;
+			snapshots = NULL;
+			media = NULL;
+			events = NULL;
+			strategies = NULL;
+			accounts = NULL;
 		}
+	}
+
+	void trimKeyArray(string &keyArray[]) {
+		for (int i = 0; i < ArraySize(keyArray); i++) {
+			StringTrimLeft(keyArray[i]);
+			StringTrimRight(keyArray[i]);
+		}
+	}
+
+	bool matchesKey(const string eventKey, string &keyArray[]) {
+		for (int k = 0; k < ArraySize(keyArray); k++) {
+			if (keyArray[k] == eventKey) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool matchesFilters(JSON::Object *payload, const string symbolFilter, int strategyFilter) {
+		if (strategyFilter > 0) {
+			int eventStrategy = (int)payload.getNumber("strategy_id");
+			if (eventStrategy != 0 && eventStrategy != strategyFilter) {
+				return false;
+			}
+		}
+
+		if (symbolFilter != "") {
+			string eventSymbol = payload.getString("symbol");
+			if (eventSymbol != "" && eventSymbol != symbolFilter) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	int consumeEventsFromBus(const string keys, const string symbolFilter, SHorizonEvent &eventList[], int limit, int strategyFilter) {
+		SMessage messages[];
+		int count = SEMessageBus::Poll(MB_CHANNEL_EVENTS_IN, messages);
+
+		if (count == 0) {
+			ArrayResize(eventList, 0);
+			return 0;
+		}
+
+		string keyArray[];
+		StringSplit(keys, ',', keyArray);
+		trimKeyArray(keyArray);
+
+		ArrayResize(eventList, 0);
+		int matched = 0;
+
+		for (int i = 0; i < count && matched < limit; i++) {
+			JSON::Object *payload = new JSON::Object(messages[i].payloadJson);
+			string eventKey = payload.getString("key");
+
+			if (!matchesKey(eventKey, keyArray) || !matchesFilters(payload, symbolFilter, strategyFilter)) {
+				delete payload;
+				continue;
+			}
+
+			SHorizonEvent event;
+			event.FromJson(payload);
+
+			ArrayResize(eventList, matched + 1);
+			eventList[matched] = event;
+			matched++;
+
+			SEMessageBus::Ack(MB_CHANNEL_EVENTS_IN, messages[i].sequence);
+			delete payload;
+		}
+
+		return matched;
+	}
+
+	bool ackEventViaBus(const string eventId, JSON::Object &responseBody) {
+		JSON::Object payload;
+		payload.setProperty("event_id", eventId);
+
+		string responseJson = responseBody.toString();
+		JSON::Object *responseCopy = new JSON::Object(responseJson);
+		payload.setProperty("response", responseCopy);
+
+		return SEMessageBus::Send(MB_CHANNEL_EVENTS_OUT, "ack_event", payload);
+	}
+
+	bool authenticate(string baseUrl, string email, string password) {
+		context.DeleteRequest();
 
 		SERequest authRequest(baseUrl);
 		authRequest.AddHeader("Content-Type", "application/json");
 
 		JSON::Object loginBody;
-		loginBody.setProperty("api_key", apiKey);
+		loginBody.setProperty("email", email);
+		loginBody.setProperty("password", password);
 
 		SRequestResponse response = authRequest.Post("api/v1/auth/login/", loginBody, 10000);
 
@@ -64,9 +174,10 @@ private:
 			return false;
 		}
 
-		context.request = new SERequest(baseUrl);
-		context.request.AddHeader("Content-Type", "application/json");
-		context.request.AddHeader("Authorization", "Bearer " + accessToken);
+		SERequest *authenticatedRequest = new SERequest(baseUrl);
+		authenticatedRequest.AddHeader("Content-Type", "application/json");
+		authenticatedRequest.AddHeader("Authorization", "Bearer " + accessToken);
+		context.SetRequest(authenticatedRequest);
 
 		logger.Info("Authentication successful");
 		return true;
@@ -84,77 +195,30 @@ private:
 		media = new MediaResource(ctx);
 	}
 
-	void deleteResources() {
-		if (orders != NULL && CheckPointer(orders) == POINTER_DYNAMIC) {
-			delete orders;
-		}
-		if (heartbeats != NULL && CheckPointer(heartbeats) == POINTER_DYNAMIC) {
-			delete heartbeats;
-		}
-		if (logs != NULL && CheckPointer(logs) == POINTER_DYNAMIC) {
-			delete logs;
-		}
-		if (snapshots != NULL && CheckPointer(snapshots) == POINTER_DYNAMIC) {
-			delete snapshots;
-		}
-		if (media != NULL && CheckPointer(media) == POINTER_DYNAMIC) {
-			delete media;
-		}
-		if (events != NULL && CheckPointer(events) == POINTER_DYNAMIC) {
-			delete events;
-		}
-		if (strategies != NULL && CheckPointer(strategies) == POINTER_DYNAMIC) {
-			delete strategies;
-		}
-		if (accounts != NULL && CheckPointer(accounts) == POINTER_DYNAMIC) {
-			delete accounts;
-		}
-
-		orders = NULL;
-		heartbeats = NULL;
-		logs = NULL;
-		snapshots = NULL;
-		media = NULL;
-		events = NULL;
-		strategies = NULL;
-		accounts = NULL;
-	}
-
 public:
 	HorizonAPI() {
-		accounts = NULL;
-		strategies = NULL;
-		orders = NULL;
-		heartbeats = NULL;
-		logs = NULL;
-		snapshots = NULL;
-		events = NULL;
-		media = NULL;
+		resetResources();
 		logger.SetPrefix("HorizonAPI");
 	}
 
 	~HorizonAPI() {
-		deleteResources();
-
-		if (context.request != NULL && CheckPointer(context.request) == POINTER_DYNAMIC) {
-			delete context.request;
-			context.request = NULL;
-		}
+		resetResources(true);
+		context.DeleteRequest();
 	}
 
-	bool Initialize(string baseUrl, string apiKey, bool enabled) {
+	bool Initialize(string baseUrl, string email, string password, bool enabled) {
 		if (!enabled) {
 			return true;
 		}
 
-		if (apiKey == "") {
-			logger.Error("API key is required. HorizonAPI integration disabled.");
+		if (email == "" || password == "") {
+			logger.Error("Email and password are required. HorizonAPI integration disabled.");
 			return false;
 		}
 
 		context.SetAccountId(AccountInfoInteger(ACCOUNT_LOGIN));
 
-		if (!authenticate(baseUrl, apiKey)) {
+		if (!authenticate(baseUrl, email, password)) {
 			return false;
 		}
 
@@ -167,6 +231,14 @@ public:
 
 	bool IsEnabled() {
 		return context.IsEnabled();
+	}
+
+	void PostDirect(string path, JSON::Object &body) {
+		if (!context.IsEnabled() || !context.HasRequest()) {
+			return;
+		}
+
+		context.GetRequest().Post(path, body);
 	}
 
 	void UpsertAccount() {
@@ -269,12 +341,20 @@ public:
 			return 0;
 		}
 
+		if (SEMessageBus::IsActive()) {
+			return consumeEventsFromBus(keys, symbolFilter, eventList, limit, strategyFilter);
+		}
+
 		return events.Consume(keys, symbolFilter, eventList, limit, strategyFilter);
 	}
 
 	bool AckEvent(const string eventId, JSON::Object &responseBody) {
 		if (!context.IsEnabled()) {
 			return false;
+		}
+
+		if (SEMessageBus::IsActive()) {
+			return ackEventViaBus(eventId, responseBody);
 		}
 
 		return events.Ack(eventId, responseBody);

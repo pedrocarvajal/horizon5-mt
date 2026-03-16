@@ -2,6 +2,7 @@
 #define __SR_PERSISTENCE_OF_STATE_MQH__
 
 #include "../../helpers/HIsLiveTrading.mqh"
+
 #include "../SELogger/SELogger.mqh"
 #include "../SEDb/SEDb.mqh"
 
@@ -42,8 +43,8 @@ public:
 		stateDocument = NULL;
 	}
 
-	void Initialize(string strategyPrefix) {
-		string basePath = StringFormat("Live/%s/%s", _Symbol, strategyPrefix);
+	void Initialize(string symbolName, string strategyPrefix) {
+		string basePath = StringFormat("Live/%s/%s", symbolName, strategyPrefix);
 		database.Initialize(basePath, true);
 		stateCollection = database.Collection("state");
 	}
@@ -58,13 +59,6 @@ public:
 		}
 
 		stateDocument = stateCollection.FindOne("_id", "state");
-
-		if (stateDocument == NULL) {
-			logger.Info("No saved state found, starting fresh");
-		} else {
-			logger.Info("State restored from database");
-		}
-
 		return true;
 	}
 
@@ -85,7 +79,6 @@ public:
 		}
 
 		value = defaultValue;
-		logger.Warning(StringFormat("State key '%s' not found, using default: %f", key, defaultValue));
 	}
 
 	void SetInt(string key, int value) {
@@ -105,7 +98,6 @@ public:
 		}
 
 		value = defaultValue;
-		logger.Warning(StringFormat("State key '%s' not found, using default: %d", key, defaultValue));
 	}
 
 	void SetString(string key, string value) {
@@ -125,7 +117,6 @@ public:
 		}
 
 		value = defaultValue;
-		logger.Warning(StringFormat("State key '%s' not found, using default: %s", key, defaultValue));
 	}
 
 	void SetBool(string key, bool value) {
@@ -145,7 +136,6 @@ public:
 		}
 
 		value = defaultValue;
-		logger.Warning(StringFormat("State key '%s' not found, using default: %s", key, defaultValue ? "true" : "false"));
 	}
 
 	void SetDatetime(string key, datetime value) {
@@ -165,7 +155,6 @@ public:
 		}
 
 		value = defaultValue;
-		logger.Warning(StringFormat("State key '%s' not found, using default: %s", key, TimeToString(defaultValue)));
 	}
 };
 

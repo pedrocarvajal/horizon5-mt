@@ -2,8 +2,16 @@
 #define __SE_DB_COLLECTION_MQH__
 
 #include "../../libraries/json/index.mqh"
+
 #include "../../helpers/HGenerateUuid.mqh"
+
+#include "../SEMessageBus/SEMessageBus.mqh"
+#include "../SEMessageBus/SEMessageBusChannels.mqh"
+
 #include "SEDbQuery.mqh"
+
+#define SEDB_FILE_ERROR_NOT_FOUND 5002
+#define SEDB_FILE_ERROR_NOT_EXIST 5019
 
 class SEDbCollection {
 private:
@@ -12,59 +20,6 @@ private:
 	int fileFlags;
 	bool shouldAutoFlush;
 	JSON::Object *documents[];
-	string generateId() {
-		return GenerateUuid();
-	}
-
-	int findIndexByKeyValue(string key, string value) {
-		int size = ArraySize(documents);
-
-		for (int i = 0; i < size; i++) {
-			if (documents[i] != NULL && documents[i].hasValue(key)) {
-				if (documents[i].getString(key) == value) {
-					return i;
-				}
-			}
-		}
-
-		return -1;
-	}
-
-	void ensureDirectoryExists() {
-		int lastSlash = StringFind(filePath, "/");
-		int position = lastSlash;
-
-		while (position != -1) {
-			lastSlash = position;
-			position = StringFind(filePath, "/", lastSlash + 1);
-		}
-
-		if (lastSlash <= 0) {
-			return;
-		}
-
-		string directory = StringSubstr(filePath, 0, lastSlash);
-		int commonFlag = (fileFlags & FILE_COMMON) != 0 ? FILE_COMMON : 0;
-		FolderCreate(directory, commonFlag);
-	}
-
-	void removeAtIndex(int index) {
-		int size = ArraySize(documents);
-
-		if (index < 0 || index >= size) {
-			return;
-		}
-
-		if (documents[index] != NULL && CheckPointer(documents[index]) == POINTER_DYNAMIC) {
-			delete documents[index];
-		}
-
-		for (int i = index; i < size - 1; i++) {
-			documents[i] = documents[i + 1];
-		}
-
-		ArrayResize(documents, size - 1);
-	}
 
 public:
 	SEDbCollection() {
@@ -156,6 +111,17 @@ public:
 
 		string jsonData = array.toString();
 		delete array;
+
+		if (SEMessageBus::IsActive()) {
+			JSON::Object payload;
+			payload.setProperty("filePath", filePath);
+			payload.setProperty("fileFlags", fileFlags);
+			payload.setProperty("data", jsonData);
+
+			if (SEMessageBus::Send(MB_CHANNEL_PERSISTENCE, "flush", payload)) {
+				return true;
+			}
+		}
 
 		ensureDirectoryExists();
 
@@ -294,13 +260,68 @@ public:
 		if (!FileDelete(filePath, commonFlag)) {
 			int error = GetLastError();
 
-			if (error != 5002 && error != 5019) {
+			if (error != SEDB_FILE_ERROR_NOT_FOUND && error != SEDB_FILE_ERROR_NOT_EXIST) {
 				Print("[ERROR] SEDbCollection: Cannot delete '", filePath, "' - Error: ", error);
 				return false;
 			}
 		}
 
 		return true;
+	}
+
+private:
+	string generateId() {
+		return GenerateUuid();
+	}
+
+	int findIndexByKeyValue(string key, string value) {
+		int size = ArraySize(documents);
+
+		for (int i = 0; i < size; i++) {
+			if (documents[i] != NULL && documents[i].hasValue(key)) {
+				if (documents[i].getString(key) == value) {
+					return i;
+				}
+			}
+		}
+
+		return -1;
+	}
+
+	void ensureDirectoryExists() {
+		int lastSlash = StringFind(filePath, "/");
+		int position = lastSlash;
+
+		while (position != -1) {
+			lastSlash = position;
+			position = StringFind(filePath, "/", lastSlash + 1);
+		}
+
+		if (lastSlash <= 0) {
+			return;
+		}
+
+		string directory = StringSubstr(filePath, 0, lastSlash);
+		int commonFlag = (fileFlags & FILE_COMMON) != 0 ? FILE_COMMON : 0;
+		FolderCreate(directory, commonFlag);
+	}
+
+	void removeAtIndex(int index) {
+		int size = ArraySize(documents);
+
+		if (index < 0 || index >= size) {
+			return;
+		}
+
+		if (documents[index] != NULL && CheckPointer(documents[index]) == POINTER_DYNAMIC) {
+			delete documents[index];
+		}
+
+		for (int i = index; i < size - 1; i++) {
+			documents[i] = documents[i + 1];
+		}
+
+		ArrayResize(documents, size - 1);
 	}
 };
 

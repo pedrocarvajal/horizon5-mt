@@ -1,16 +1,20 @@
 #ifndef __SE_ORDER_BOOK_MQH__
 #define __SE_ORDER_BOOK_MQH__
 
-#include "../../entities/EOrder.mqh"
-#include "../../adapters/ATrade.mqh"
+#include "../../constants/time.mqh"
+
 #include "../../enums/EOrderStatuses.mqh"
+#include "../../structs/STradingStatus.mqh"
+
+#include "../../helpers/HIsMarketClosed.mqh"
+
 #include "../../services/SELogger/SELogger.mqh"
 #include "../../services/SEDateTime/SEDateTime.mqh"
 #include "../../services/SEDateTime/structs/SDateTime.mqh"
 #include "../../services/SRPersistenceOfOrders/SRPersistenceOfOrders.mqh"
-#include "../../helpers/HIsMarketClosed.mqh"
-#include "../../constants/time.mqh"
-#include "../../structs/STradingStatus.mqh"
+
+#include "../../entities/EOrder.mqh"
+#include "../../adapters/ATrade.mqh"
 
 #define ORDER_TYPE_ANY    -1
 #define ORDER_STATUS_ANY  -1
@@ -347,6 +351,21 @@ public:
 		}
 
 		if (order.status == ORDER_STATUS_PENDING) {
+			SMarketStatus pendingMarketStatus = GetMarketStatus(symbol);
+
+			if (pendingMarketStatus.isClosed) {
+				order.pendingToClose = true;
+				order.retryAfter = dtime.Timestamp() + pendingMarketStatus.opensInSeconds;
+
+				logger.Info(StringFormat(
+					"[%s] Cancel pending: Market closed, will retry in %d seconds",
+					order.GetId(),
+					pendingMarketStatus.opensInSeconds
+				));
+
+				return;
+			}
+
 			if (order.GetOrderId() == 0) {
 				logger.Info(StringFormat("[%s] Cannot cancel order: invalid orderId", order.GetId()));
 				CancelOrder(order);
@@ -729,6 +748,7 @@ public:
 	void PurgeClosedOrders() {
 		datetime threshold = dtime.Timestamp() - SECONDS_IN_24_HOURS;
 		int writeIndex = 0;
+		string idsToPurge[];
 
 		for (int i = 0; i < ArraySize(orders); i++) {
 			ENUM_ORDER_STATUSES orderStatus = orders[i].GetStatus();
@@ -736,6 +756,9 @@ public:
 			bool isOldEnough = (orders[i].GetCloseAt().timestamp > 0 && orders[i].GetCloseAt().timestamp < threshold);
 
 			if (isDead && isOldEnough) {
+				int purgeSize = ArraySize(idsToPurge);
+				ArrayResize(idsToPurge, purgeSize + 1);
+				idsToPurge[purgeSize] = orders[i].GetId();
 				continue;
 			}
 
@@ -746,11 +769,18 @@ public:
 			writeIndex++;
 		}
 
-		int purged = ArraySize(orders) - writeIndex;
+		int purged = ArraySize(idsToPurge);
 
 		if (purged > 0) {
 			ArrayResize(orders, writeIndex);
-			logger.Info(StringFormat("Purged %d closed orders from memory", purged));
+
+			if (CheckPointer(orderPersistence) != POINTER_INVALID) {
+				for (int i = 0; i < purged; i++) {
+					orderPersistence.DeleteOrder(idsToPurge[i]);
+				}
+			}
+
+			logger.Info(StringFormat("Purged %d closed orders from memory and database", purged));
 		}
 	}
 
@@ -783,7 +813,7 @@ public:
 		ArrayResize(orders, 0);
 	}
 
-	int RestoreOrders() {
+	int RestoreOrders(EOrder &reconciledOrders[]) {
 		if (CheckPointer(orderPersistence) == POINTER_INVALID) {
 			return 0;
 		}
@@ -806,6 +836,9 @@ public:
 			ENUM_ORDER_STATUSES orderStatus = restoredOrders[i].GetStatus();
 
 			if (orderStatus == ORDER_STATUS_CLOSED || orderStatus == ORDER_STATUS_CANCELLED) {
+				int reconciledSize = ArraySize(reconciledOrders);
+				ArrayResize(reconciledOrders, reconciledSize + 1);
+				reconciledOrders[reconciledSize] = restoredOrders[i];
 				continue;
 			}
 
