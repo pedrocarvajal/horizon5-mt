@@ -13,16 +13,17 @@
 #include "../helpers/HGetCloseReason.mqh"
 #include "StrategyResource.mqh"
 
-#define VALID_ORDER_YEAR_MIN 2020
-#define VALID_ORDER_YEAR_MAX 2100
+#define VALID_TIMESTAMP_MIN 1577836800
+#define VALID_TIMESTAMP_MAX 4102444800
 
 class OrderResource {
 private:
 	HorizonAPIContext * context;
 	StrategyResource *strategies;
 
-	bool isValidDateTime(SDateTime &dt) {
-		return dt.timestamp > 0 && dt.year >= VALID_ORDER_YEAR_MIN && dt.year <= VALID_ORDER_YEAR_MAX;
+	bool isValidTimestamp(datetime ts) {
+		long value = (long)ts;
+		return value > VALID_TIMESTAMP_MIN && value < VALID_TIMESTAMP_MAX;
 	}
 
 	void buildProfitFields(JSON::Object &body, EOrder &order) {
@@ -38,20 +39,20 @@ private:
 	}
 
 	void buildDateTimeFields(JSON::Object &body, EOrder &order) {
-		SDateTime signalTime = order.GetSignalAt();
-		SDateTime openTime = order.GetOpenAt();
-		SDateTime closeTime = order.GetCloseAt();
+		datetime signalTimestamp = order.GetSignalAt().timestamp;
+		datetime openTimestamp = order.GetOpenAt().timestamp;
+		datetime closeTimestamp = order.GetCloseAt().timestamp;
 
-		if (isValidDateTime(signalTime)) {
-			body.setProperty("signal_at", signalTime.ToUTCISO());
+		if (isValidTimestamp(signalTimestamp)) {
+			body.setProperty("signal_at", (long)signalTimestamp);
 		}
 
-		if (isValidDateTime(openTime)) {
-			body.setProperty("opened_at", openTime.ToUTCISO());
+		if (isValidTimestamp(openTimestamp)) {
+			body.setProperty("opened_at", (long)openTimestamp);
 		}
 
-		if (isValidDateTime(closeTime)) {
-			body.setProperty("closed_at", closeTime.ToUTCISO());
+		if (isValidTimestamp(closeTimestamp)) {
+			body.setProperty("closed_at", (long)closeTimestamp);
 		}
 	}
 
