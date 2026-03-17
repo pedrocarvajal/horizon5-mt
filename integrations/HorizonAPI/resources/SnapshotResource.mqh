@@ -23,7 +23,8 @@ public:
 		double dailyPnl,
 		double floatingPnl,
 		int openOrderCount,
-		double exposureLots
+		double exposureLots,
+		double exposureUsd
 	) {
 		double balance = ClampNumeric(AccountInfoDouble(ACCOUNT_BALANCE), 13, 2);
 		double equity = ClampNumeric(AccountInfoDouble(ACCOUNT_EQUITY), 13, 2);
@@ -40,6 +41,7 @@ public:
 		body.setProperty("floating_pnl", ClampNumeric(floatingPnl, 13, 2));
 		body.setProperty("open_order_count", openOrderCount);
 		body.setProperty("exposure_lots", ClampNumeric(exposureLots, 6, 4));
+		body.setProperty("exposure_usd", ClampNumeric(exposureUsd, 13, 2));
 
 		context.Post("api/v1/accounts/snapshots/", body);
 	}
@@ -51,7 +53,8 @@ public:
 		double dailyPnl,
 		double floatingPnl,
 		int openOrderCount,
-		double exposureLots
+		double exposureLots,
+		double exposureUsd
 	) {
 		JSON::Object body;
 		body.setProperty("account_id", context.GetAccountId());
@@ -62,6 +65,7 @@ public:
 		body.setProperty("floating_pnl", ClampNumeric(floatingPnl, 13, 2));
 		body.setProperty("open_order_count", openOrderCount);
 		body.setProperty("exposure_lots", ClampNumeric(exposureLots, 6, 4));
+		body.setProperty("exposure_usd", ClampNumeric(exposureUsd, 13, 2));
 
 		context.Post("api/v1/strategies/snapshots/", body);
 	}
