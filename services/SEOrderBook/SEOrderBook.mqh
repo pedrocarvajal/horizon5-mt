@@ -207,7 +207,7 @@ public:
 		}
 
 		if (order.retryCount >= MAX_RETRY_COUNT) {
-			logger.Warning(StringFormat("[%s] Max retry count reached, cancelling order", order.GetId()));
+			logger.Error(StringFormat("[%s] Max retry count reached, cancelling order", order.GetId()));
 			CancelOrder(order);
 			return;
 		}
@@ -243,7 +243,7 @@ public:
 		}
 
 		if (order.retryCount >= MAX_RETRY_COUNT) {
-			logger.Warning(StringFormat("[%s] Max retry count reached for close, giving up", order.GetId()));
+			logger.Error(StringFormat("[%s] Max retry count reached for close, giving up", order.GetId()));
 			order.pendingToClose = false;
 			order.retryCount = 0;
 			return;
@@ -474,14 +474,14 @@ public:
 			NotifyOrderPlaced(order);
 		} else {
 			if (wasPending) {
-				logger.Info(StringFormat(
+				logger.Success(StringFormat(
 					"[%s] Pending order has opened, dealId: %llu, positionId: %llu",
 					order.GetId(),
 					order.GetDealId(),
 					order.GetPositionId()
 				));
 			} else {
-				logger.Info(StringFormat(
+				logger.Success(StringFormat(
 					"[%s] Order opened immediately, dealId: %llu, positionId: %llu",
 					order.GetId(),
 					order.GetDealId(),
@@ -513,7 +513,7 @@ public:
 
 		if (profits == 0.0 && price == 0.0) {
 			order.status = ORDER_STATUS_CANCELLED;
-			logger.Info(StringFormat("[%s] Order cancelled", order.GetId()));
+			logger.Error(StringFormat("[%s] Order cancelled", order.GetId()));
 		}
 
 		order.orderCloseReason = reason;
@@ -521,22 +521,22 @@ public:
 
 		switch (reason) {
 		case DEAL_REASON_TP:
-			logger.Info(StringFormat("[%s] Order closed by Take Profit", order.GetId()));
+			logger.Success(StringFormat("[%s] Order closed by Take Profit", order.GetId()));
 			break;
 		case DEAL_REASON_EXPERT:
-			logger.Info(StringFormat("[%s] Order closed by Expert", order.GetId()));
+			logger.Success(StringFormat("[%s] Order closed by Expert", order.GetId()));
 			break;
 		case DEAL_REASON_CLIENT:
-			logger.Info(StringFormat("[%s] Order closed by Client", order.GetId()));
+			logger.Success(StringFormat("[%s] Order closed by Client", order.GetId()));
 			break;
 		case DEAL_REASON_MOBILE:
-			logger.Info(StringFormat("[%s] Order closed by Mobile", order.GetId()));
+			logger.Success(StringFormat("[%s] Order closed by Mobile", order.GetId()));
 			break;
 		case DEAL_REASON_WEB:
-			logger.Info(StringFormat("[%s] Order closed by Web", order.GetId()));
+			logger.Success(StringFormat("[%s] Order closed by Web", order.GetId()));
 			break;
 		case DEAL_REASON_SL:
-			logger.Info(StringFormat("[%s] Order closed by Stop Loss", order.GetId()));
+			logger.Success(StringFormat("[%s] Order closed by Stop Loss", order.GetId()));
 			break;
 		default:
 			break;
