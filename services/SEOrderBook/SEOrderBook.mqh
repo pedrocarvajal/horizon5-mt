@@ -470,6 +470,8 @@ public:
 				order.GetId(),
 				order.GetOrderId()
 			));
+
+			NotifyOrderPlaced(order);
 		} else {
 			if (wasPending) {
 				logger.Info(StringFormat(
@@ -870,6 +872,7 @@ public:
 
 private:
 	void NotifyOrderCancelled(EOrder &order);
+	void NotifyOrderPlaced(EOrder &order);
 
 	bool validateOrder(EOrder &order) {
 		bool isBuy = (order.side == ORDER_TYPE_BUY || order.side == ORDER_TYPE_BUY_STOP || order.side == ORDER_TYPE_BUY_LIMIT);
