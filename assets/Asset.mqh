@@ -493,6 +493,8 @@ public:
 			return;
 		}
 
+		horizonAPI.UpsertSymbol(symbol);
+
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			horizonAPI.UpsertStrategy(
 				strategies[i].GetName(),
@@ -522,8 +524,12 @@ public:
 		double &dailyPnl,
 		double &floatingPnl,
 		int &openOrderCount,
-		double &exposureLots
+		double &exposureLots,
+		double &exposureUsd
 	) {
+		double contractSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
+		double bidPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
+
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			double stratFloatingPnl = 0;
 			double stratExposureLots = 0;
@@ -551,6 +557,7 @@ public:
 			floatingPnl += stratFloatingPnl;
 			openOrderCount += book.GetOpenOrderCount();
 			exposureLots += stratExposureLots;
+			exposureUsd += stratExposureLots * contractSize * bidPrice;
 		}
 	}
 };
