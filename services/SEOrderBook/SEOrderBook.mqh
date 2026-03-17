@@ -44,6 +44,20 @@ private:
 	SRPersistenceOfOrders *orderPersistence;
 	SEStrategy *listener;
 
+	string BuildOrderComment(EOrder &order) {
+		string cleanSymbol = symbol;
+		StringReplace(cleanSymbol, ".", "");
+
+		string orderId = order.GetId();
+		StringReplace(orderId, "-", "");
+		string shortId = StringSubstr(orderId, 0, 8);
+
+		string comment = "HRZ" + cleanSymbol + order.GetSource() + shortId;
+		StringToUpper(comment);
+
+		return comment;
+	}
+
 public:
 	SEOrderBook() {
 		logger.SetPrefix("OrderBook");
@@ -299,7 +313,7 @@ public:
 
 		MqlTradeResult result = trade.Open(
 			symbol,
-			order.GetSource() + "-" + order.GetId(),
+			BuildOrderComment(order),
 			orderType,
 			price,
 			order.volume,

@@ -1,5 +1,5 @@
 #property copyright "Horizon5, by Pedro Carvajal"
-#property version "1.50"
+#property version "1.60"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 #include <Trade/Trade.mqh>
@@ -188,6 +188,34 @@ int OnInit() {
 
 	if (!ValidateMagicNumbers()) {
 		return INIT_FAILED;
+	}
+
+	if (IsLiveTrading()) {
+		int trackedOrderCount = 0;
+		int trackedStrategyCount = 0;
+
+		for (int i = 0; i < assetCount; i++) {
+			if (!assets[i].IsEnabled()) {
+				continue;
+			}
+
+			for (int j = 0; j < assets[i].GetStrategyCount(); j++) {
+				trackedStrategyCount++;
+				SEOrderBook *book = assets[i].GetStrategyAtIndex(j).GetOrderBook();
+				trackedOrderCount += book.GetOpenOrderCount();
+			}
+		}
+
+		int metatraderPositions = PositionsTotal();
+		int metatraderPendingOrders = OrdersTotal();
+
+		logger.Info(StringFormat(
+			"Order summary | MT5 positions: %d | MT5 pending: %d | Tracked orders: %d | Strategies: %d",
+			metatraderPositions,
+			metatraderPendingOrders,
+			trackedOrderCount,
+			trackedStrategyCount
+		));
 	}
 
 	if (horizonAPI.IsEnabled()) {

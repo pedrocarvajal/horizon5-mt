@@ -54,6 +54,11 @@ public:
 
         for (long long seq = startSequence; seq < headSequence && count < maxResults; seq++) {
             int index = static_cast<int>(seq % capacity);
+
+            if (buffer[index].acknowledged) {
+                continue;
+            }
+
             results[count] = buffer[index];
             count++;
         }
@@ -61,13 +66,29 @@ public:
         return count;
     }
 
+    void AckSequence(long long sequence)
+    {
+        if (sequence < tailSequence || sequence >= headSequence) {
+            return;
+        }
+
+        int index = static_cast<int>(sequence % capacity);
+        buffer[index].acknowledged = true;
+
+        while (tailSequence < headSequence) {
+            int tailIndex = static_cast<int>(tailSequence % capacity);
+
+            if (!buffer[tailIndex].acknowledged) {
+                break;
+            }
+
+            tailSequence++;
+        }
+    }
+
     void AdvanceTail(long long upToSequence)
     {
-        long long newTail = upToSequence + 1;
-
-        if (newTail > tailSequence) {
-            tailSequence = newTail;
-        }
+        AckSequence(upToSequence);
     }
 
     long long GetHeadSequence() const { return headSequence; }

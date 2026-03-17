@@ -18,6 +18,9 @@ target_compile_definitions(HorizonMessageBus PRIVATE HORIZON_MB_EXPORTS)
 
 if(MSVC)
     target_compile_options(HorizonMessageBus PRIVATE /W4 /O2)
+elseif(MINGW)
+    target_link_options(HorizonMessageBus PRIVATE -static-libgcc -static-libstdc++ -static)
+    target_link_libraries(HorizonMessageBus PRIVATE -lwinpthread)
 endif()
 
 set_target_properties(HorizonMessageBus PROPERTIES

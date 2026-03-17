@@ -8,12 +8,14 @@ struct Message {
     std::wstring type;
     std::wstring payload;
     long long timestamp;
+    bool acknowledged;
 
     Message()
         : sequence(0)
         , type()
         , payload()
         , timestamp(0)
+        , acknowledged(false)
     {
     }
 
@@ -23,6 +25,7 @@ struct Message {
         , type(messageType)
         , payload(messagePayload)
         , timestamp(messageTimestamp)
+        , acknowledged(false)
     {
     }
 };

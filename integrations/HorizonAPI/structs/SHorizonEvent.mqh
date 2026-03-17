@@ -1,7 +1,7 @@
 #ifndef __S_HORIZON_EVENT_MQH__
 #define __S_HORIZON_EVENT_MQH__
 
-#include "../../../libraries/json/index.mqh"
+#include "../../../libraries/Json/index.mqh"
 
 struct SHorizonEvent {
 	string id;
