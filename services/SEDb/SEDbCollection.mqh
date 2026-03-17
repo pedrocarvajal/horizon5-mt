@@ -1,7 +1,7 @@
 #ifndef __SE_DB_COLLECTION_MQH__
 #define __SE_DB_COLLECTION_MQH__
 
-#include "../../libraries/json/index.mqh"
+#include "../../libraries/Json/index.mqh"
 
 #include "../../helpers/HGenerateUuid.mqh"
 
