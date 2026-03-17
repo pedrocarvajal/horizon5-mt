@@ -32,6 +32,10 @@ public:
 		log("INFO", message);
 	}
 
+	void Success(string message) {
+		log("SUCCESS", message);
+	}
+
 	void Separator(string title) {
 		log("INFO", title + " -------------------------------- ");
 	}
