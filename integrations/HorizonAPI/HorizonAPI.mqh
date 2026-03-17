@@ -15,6 +15,7 @@
 #include "resources/HeartbeatResource.mqh"
 #include "resources/LogResource.mqh"
 #include "resources/SnapshotResource.mqh"
+#include "resources/SymbolResource.mqh"
 #include "resources/EventResource.mqh"
 #include "resources/MediaResource.mqh"
 
@@ -32,6 +33,7 @@ private:
 	HeartbeatResource *heartbeats;
 	LogResource *logs;
 	SnapshotResource *snapshots;
+	SymbolResource *symbols;
 	EventResource *events;
 	MediaResource *media;
 
@@ -41,6 +43,7 @@ private:
 			SAFE_DELETE(heartbeats);
 			SAFE_DELETE(logs);
 			SAFE_DELETE(snapshots);
+			SAFE_DELETE(symbols);
 			SAFE_DELETE(media);
 			SAFE_DELETE(events);
 			SAFE_DELETE(strategies);
@@ -50,6 +53,7 @@ private:
 			heartbeats = NULL;
 			logs = NULL;
 			snapshots = NULL;
+			symbols = NULL;
 			media = NULL;
 			events = NULL;
 			strategies = NULL;
@@ -191,6 +195,7 @@ private:
 		heartbeats = new HeartbeatResource(ctx, strategies);
 		logs = new LogResource(ctx, strategies);
 		snapshots = new SnapshotResource(ctx, strategies);
+		symbols = new SymbolResource(ctx);
 		events = new EventResource(ctx);
 		media = new MediaResource(ctx);
 	}
@@ -260,6 +265,14 @@ public:
 		return accounts.Fetch();
 	}
 
+	void UpsertSymbol(string symbolName) {
+		if (!context.IsEnabled()) {
+			return;
+		}
+
+		symbols.Upsert(symbolName);
+	}
+
 	void UpsertStrategy(
 		string strategyName,
 		string symbol,
@@ -311,13 +324,14 @@ public:
 		double dailyPnl,
 		double floatingPnl,
 		int openOrderCount,
-		double exposureLots
+		double exposureLots,
+		double exposureUsd
 	) {
 		if (!context.IsEnabled()) {
 			return;
 		}
 
-		snapshots.StoreAccount(drawdownPct, dailyPnl, floatingPnl, openOrderCount, exposureLots);
+		snapshots.StoreAccount(drawdownPct, dailyPnl, floatingPnl, openOrderCount, exposureLots, exposureUsd);
 	}
 
 	void StoreStrategySnapshot(
@@ -327,13 +341,14 @@ public:
 		double dailyPnl,
 		double floatingPnl,
 		int openOrderCount,
-		double exposureLots
+		double exposureLots,
+		double exposureUsd
 	) {
 		if (!context.IsEnabled()) {
 			return;
 		}
 
-		snapshots.StoreStrategy(magicNumber, nav, drawdownPct, dailyPnl, floatingPnl, openOrderCount, exposureLots);
+		snapshots.StoreStrategy(magicNumber, nav, drawdownPct, dailyPnl, floatingPnl, openOrderCount, exposureLots, exposureUsd);
 	}
 
 	int ConsumeEvents(const string keys, const string symbolFilter, SHorizonEvent &eventList[], int limit = 10, int strategyFilter = 0) {

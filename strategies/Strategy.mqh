@@ -369,12 +369,16 @@ public:
 	void SyncSnapshot() {
 		double floatingPnl = 0;
 		double exposureLots = 0;
+		double exposureUsd = 0;
+
+		double contractSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
 
 		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
 			EOrder *order = orderBook.GetOrderAtIndex(i);
 			if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
 				floatingPnl += orderBook.GetFloatingProfitAndLoss(order);
 				exposureLots += order.GetVolume();
+				exposureUsd += order.GetVolume() * contractSize * SymbolInfoDouble(symbol, SYMBOL_BID);
 			}
 		}
 
@@ -396,7 +400,8 @@ public:
 			statistics.GetDailyPerformance(),
 			floatingPnl,
 			orderBook.GetOpenOrderCount(),
-			exposureLots
+			exposureLots,
+			exposureUsd
 		);
 	}
 

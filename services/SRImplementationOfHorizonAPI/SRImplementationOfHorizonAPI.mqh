@@ -71,6 +71,7 @@ public:
 		double totalFloatingPnl = 0;
 		int totalOpenOrderCount = 0;
 		double totalExposureLots = 0;
+		double totalExposureUsd = 0;
 
 		for (int i = 0; i < assetCount; i++) {
 			registeredAssets[i].SyncToHorizonAPI();
@@ -79,7 +80,8 @@ public:
 				totalDailyPnl,
 				totalFloatingPnl,
 				totalOpenOrderCount,
-				totalExposureLots
+				totalExposureLots,
+				totalExposureUsd
 			);
 		}
 
@@ -88,7 +90,8 @@ public:
 			totalDailyPnl,
 			totalFloatingPnl,
 			totalOpenOrderCount,
-			totalExposureLots
+			totalExposureLots,
+			totalExposureUsd
 		);
 	}
 };
