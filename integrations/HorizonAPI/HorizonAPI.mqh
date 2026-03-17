@@ -375,6 +375,14 @@ public:
 		return events.Ack(eventId, responseBody);
 	}
 
+	bool AckEventDirect(const string eventId, JSON::Object &responseBody) {
+		if (!context.IsEnabled()) {
+			return false;
+		}
+
+		return events.Ack(eventId, responseBody);
+	}
+
 	string UploadMedia(string fileName, char &fileData[], string contentType = "text/csv") {
 		if (!context.IsEnabled()) {
 			return "";

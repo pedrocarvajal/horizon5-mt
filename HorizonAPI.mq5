@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "2.06"
+#property version   "2.07"
 #property strict
 
 #include "enums/EDebugLevel.mqh"
@@ -133,13 +133,19 @@ void consumeAndForwardTradingEvents() {
 	SHorizonEvent tradingEvents[];
 	int tradingCount = horizonAPI.ConsumeEvents(tradingKeys, "", tradingEvents, MaxEventsPerPoll);
 
+	if (tradingCount > 0) {
+		hlogger.Info(StringFormat("Consumed %d trading events from API", tradingCount));
+	}
+
 	for (int i = 0; i < tradingCount; i++) {
 		JSON::Object eventPayload;
 		tradingEvents[i].ToJson(eventPayload);
-		SEMessageBus::Send(MB_CHANNEL_EVENTS_IN, tradingEvents[i].key, eventPayload);
+		bool sent = SEMessageBus::Send(MB_CHANNEL_EVENTS_IN, tradingEvents[i].key, eventPayload);
 		hlogger.Info(StringFormat(
-			"Event forwarded to EA | %s | strategy=%d | id=%s",
-			tradingEvents[i].key, tradingEvents[i].strategyId, tradingEvents[i].id
+			"Event forwarded to EA | %s | strategy=%d | symbol=%s | id=%s | sent=%s",
+			tradingEvents[i].key, tradingEvents[i].strategyId,
+			tradingEvents[i].symbol, tradingEvents[i].id,
+			sent ? "ok" : "FAILED"
 		));
 	}
 }
@@ -189,7 +195,7 @@ void processAckResponses() {
 
 		string responseJson = responseObject.toString();
 		JSON::Object responseBody(responseJson);
-		horizonAPI.AckEvent(eventId, responseBody);
+		horizonAPI.AckEventDirect(eventId, responseBody);
 
 		hlogger.Info(StringFormat("Ack forwarded to API | event=%s", eventId));
 		SEMessageBus::Ack(MB_CHANNEL_EVENTS_OUT, ackMessages[i].sequence);

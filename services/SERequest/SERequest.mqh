@@ -1,7 +1,7 @@
 #ifndef __SE_REQUEST_MQH__
 #define __SE_REQUEST_MQH__
 
-#include "../../libraries/json/index.mqh"
+#include "../../libraries/Json/index.mqh"
 
 #include "structs/SRequestResponse.mqh"
 
