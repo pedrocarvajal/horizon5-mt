@@ -39,6 +39,12 @@ void SEOrderBook::NotifyOrderCancelled(EOrder &order) {
 	}
 }
 
+void SEOrderBook::NotifyOrderPlaced(EOrder &order) {
+	if (CheckPointer(listener) != POINTER_INVALID) {
+		listener.OnPendingOrderPlaced(order);
+	}
+}
+
 class SEStrategy:
 public IStrategy {
 private:
@@ -313,6 +319,10 @@ public:
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
 		}
+	}
+
+	virtual void OnPendingOrderPlaced(EOrder& order) {
+		horizonAPI.UpsertOrder(order);
 	}
 
 	virtual void OnOpenOrder(EOrder& order) {

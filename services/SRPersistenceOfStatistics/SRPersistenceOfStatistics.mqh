@@ -208,7 +208,7 @@ public:
 		delete json;
 
 		if (result) {
-			logger.Info("Statistics saved to database");
+			logger.Debug("Statistics saved to database");
 		}
 
 		return result;
@@ -232,7 +232,7 @@ public:
 		bool result = deserialize(document, stats);
 
 		if (result) {
-			logger.Info("Statistics restored from database");
+			logger.Debug("Statistics restored from database");
 		} else {
 			logger.Error("Failed to deserialize statistics");
 		}

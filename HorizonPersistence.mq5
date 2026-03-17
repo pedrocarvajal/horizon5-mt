@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "1.02"
+#property version   "1.03"
 #property strict
 
 #include "enums/EDebugLevel.mqh"
@@ -119,6 +119,10 @@ void processMessages(SMessage &messages[], int count) {
 
 int OnStart() {
 	SELogger::SetGlobalDebugLevel(DebugLevel);
+
+	while (!IsStopped() && !TerminalInfoInteger(TERMINAL_CONNECTED)) {
+		Sleep(1000);
+	}
 
 	if (!IsLiveTrading()) {
 		logger.Warning("Not in live trading mode, service idle");

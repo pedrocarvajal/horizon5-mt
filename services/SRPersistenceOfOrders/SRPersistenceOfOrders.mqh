@@ -39,7 +39,7 @@ public:
 		}
 
 		int documentCount = ordersCollection.Count();
-		logger.Info(StringFormat("Starting order restoration, found %d documents", documentCount));
+		logger.Debug(StringFormat("Starting order restoration, found %d documents", documentCount));
 
 		if (documentCount == 0) {
 			return 0;
@@ -66,9 +66,9 @@ public:
 
 		cleanupOrphanedOrders(idsToDelete);
 
-		logger.Info("Order restoration completed");
-		logger.Info(StringFormat("Documents found: %d", foundCount));
-		logger.Info(StringFormat("Orders loaded: %d", loadedCount));
+		logger.Debug("Order restoration completed");
+		logger.Debug(StringFormat("Documents found: %d", foundCount));
+		logger.Debug(StringFormat("Orders loaded: %d", loadedCount));
 		return loadedCount;
 	}
 
@@ -94,7 +94,7 @@ public:
 		delete json;
 
 		if (result) {
-			logger.Info(StringFormat("Order saved to database: %s", order.GetId()));
+			logger.Debug(StringFormat("Order saved to database: %s", order.GetId()));
 		}
 
 		return result;
@@ -112,7 +112,7 @@ public:
 		bool result = ordersCollection.DeleteOne("_id", orderId);
 
 		if (result) {
-			logger.Info(StringFormat("Order deleted from database: %s", orderId));
+			logger.Debug(StringFormat("Order deleted from database: %s", orderId));
 		}
 
 		return result;
@@ -128,6 +128,20 @@ public:
 	}
 
 private:
+	bool isExpiredOrder(EOrder &order) {
+		if (order.GetStatus() != ORDER_STATUS_CLOSED && order.GetStatus() != ORDER_STATUS_CANCELLED) {
+			return false;
+		}
+
+		datetime closeTimestamp = order.GetCloseAt().timestamp;
+
+		if (closeTimestamp == 0) {
+			return false;
+		}
+
+		return (TimeCurrent() - closeTimestamp) > 3600;
+	}
+
 	int loadAndValidateOrder(JSON::Object *document, EOrder &restoredOrders[], string &idsToDelete[], int index) {
 		EOrder order;
 
@@ -137,6 +151,13 @@ private:
 				index
 			));
 			return -1;
+		}
+
+		if (isExpiredOrder(order)) {
+			int deleteSize = ArraySize(idsToDelete);
+			ArrayResize(idsToDelete, deleteSize + 1);
+			idsToDelete[deleteSize] = order.GetId();
+			return 0;
 		}
 
 		if (!validateOrderExists(order)) {
