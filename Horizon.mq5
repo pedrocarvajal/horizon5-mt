@@ -1,5 +1,5 @@
 #property copyright "Horizon5, by Pedro Carvajal"
-#property version "1.60"
+#property version "1.61"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 #include <Trade/Trade.mqh>
@@ -441,7 +441,7 @@ double OnTester() {
 	double quality = 1.0;
 
 	for (int i = 0; i < ArraySize(assets); i++) {
-		assets[i].PerformStatistics();
+		assets[i].ForceEndStatistics();
 		double assetQuality = assets[i].CalculateQualityProduct();
 
 		if (assetQuality == 0) {

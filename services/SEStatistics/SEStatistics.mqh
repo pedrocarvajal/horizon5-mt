@@ -3,15 +3,8 @@
 
 #include "../../structs/SSOrderHistory.mqh"
 #include "../../structs/SSStatisticsSnapshot.mqh"
-#include "../../structs/SQualityThresholds.mqh"
 #include "../../structs/SSQualityResult.mqh"
 #include "../../structs/SStatisticsState.mqh"
-
-#include "helpers/HCalculateRSquared.mqh"
-#include "helpers/HCalculateSharpeRatio.mqh"
-#include "helpers/HCalculateMetricQuality.mqh"
-#include "helpers/HCalculateCAGR.mqh"
-#include "helpers/HCalculateStability.mqh"
 
 #include "../SEDateTime/SEDateTime.mqh"
 
@@ -19,17 +12,12 @@
 
 extern SEDateTime dtime;
 
-#define SEVERE_LOSS_THRESHOLD   0.50
+#define DRAWDOWN_EPSILON 0.0000001
 
 class SEStatistics {
 private:
 	string id;
-	string strategyName;
-	string strategyPrefix;
-	string symbol;
 	datetime startTime;
-
-	SQualityThresholds qualityThresholds;
 
 	double nav[];
 	double performance[];
@@ -42,85 +30,13 @@ private:
 	double drawdownMaxInDollars;
 	double drawdownMaxInPercentage;
 
-	int winningOrders;
-	double winningOrdersPerformance;
-
-	int losingOrders;
-	double losingOrdersPerformance;
-	double maxLoss;
-
-	double riskRewardRatio;
-	double winRate;
-	double recoveryFactor;
-
 	SSOrderHistory ordersHistory[];
 	EOrder lastClosedOrders[];
-	SSStatisticsSnapshot snapshots[];
 
-	double maxExposureInLots;
-	double maxExposureInPercentage;
-
-	bool stopOutDetected;
 	double initialBalance;
-	double finalEquity;
-
-	int getMonthsElapsed() {
-		SDateTime start = dtime.FromTimestamp(startTime);
-		SDateTime now = dtime.Now();
-		int months = (now.year - start.year) * 12 + (now.month - start.month);
-		return MathMax(months, 0);
-	}
-
-	bool detectStopOut() {
-		finalEquity = AccountInfoDouble(ACCOUNT_EQUITY);
-		double equityPercentage = finalEquity / initialBalance;
-
-		if (equityPercentage < SEVERE_LOSS_THRESHOLD) {
-			stopOutDetected = true;
-			return true;
-		}
-
-		return false;
-	}
-
-	void recordOrderResult(EOrder &order, double &nextPerformance) {
-		double profit = order.GetProfitInDollars();
-		nextPerformance += profit;
-
-		if (profit > 0) {
-			winningOrders++;
-			winningOrdersPerformance += profit;
-		} else {
-			losingOrders++;
-			losingOrdersPerformance += profit;
-			double currentLoss = MathAbs(profit);
-
-			if (currentLoss > maxLoss) {
-				maxLoss = currentLoss;
-			}
-		}
-	}
-
-	void updateRatios() {
-		double avgWin = (winningOrders > 0)
-			? winningOrdersPerformance / winningOrders
-			: 0;
-
-		int totalOrders = winningOrders + losingOrders;
-		winRate = (totalOrders > 0)
-			? (double)winningOrders / totalOrders
-			: 0;
-
-		riskRewardRatio = (maxLoss > 0) ? avgWin / maxLoss : 0;
-	}
 
 	void updatePerformance(double nextPerformance) {
-		if (ArraySize(performance) > 0) {
-			performance[ArraySize(performance) - 1] = nextPerformance;
-		} else {
-			ArrayResize(performance, 1);
-			performance[0] = nextPerformance;
-		}
+		performance[ArraySize(performance) - 1] = nextPerformance;
 	}
 
 	void processPendingOrders() {
@@ -133,10 +49,9 @@ private:
 		double nextPerformance = prevPerformance;
 
 		for (int i = 0; i < ArraySize(lastClosedOrders); i++) {
-			recordOrderResult(lastClosedOrders[i], nextPerformance);
+			nextPerformance += lastClosedOrders[i].GetProfitInDollars();
 		}
 
-		updateRatios();
 		updatePerformance(nextPerformance);
 
 		ArrayResize(lastClosedOrders, 0);
@@ -161,26 +76,9 @@ private:
 		snapshotData.navPeak = navPeak;
 		snapshotData.drawdownMaxInDollars = drawdownMaxInDollars;
 		snapshotData.drawdownMaxInPercentage = drawdownMaxInPercentage;
-		snapshotData.winningOrders = winningOrders;
-		snapshotData.winningOrdersPerformance = winningOrdersPerformance;
-		snapshotData.losingOrders = losingOrders;
-		snapshotData.losingOrdersPerformance = losingOrdersPerformance;
-		snapshotData.maxLoss = maxLoss;
-
-		snapshotData.rSquared = GetR2(performance);
-		snapshotData.sharpeRatio = GetSharpeRatio(performance);
-		snapshotData.riskRewardRatio = riskRewardRatio;
-		snapshotData.winRate = winRate;
-		snapshotData.recoveryFactor = GetRecoveryFactor();
-		snapshotData.cagr = GetCAGR();
-		snapshotData.stability = GetStability();
-		snapshotData.stabilitySQ3 = GetStabilitySQ3();
 
 		snapshotData.quality = quality.quality;
 		snapshotData.qualityReason = quality.reason;
-
-		snapshotData.maxExposureInLots = maxExposureInLots;
-		snapshotData.maxExposureInPercentage = maxExposureInPercentage;
 
 		if (ArraySize(nav) > 1 && nav[ArraySize(nav) - 2] != 0.0) {
 			snapshotData.dailyPerformance = dailyPerformance / nav[ArraySize(nav) - 2];
@@ -189,14 +87,6 @@ private:
 		}
 
 		return snapshotData;
-	}
-
-	void snapshot() {
-		SSQualityResult quality = GetQuality();
-		SSStatisticsSnapshot snapshotData = buildSnapshotData(quality);
-
-		ArrayResize(snapshots, ArraySize(snapshots) + 1);
-		snapshots[ArraySize(snapshots) - 1] = snapshotData;
 	}
 
 	double calculateFloatingPnL(EOrder &strategyOrders[]) {
@@ -237,67 +127,12 @@ private:
 		}
 	}
 
-	void updateExposure(EOrder &strategyOrders[]) {
-		double currentExposureLots = 0.0;
-
-		for (int i = 0; i < ArraySize(strategyOrders); i++) {
-			if (strategyOrders[i].GetStatus() == ORDER_STATUS_OPEN ||
-			    strategyOrders[i].GetStatus() == ORDER_STATUS_PENDING) {
-				if (strategyOrders[i].GetSide() == ORDER_TYPE_BUY) {
-					currentExposureLots += strategyOrders[i].GetVolume();
-				} else if (strategyOrders[i].GetSide() == ORDER_TYPE_SELL) {
-					currentExposureLots -= strategyOrders[i].GetVolume();
-				}
-			}
-		}
-
-		if (MathAbs(currentExposureLots) > MathAbs(maxExposureInLots)) {
-			maxExposureInLots = currentExposureLots;
-		}
-
-		double accountEquity = AccountInfoDouble(ACCOUNT_EQUITY);
-		double symbolPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
-		double currentExposurePercentage = 0.0;
-
-		if (accountEquity > 0) {
-			currentExposurePercentage = (currentExposureLots * symbolPrice) / accountEquity;
-		}
-
-		if (MathAbs(currentExposurePercentage) > MathAbs(maxExposureInPercentage)) {
-			maxExposureInPercentage = currentExposurePercentage;
-		}
-	}
-
-	bool evaluateOptimizationFormula(
-		int formula, double qualityValue,
-		SSQualityResult &result, string failReason
-	) {
-		if (qualityThresholds.optimizationFormula != formula) {
-			return false;
-		}
-
-		if (qualityValue == 0) {
-			result.quality = 0;
-			result.reason = failReason;
-			return true;
-		}
-
-		result.quality = qualityValue;
-		result.reason = NULL;
-		return true;
-	}
-
 public:
-	SEStatistics(string newSymbol, string name, string prefix, double allocatedBalance) {
-		symbol = newSymbol;
-		strategyName = name;
-		strategyPrefix = prefix;
+	SEStatistics(double allocatedBalance) {
 		initialBalance = allocatedBalance;
 
 		id = TimeToString(dtime.Now().timestamp, TIME_DATE | TIME_SECONDS);
 		startTime = dtime.Now().timestamp;
-		stopOutDetected = false;
-		finalEquity = allocatedBalance;
 
 		ArrayResize(nav, 1);
 		nav[0] = allocatedBalance;
@@ -312,37 +147,6 @@ public:
 
 		drawdownMaxInDollars = 0.0;
 		drawdownMaxInPercentage = 0.0;
-		maxLoss = 0.0;
-
-		maxExposureInLots = 0.0;
-		maxExposureInPercentage = 0.0;
-	}
-
-	double GetDailyPerformancePercent() {
-		if (ArraySize(nav) > 1 && nav[ArraySize(nav) - 2] != 0.0) {
-			return dailyPerformance / nav[ArraySize(nav) - 2];
-		}
-
-		return 0.0;
-	}
-
-	double GetCAGR() {
-		int lastIndex = ArraySize(nav) - 1;
-		double currentNav = (lastIndex >= 0) ? nav[lastIndex] : initialBalance;
-		return CalculateCAGR(initialBalance, currentNav, getMonthsElapsed());
-	}
-
-	double GetStability() {
-		int lastIndex = ArraySize(performance) - 1;
-		double totalProfit = (lastIndex >= 0) ? performance[lastIndex] : 0;
-		return CalculateStability(nav, totalProfit);
-	}
-
-	double GetStabilitySQ3() {
-		int lastIndex = ArraySize(performance) - 1;
-		double totalProfit = (lastIndex >= 0) ? performance[lastIndex] : 0;
-		int totalTrades = winningOrders + losingOrders;
-		return CalculateStabilitySQ3(nav, totalProfit, totalTrades);
 	}
 
 	double GetInitialBalance() {
@@ -387,38 +191,6 @@ public:
 		return drawdownMaxInPercentage;
 	}
 
-	int GetWinningOrders() {
-		return winningOrders;
-	}
-
-	double GetWinningOrdersPerformance() {
-		return winningOrdersPerformance;
-	}
-
-	int GetLosingOrders() {
-		return losingOrders;
-	}
-
-	double GetLosingOrdersPerformance() {
-		return losingOrdersPerformance;
-	}
-
-	double GetMaxLoss() {
-		return maxLoss;
-	}
-
-	double GetMaxExposureInLots() {
-		return maxExposureInLots;
-	}
-
-	double GetMaxExposureInPercentage() {
-		return maxExposureInPercentage;
-	}
-
-	bool GetStopOutDetected() {
-		return stopOutDetected;
-	}
-
 	void GetNavArray(double &target[]) {
 		ArrayResize(target, ArraySize(nav));
 		ArrayCopy(target, nav);
@@ -445,125 +217,39 @@ public:
 	SSQualityResult GetQuality() {
 		SSQualityResult result;
 
-		if (stopOutDetected) {
+		int lastIndex = ArraySize(performance) - 1;
+		double totalPerformance = (lastIndex >= 0) ? performance[lastIndex] : 0;
+
+		if (totalPerformance <= 0) {
 			result.quality = 0;
-			result.reason = "Stop out detected.";
+			result.reason = "Total performance is zero or negative";
 			return result;
 		}
 
-		double totalTrades = winningOrders + losingOrders;
-		int lastIndex = ArraySize(performance) - 1;
-		double snapshotPerformance = (lastIndex >= 0) ? performance[lastIndex] : 0;
-		double performanceInPercentage = snapshotPerformance / nav[0];
-		double currentRecoveryFactor = GetRecoveryFactor();
-		double currentRSquared = GetR2(performance);
-
-		double qPerformance = CalculateMetricQuality(
-			performanceInPercentage,
-			qualityThresholds.expectedTotalReturnPctByMonth * getMonthsElapsed(),
-			qualityThresholds.minTotalReturnPct,
-			true);
-
-		double qDrawdown = CalculateMetricQuality(
-			drawdownMaxInPercentage,
-			qualityThresholds.expectedMaxDrawdownPct,
-			qualityThresholds.maxMaxDrawdownPct,
-			false);
-
-		double qRiskReward = CalculateMetricQuality(
-			riskRewardRatio,
-			qualityThresholds.expectedRiskRewardRatio,
-			qualityThresholds.minRiskRewardRatio,
-			true);
-
-		double qWinRate = CalculateMetricQuality(
-			winRate,
-			qualityThresholds.expectedWinRate,
-			qualityThresholds.minWinRate,
-			true);
-
-		double qRSquared = CalculateMetricQuality(
-			currentRSquared,
-			qualityThresholds.expectedRSquared,
-			qualityThresholds.minRSquared,
-			true);
-
-		double qTrades = CalculateMetricQuality(
-			totalTrades,
-			qualityThresholds.expectedTrades,
-			qualityThresholds.minTrades,
-			true);
-
-		double qRecoveryFactor = CalculateMetricQuality(
-			currentRecoveryFactor,
-			qualityThresholds.expectedRecoveryFactor,
-			qualityThresholds.minRecoveryFactor,
-			true);
-
-		int formulas[7] = {
-			OPTIMIZATION_BY_PERFORMANCE, OPTIMIZATION_BY_DRAWDOWN,
-			OPTIMIZATION_BY_RISK_REWARD, OPTIMIZATION_BY_WIN_RATE,
-			OPTIMIZATION_BY_R_SQUARED,   OPTIMIZATION_BY_TRADES,
-			OPTIMIZATION_BY_RECOVERY_FACTOR
-		};
-
-		double qualityValues[7] = {
-			qPerformance, qDrawdown, qRiskReward, qWinRate,
-			qRSquared,    qTrades,	 qRecoveryFactor
-		};
-
-		string failReasons[7] = {
-			"Performance below minimum threshold",
-			"Drawdown below minimum threshold",
-			"Risk-reward ratio below minimum threshold",
-			"Win rate below minimum threshold",
-			"R-squared below minimum threshold",
-			"Number of trades below minimum threshold",
-			"Recovery factor below minimum threshold"
-		};
-
-		for (int i = 0; i < 7; i++) {
-			if (evaluateOptimizationFormula(formulas[i], qualityValues[i], result, failReasons[i])) {
-				return result;
-			}
+		if (drawdownMaxInDollars <= DRAWDOWN_EPSILON) {
+			result.quality = 0;
+			result.reason = "Maximum drawdown is zero";
+			return result;
 		}
+
+		result.quality = totalPerformance / drawdownMaxInDollars;
+		result.reason = NULL;
 
 		return result;
 	}
 
-	double GetR2(double &points[]) {
-		return CalculateRSquared(points);
-	}
-
-	double GetRecoveryFactor() {
-		if (drawdownMaxInDollars <= 0.0000001) {
-			return 0;
-		}
-
-		int lastIndex = ArraySize(performance) - 1;
-		double totalProfit = (lastIndex >= 0) ? performance[lastIndex] : 0;
-		return totalProfit / drawdownMaxInDollars;
-	}
-
-	double GetSharpeRatio(double &perf[]) {
-		return CalculateSharpeRatio(perf);
-	}
-
-	void OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason, EOrder &strategyOrders[]) {
+	void OnCloseOrder(EOrder &order, EOrder &strategyOrders[]) {
 		ArrayResize(lastClosedOrders, ArraySize(lastClosedOrders) + 1);
 		lastClosedOrders[ArraySize(lastClosedOrders) - 1] = order;
 
 		ArrayResize(ordersHistory, ArraySize(ordersHistory) + 1);
 		ordersHistory[ArraySize(ordersHistory) - 1] = order.GetSnapshot();
 
-		updateExposure(strategyOrders);
 		updateDrawdownWithFloatingPnL(strategyOrders);
 	}
 
 	void OnForceEnd() {
-		detectStopOut();
 		processPendingOrders();
-		snapshot();
 	}
 
 	void OnOpenOrder(EOrder &order, EOrder &strategyOrders[]) {
@@ -571,7 +257,6 @@ public:
 			return;
 		}
 
-		updateExposure(strategyOrders);
 		updateDrawdownWithFloatingPnL(strategyOrders);
 	}
 
@@ -607,10 +292,6 @@ public:
 	void OnStartHour() {
 	}
 
-	void SetQualityThresholds(SQualityThresholds &thresholds) {
-		qualityThresholds = thresholds;
-	}
-
 	SSStatisticsSnapshot GetDailySnapshot() {
 		processPendingOrders();
 		SSQualityResult quality = GetQuality();
@@ -625,14 +306,6 @@ public:
 		navYesterday = state.navYesterday;
 		drawdownMaxInDollars = state.drawdownMaxInDollars;
 		drawdownMaxInPercentage = state.drawdownMaxInPercentage;
-		winningOrders = state.winningOrders;
-		winningOrdersPerformance = state.winningOrdersPerformance;
-		losingOrders = state.losingOrders;
-		losingOrdersPerformance = state.losingOrdersPerformance;
-		maxLoss = state.maxLoss;
-		maxExposureInLots = state.maxExposureInLots;
-		maxExposureInPercentage = state.maxExposureInPercentage;
-		stopOutDetected = state.stopOutDetected;
 
 		ArrayResize(nav, ArraySize(state.nav));
 		ArrayCopy(nav, state.nav);
@@ -647,8 +320,6 @@ public:
 		for (int i = 0; i < ArraySize(state.ordersHistory); i++) {
 			ordersHistory[i] = state.ordersHistory[i];
 		}
-
-		updateRatios();
 
 		if (ArraySize(nav) > 0) {
 			dailyPerformance = nav[ArraySize(nav) - 1] - navYesterday;

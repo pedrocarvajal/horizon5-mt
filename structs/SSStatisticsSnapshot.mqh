@@ -10,26 +10,9 @@ struct SSStatisticsSnapshot {
 	double navPeak;
 	double drawdownMaxInDollars;
 	double drawdownMaxInPercentage;
-	int winningOrders;
-	double winningOrdersPerformance;
-	int losingOrders;
-	double losingOrdersPerformance;
-	double maxLoss;
-
-	double rSquared;
-	double sharpeRatio;
-	double riskRewardRatio;
-	double winRate;
-	double recoveryFactor;
-	double cagr;
-	double stability;
-	double stabilitySQ3;
 
 	double quality;
 	string qualityReason;
-
-	double maxExposureInLots;
-	double maxExposureInPercentage;
 
 	double dailyPerformance;
 

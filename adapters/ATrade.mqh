@@ -14,20 +14,6 @@ private:
 	ulong orderId;
 	ulong positionId;
 
-	ENUM_ORDER_TYPE_FILLING getFillingMode(string symbol) {
-		long fillingModes = SymbolInfoInteger(symbol, SYMBOL_FILLING_MODE);
-
-		if ((fillingModes & SYMBOL_FILLING_FOK) == SYMBOL_FILLING_FOK) {
-			return ORDER_FILLING_FOK;
-		}
-
-		if ((fillingModes & SYMBOL_FILLING_IOC) == SYMBOL_FILLING_IOC) {
-			return ORDER_FILLING_IOC;
-		}
-
-		return ORDER_FILLING_RETURN;
-	}
-
 public:
 	ATrade() {
 		logger.SetPrefix("Trade");
@@ -59,135 +45,6 @@ public:
 		}
 
 		return false;
-	}
-
-	bool IsPendingOrder(ulong ticket) {
-		return OrderSelect(ticket);
-	}
-
-	bool IsOpenPosition(ulong ticket) {
-		return PositionSelectByTicket(ticket);
-	}
-
-	bool Modify(double stopLoss = 0, double takeProfit = 0,
-		    ulong magicNumber = 0) {
-		logger.Info(StringFormat("Modifying order, position_id=%llu, order_id=%llu",
-			GetPositionId(), GetOrderId()));
-
-		if (stopLoss == 0 && takeProfit == 0) {
-			return false;
-		}
-
-		if (!PositionSelectByTicket(GetPositionId())) {
-			logger.Error(StringFormat("Error selecting position: %llu", GetPositionId()));
-			return false;
-		}
-
-		string positionSymbol = PositionGetString(POSITION_SYMBOL);
-		double currentSl = PositionGetDouble(POSITION_SL);
-		double currentTp = PositionGetDouble(POSITION_TP);
-
-		MqlTradeRequest request;
-		MqlTradeResult result;
-		ZeroMemory(request);
-		ZeroMemory(result);
-
-		request.action = TRADE_ACTION_SLTP;
-		request.position = GetPositionId();
-		request.symbol = positionSymbol;
-		request.magic = magicNumber;
-		request.sl = (stopLoss > 0) ? NormalizeDouble(stopLoss,
-			(int)SymbolInfoInteger(
-				positionSymbol,
-				SYMBOL_DIGITS)) :
-			     currentSl;
-		request.tp = (takeProfit > 0) ? NormalizeDouble(takeProfit,
-			(int)SymbolInfoInteger(
-				positionSymbol,
-				SYMBOL_DIGITS)) :
-			     currentTp;
-
-		if (!OrderSend(request, result)) {
-			logger.Error(StringFormat("Error sending order modification: %d", GetLastError()));
-			return false;
-		}
-
-		if (result.retcode != TRADE_RETCODE_DONE) {
-			logger.Error(StringFormat("Error modifying order: %d", result.retcode));
-			return false;
-		}
-
-		return true;
-	}
-
-	bool ModifyStopLoss(double stopLoss, ulong magicNumber = 0) {
-		return Modify(stopLoss, 0, magicNumber);
-	}
-
-	bool ModifyTakeProfit(double takeProfit, ulong magicNumber = 0) {
-		return Modify(0, takeProfit, magicNumber);
-	}
-
-	bool ModifyStopLossAndTakeProfit(double stopLoss, double takeProfit, ulong magicNumber = 0) {
-		return Modify(stopLoss, takeProfit, magicNumber);
-	}
-
-	MqlTradeResult Open(
-		string symbol,
-		string id,
-		ENUM_ORDER_TYPE orderType,
-		double price,
-		double volume,
-		double takeProfit,
-		double stopLoss,
-		ulong magicNumber) {
-		MqlTradeRequest request;
-		MqlTradeResult result;
-		ZeroMemory(request);
-		ZeroMemory(result);
-
-		int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
-		bool isMarketOrder = (orderType == ORDER_TYPE_BUY || orderType == ORDER_TYPE_SELL);
-
-		request.action = isMarketOrder ? TRADE_ACTION_DEAL : TRADE_ACTION_PENDING;
-		request.type = orderType;
-		request.comment = id;
-		request.symbol = symbol;
-		request.volume = volume;
-		request.deviation = SLIPPAGE_POINTS;
-		request.magic = magicNumber;
-		request.type_filling = getFillingMode(symbol);
-		request.price = NormalizeDouble(price, digits);
-
-		if (stopLoss > 0) {
-			request.sl = NormalizeDouble(stopLoss, digits);
-		}
-
-		if (takeProfit > 0) {
-			request.tp = NormalizeDouble(takeProfit, digits);
-		}
-
-		logger.Separator("Trade request");
-
-		if (!OrderSend(request, result)) {
-			logger.Error(StringFormat("Error opening order: %s (%d)",
-				DescribeRetcode(result.retcode), GetLastError()));
-			return result;
-		}
-
-		SetDealId(result.deal);
-		SetOrderId(result.order);
-
-		if (GetDealId() > 0) {
-			HistoryDealSelect(GetDealId());
-			SetPositionId(HistoryDealGetInteger(GetDealId(), DEAL_POSITION_ID));
-			logger.Info(StringFormat("Position ID found: %llu", GetPositionId()));
-		}
-
-		logger.Info(StringFormat(
-			"Order opened, deal_id=%llu, order_id=%llu, position_id=%llu",
-			GetDealId(), GetOrderId(), GetPositionId()));
-		return result;
 	}
 
 	static string DescribeRetcode(uint retcode) {
@@ -228,6 +85,110 @@ public:
 		}
 	}
 
+	ulong GetDealId() const {
+		return dealId;
+	}
+
+	ulong GetOrderId() const {
+		return orderId;
+	}
+
+	ulong GetPositionId() const {
+		return positionId;
+	}
+
+	bool IsOpenPosition(ulong ticket) {
+		return PositionSelectByTicket(ticket);
+	}
+
+	bool IsPendingOrder(ulong ticket) {
+		return OrderSelect(ticket);
+	}
+
+	bool Modify(double stopLoss = 0, double takeProfit = 0,
+		    ulong magicNumber = 0) {
+		logger.Info(StringFormat("Modifying order, position_id=%llu, order_id=%llu",
+			GetPositionId(), GetOrderId()));
+
+		if (stopLoss == 0 && takeProfit == 0) {
+			return false;
+		}
+
+		if (!PositionSelectByTicket(GetPositionId())) {
+			logger.Error(StringFormat("Error selecting position: %llu", GetPositionId()));
+			return false;
+		}
+
+		string positionSymbol = PositionGetString(POSITION_SYMBOL);
+		double currentSl = PositionGetDouble(POSITION_SL);
+		double currentTp = PositionGetDouble(POSITION_TP);
+
+		MqlTradeRequest request;
+		MqlTradeResult result;
+		ZeroMemory(request);
+		ZeroMemory(result);
+
+		buildModifyRequest(request, positionSymbol, stopLoss, currentSl,
+			takeProfit, currentTp, magicNumber);
+
+		if (!OrderSend(request, result)) {
+			logger.Error(StringFormat("Error sending order modification: %d", GetLastError()));
+			return false;
+		}
+
+		if (result.retcode != TRADE_RETCODE_DONE) {
+			logger.Error(StringFormat("Error modifying order: %d", result.retcode));
+			return false;
+		}
+
+		return true;
+	}
+
+	bool ModifyStopLoss(double stopLoss, ulong magicNumber = 0) {
+		return Modify(stopLoss, 0, magicNumber);
+	}
+
+	bool ModifyStopLossAndTakeProfit(double stopLoss, double takeProfit, ulong magicNumber = 0) {
+		return Modify(stopLoss, takeProfit, magicNumber);
+	}
+
+	bool ModifyTakeProfit(double takeProfit, ulong magicNumber = 0) {
+		return Modify(0, takeProfit, magicNumber);
+	}
+
+	MqlTradeResult Open(
+		string symbol,
+		string id,
+		ENUM_ORDER_TYPE orderType,
+		double price,
+		double volume,
+		double takeProfit,
+		double stopLoss,
+		ulong magicNumber) {
+		MqlTradeRequest request;
+		MqlTradeResult result;
+		ZeroMemory(request);
+		ZeroMemory(result);
+
+		buildOpenRequest(request, symbol, id, orderType, price, volume,
+			takeProfit, stopLoss, magicNumber);
+
+		logger.Separator("Trade request");
+
+		if (!OrderSend(request, result)) {
+			logger.Error(StringFormat("Error opening order: %s (%d)",
+				DescribeRetcode(result.retcode), GetLastError()));
+			return result;
+		}
+
+		trackOrderIds(result);
+
+		logger.Info(StringFormat(
+			"Order opened, deal_id=%llu, order_id=%llu, position_id=%llu",
+			GetDealId(), GetOrderId(), GetPositionId()));
+		return result;
+	}
+
 	void SetDealId(ulong newDealId) {
 		dealId = newDealId;
 	}
@@ -240,16 +201,79 @@ public:
 		positionId = newPositionId;
 	}
 
-	ulong GetDealId() const {
-		return dealId;
+private:
+	void buildModifyRequest(MqlTradeRequest &request, string positionSymbol,
+				double stopLoss, double currentSl,
+				double takeProfit, double currentTp,
+				ulong magicNumber) {
+		int digits = (int)SymbolInfoInteger(positionSymbol, SYMBOL_DIGITS);
+
+		request.action = TRADE_ACTION_SLTP;
+		request.position = GetPositionId();
+		request.symbol = positionSymbol;
+		request.magic = magicNumber;
+
+		if (stopLoss > 0) {
+			request.sl = NormalizeDouble(stopLoss, digits);
+		} else {
+			request.sl = currentSl;
+		}
+
+		if (takeProfit > 0) {
+			request.tp = NormalizeDouble(takeProfit, digits);
+		} else {
+			request.tp = currentTp;
+		}
 	}
 
-	ulong GetOrderId() const {
-		return orderId;
+	void buildOpenRequest(MqlTradeRequest &request, string symbol, string id,
+			      ENUM_ORDER_TYPE orderType, double price, double volume,
+			      double takeProfit, double stopLoss, ulong magicNumber) {
+		int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+		bool isMarketOrder = (orderType == ORDER_TYPE_BUY || orderType == ORDER_TYPE_SELL);
+
+		request.action = isMarketOrder ? TRADE_ACTION_DEAL : TRADE_ACTION_PENDING;
+		request.type = orderType;
+		request.comment = id;
+		request.symbol = symbol;
+		request.volume = volume;
+		request.deviation = SLIPPAGE_POINTS;
+		request.magic = magicNumber;
+		request.type_filling = getFillingMode(symbol);
+		request.price = NormalizeDouble(price, digits);
+
+		if (stopLoss > 0) {
+			request.sl = NormalizeDouble(stopLoss, digits);
+		}
+
+		if (takeProfit > 0) {
+			request.tp = NormalizeDouble(takeProfit, digits);
+		}
 	}
 
-	ulong GetPositionId() const {
-		return positionId;
+	ENUM_ORDER_TYPE_FILLING getFillingMode(string symbol) {
+		long fillingModes = SymbolInfoInteger(symbol, SYMBOL_FILLING_MODE);
+
+		if ((fillingModes & SYMBOL_FILLING_FOK) == SYMBOL_FILLING_FOK) {
+			return ORDER_FILLING_FOK;
+		}
+
+		if ((fillingModes & SYMBOL_FILLING_IOC) == SYMBOL_FILLING_IOC) {
+			return ORDER_FILLING_IOC;
+		}
+
+		return ORDER_FILLING_RETURN;
+	}
+
+	void trackOrderIds(MqlTradeResult &result) {
+		SetDealId(result.deal);
+		SetOrderId(result.order);
+
+		if (GetDealId() > 0) {
+			HistoryDealSelect(GetDealId());
+			SetPositionId(HistoryDealGetInteger(GetDealId(), DEAL_POSITION_ID));
+			logger.Info(StringFormat("Position ID found: %llu", GetPositionId()));
+		}
 	}
 };
 

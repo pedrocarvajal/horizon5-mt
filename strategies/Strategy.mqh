@@ -8,7 +8,6 @@ class SEAsset;
 #include "../enums/EOrderStatuses.mqh"
 #include "../structs/SSOrderHistory.mqh"
 #include "../structs/SSStatisticsSnapshot.mqh"
-#include "../structs/SQualityThresholds.mqh"
 #include "../structs/STradingStatus.mqh"
 
 #include "../interfaces/IStrategy.mqh"
@@ -165,10 +164,6 @@ public:
 		}
 	}
 
-	SEOrderBook * GetOrderBook() {
-		return orderBook;
-	}
-
 	void ExportOrderHistory() {
 		if (CheckPointer(orderHistoryReporter) == POINTER_INVALID) {
 			return;
@@ -234,6 +229,10 @@ public:
 		return name;
 	}
 
+	SEOrderBook * GetOrderBook() {
+		return orderBook;
+	}
+
 	string GetPrefix() {
 		return prefix;
 	}
@@ -250,8 +249,17 @@ public:
 		return weight;
 	}
 
+	virtual void OnCancelOrder(EOrder& order) {
+		orderBook.OnOrderCancelled();
+		horizonAPI.UpsertOrder(order);
+
+		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
+			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
+		}
+	}
+
 	virtual void OnCloseOrder(EOrder& order, ENUM_DEAL_REASON reason) {
-		statistics.OnCloseOrder(order, reason, orderBook.orders);
+		statistics.OnCloseOrder(order, orderBook.orders);
 		orderBook.OnOrderClosed();
 
 		if (CheckPointer(statisticsPersistence) == POINTER_DYNAMIC) {
@@ -287,7 +295,6 @@ public:
 		}
 
 		initializeServices();
-		initializeDefaultThresholds();
 
 		if (IsLiveTrading()) {
 			orderPersistence = new SRPersistenceOfOrders();
@@ -312,21 +319,12 @@ public:
 		return INIT_SUCCEEDED;
 	}
 
-	virtual void OnCancelOrder(EOrder& order) {
-		orderBook.OnOrderCancelled();
+	virtual void OnOpenOrder(EOrder& order) {
+		statistics.OnOpenOrder(order, orderBook.orders);
 		horizonAPI.UpsertOrder(order);
-
-		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
-			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
-		}
 	}
 
 	virtual void OnPendingOrderPlaced(EOrder& order) {
-		horizonAPI.UpsertOrder(order);
-	}
-
-	virtual void OnOpenOrder(EOrder& order) {
-		statistics.OnOpenOrder(order, orderBook.orders);
 		horizonAPI.UpsertOrder(order);
 	}
 
@@ -353,63 +351,14 @@ public:
 	virtual void OnStartMinute() {
 	}
 
-	virtual void OnTimer() {
-	}
-
-	void SyncOrders() {
-		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
-			EOrder *order = orderBook.GetOrderAtIndex(i);
-			if (order != NULL && (order.GetStatus() == ORDER_STATUS_OPEN ||
-					      order.GetStatus() == ORDER_STATUS_PENDING)) {
-				horizonAPI.UpsertOrder(order);
-			}
-		}
-	}
-
-	void SyncSnapshot() {
-		double floatingPnl = 0;
-		double exposureLots = 0;
-		double exposureUsd = 0;
-
-		double contractSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
-
-		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
-			EOrder *order = orderBook.GetOrderAtIndex(i);
-			if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
-				floatingPnl += orderBook.GetFloatingProfitAndLoss(order);
-				exposureLots += order.GetVolume();
-				exposureUsd += order.GetVolume() * contractSize * SymbolInfoDouble(symbol, SYMBOL_BID);
-			}
-		}
-
-		double nav = statistics.GetClosedNav() + floatingPnl;
-		double peak = statistics.GetNavPeak();
-
-		if (nav > peak) {
-			peak = nav;
-		}
-
-		double drawdownPct = (peak > 0 && nav < peak)
-			? (peak - nav) / peak
-			: 0.0;
-
-		horizonAPI.StoreStrategySnapshot(
-			strategyMagicNumber,
-			nav,
-			drawdownPct,
-			statistics.GetDailyPerformance(),
-			floatingPnl,
-			orderBook.GetOpenOrderCount(),
-			exposureLots,
-			exposureUsd
-		);
-	}
-
 	virtual int OnTesterInit() {
 		return INIT_SUCCEEDED;
 	}
 
 	virtual void OnTick() {
+	}
+
+	virtual void OnTimer() {
 	}
 
 	void ProcessOrders() {
@@ -440,10 +389,6 @@ public:
 		prefix = strategyPrefix;
 	}
 
-	virtual void SetQualityThresholds(SQualityThresholds& thresholds) {
-		statistics.SetQualityThresholds(thresholds);
-	}
-
 	void SetSymbol(string strategySymbol) {
 		symbol = strategySymbol;
 	}
@@ -452,7 +397,72 @@ public:
 		weight = newWeight;
 	}
 
+	void SyncOrders() {
+		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
+			EOrder *order = orderBook.GetOrderAtIndex(i);
+			if (order != NULL && (order.GetStatus() == ORDER_STATUS_OPEN ||
+					      order.GetStatus() == ORDER_STATUS_PENDING)) {
+				horizonAPI.UpsertOrder(order);
+			}
+		}
+	}
+
+	void SyncSnapshot() {
+		double floatingPnl;
+		double exposureLots;
+		double exposureUsd;
+		double nav;
+		double drawdownPct;
+
+		calculateLiveMetrics(floatingPnl, exposureLots, exposureUsd, nav, drawdownPct);
+
+		horizonAPI.StoreStrategySnapshot(
+			strategyMagicNumber,
+			nav,
+			drawdownPct,
+			statistics.GetDailyPerformance(),
+			floatingPnl,
+			orderBook.GetOpenOrderCount(),
+			exposureLots,
+			exposureUsd
+		);
+	}
+
 private:
+	void calculateLiveMetrics(
+		double &floatingPnl,
+		double &exposureLots,
+		double &exposureUsd,
+		double &nav,
+		double &drawdownPct
+	) {
+		floatingPnl = 0;
+		exposureLots = 0;
+		exposureUsd = 0;
+
+		double contractSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
+
+		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
+			EOrder *order = orderBook.GetOrderAtIndex(i);
+			if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
+				floatingPnl += orderBook.GetFloatingProfitAndLoss(order);
+				exposureLots += order.GetVolume();
+				exposureUsd += order.GetVolume() * contractSize * SymbolInfoDouble(symbol, SYMBOL_BID);
+			}
+		}
+
+		nav = statistics.GetClosedNav() + floatingPnl;
+		double peak = statistics.GetNavPeak();
+
+		if (nav > peak) {
+			peak = nav;
+		}
+
+		drawdownPct = (peak > 0 && nav < peak)
+			? (peak - nav) / peak
+			: 0.0;
+	}
+
 	void detectManualClose(ENUM_DEAL_REASON reason) {
 		if (tradingStatus.isPaused) {
 			return;
@@ -469,31 +479,9 @@ private:
 		logger.Warning("Manual close detected - trading paused until next day");
 	}
 
-	void initializeDefaultThresholds() {
-		SQualityThresholds thresholds;
-
-		thresholds.optimizationFormula = OPTIMIZATION_BY_PERFORMANCE;
-		thresholds.expectedTotalReturnPctByMonth = 0.05;
-		thresholds.expectedMaxDrawdownPct = 0.25;
-		thresholds.expectedWinRate = 0.50;
-		thresholds.expectedRecoveryFactor = 2;
-		thresholds.expectedRiskRewardRatio = 2;
-		thresholds.expectedRSquared = 0.85;
-		thresholds.expectedTrades = 10;
-		thresholds.minTotalReturnPct = 0.0;
-		thresholds.maxMaxDrawdownPct = 0.30;
-		thresholds.minWinRate = 0.40;
-		thresholds.minRiskRewardRatio = 1;
-		thresholds.minRecoveryFactor = 1;
-		thresholds.minRSquared = 0.0;
-		thresholds.minTrades = 5;
-
-		SetQualityThresholds(thresholds);
-	}
-
 	void initializeServices() {
 		logger.SetPrefix(name);
-		statistics = new SEStatistics(symbol, name, prefix, balance);
+		statistics = new SEStatistics(balance);
 		lotSize = new SELotSize(symbol);
 
 		orderBook = new SEOrderBook();

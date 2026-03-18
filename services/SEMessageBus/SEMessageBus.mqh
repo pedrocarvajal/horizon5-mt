@@ -150,6 +150,16 @@ public:
 		return false;
 	}
 
+	static int GetPendingCount(string channel) {
+		int channelId = MbChannelFind(channel);
+
+		if (channelId < 0) {
+			return 0;
+		}
+
+		return MbGetPendingCount(channelId);
+	}
+
 	static int WaitForMessage(string channel, int timeoutMs) {
 		int channelId = MbChannelFind(channel);
 

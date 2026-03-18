@@ -116,14 +116,6 @@ private:
 		json.setProperty("nav_yesterday", stats.GetNavYesterday());
 		json.setProperty("drawdown_max_dollars", stats.GetDrawdownMaxInDollars());
 		json.setProperty("drawdown_max_percentage", stats.GetDrawdownMaxInPercentage());
-		json.setProperty("winning_orders", stats.GetWinningOrders());
-		json.setProperty("winning_orders_performance", stats.GetWinningOrdersPerformance());
-		json.setProperty("losing_orders", stats.GetLosingOrders());
-		json.setProperty("losing_orders_performance", stats.GetLosingOrdersPerformance());
-		json.setProperty("max_loss", stats.GetMaxLoss());
-		json.setProperty("max_exposure_lots", stats.GetMaxExposureInLots());
-		json.setProperty("max_exposure_percentage", stats.GetMaxExposureInPercentage());
-		json.setProperty("stop_out_detected", stats.GetStopOutDetected());
 
 		double navArray[];
 		stats.GetNavArray(navArray);
@@ -155,14 +147,6 @@ private:
 		state.navYesterday = json.getNumber("nav_yesterday");
 		state.drawdownMaxInDollars = json.getNumber("drawdown_max_dollars");
 		state.drawdownMaxInPercentage = json.getNumber("drawdown_max_percentage");
-		state.winningOrders = (int)json.getNumber("winning_orders");
-		state.winningOrdersPerformance = json.getNumber("winning_orders_performance");
-		state.losingOrders = (int)json.getNumber("losing_orders");
-		state.losingOrdersPerformance = json.getNumber("losing_orders_performance");
-		state.maxLoss = json.getNumber("max_loss");
-		state.maxExposureInLots = json.getNumber("max_exposure_lots");
-		state.maxExposureInPercentage = json.getNumber("max_exposure_percentage");
-		state.stopOutDetected = json.getBoolean("stop_out_detected");
 
 		deserializeDoubleArray(json.getArray("nav"), state.nav);
 		deserializeDoubleArray(json.getArray("performance"), state.performance);

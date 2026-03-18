@@ -21,6 +21,8 @@
 extern SEDateTime dtime;
 extern HorizonAPI horizonAPI;
 
+#define ROLLING_PERIOD_DAYS 90
+
 class SEAsset:
 public IAsset {
 private:
@@ -40,10 +42,31 @@ private:
 		snapshot.bid = SymbolInfoDouble(symbol, SYMBOL_BID);
 		snapshot.ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
 		snapshot.spread = snapshot.ask - snapshot.bid;
-		snapshot.rollingPerformance = RollingReturn(symbol, PERIOD_D1, 90, 0);
-		snapshot.rollingDrawdown = DrawdownFromPeak(symbol, PERIOD_D1, 90, 0);
-		snapshot.rollingVolatility = Volatility(symbol, PERIOD_D1, 90, 0);
+		snapshot.rollingPerformance = RollingReturn(symbol, PERIOD_D1, ROLLING_PERIOD_DAYS, 0);
+		snapshot.rollingDrawdown = DrawdownFromPeak(symbol, PERIOD_D1, ROLLING_PERIOD_DAYS, 0);
+		snapshot.rollingVolatility = Volatility(symbol, PERIOD_D1, ROLLING_PERIOD_DAYS, 0);
 		return snapshot;
+	}
+
+	int initializeStrategies(int strategyCount) {
+		double weightPerStrategy = weight / strategyCount;
+		double balancePerStrategy = balance / strategyCount;
+
+		for (int i = 0; i < strategyCount; i++) {
+			strategies[i].SetWeight(weightPerStrategy);
+			strategies[i].SetBalance(balancePerStrategy);
+
+			int result = strategies[i].OnInit();
+
+			if (result != INIT_SUCCEEDED) {
+				logger.Error(StringFormat(
+					"Strategy initialization failed: %s",
+					strategies[i].GetName()));
+				return INIT_FAILED;
+			}
+		}
+
+		return INIT_SUCCEEDED;
 	}
 
 protected:
@@ -83,21 +106,10 @@ public:
 			return INIT_SUCCEEDED;
 		}
 
-		double weightPerStrategy = weight / strategyCount;
-		double balancePerStrategy = balance / strategyCount;
+		int initResult = initializeStrategies(strategyCount);
 
-		for (int i = 0; i < strategyCount; i++) {
-			strategies[i].SetWeight(weightPerStrategy);
-			strategies[i].SetBalance(balancePerStrategy);
-
-			int result = strategies[i].OnInit();
-
-			if (result != INIT_SUCCEEDED) {
-				logger.Error(StringFormat(
-					"Strategy initialization failed: %s",
-					strategies[i].GetName()));
-				return INIT_FAILED;
-			}
+		if (initResult != INIT_SUCCEEDED) {
+			return initResult;
 		}
 
 		if (EnableMarketHistoryReport) {
@@ -430,7 +442,7 @@ public:
 		return false;
 	}
 
-	void PerformStatistics() {
+	void ForceEndStatistics() {
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].GetStatistics().OnForceEnd();
 		}
