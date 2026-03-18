@@ -112,23 +112,23 @@ private:
 		ArrayResize(eventList, 0);
 		int matched = 0;
 
-		for (int i = 0; i < count && matched < limit; i++) {
+		for (int i = 0; i < count; i++) {
 			JSON::Object *payload = new JSON::Object(messages[i].payloadJson);
 			string eventKey = payload.getString("key");
 
-			if (!matchesKey(eventKey, keyArray) || !matchesFilters(payload, symbolFilter, strategyFilter)) {
-				delete payload;
-				continue;
+			bool isMatch = matchesKey(eventKey, keyArray) && matchesFilters(payload, symbolFilter, strategyFilter);
+
+			if (isMatch && matched < limit) {
+				SHorizonEvent event;
+				event.FromJson(payload);
+
+				ArrayResize(eventList, matched + 1);
+				eventList[matched] = event;
+				matched++;
+
+				SEMessageBus::Ack(MB_CHANNEL_EVENTS_IN, messages[i].sequence);
 			}
 
-			SHorizonEvent event;
-			event.FromJson(payload);
-
-			ArrayResize(eventList, matched + 1);
-			eventList[matched] = event;
-			matched++;
-
-			SEMessageBus::Ack(MB_CHANNEL_EVENTS_IN, messages[i].sequence);
 			delete payload;
 		}
 

@@ -229,19 +229,19 @@ private:
 		order.SetSignalPrice(json.getNumber("signal_price"));
 		order.SetOpenAtPrice(json.getNumber("open_at_price"));
 		order.SetOpenPrice(json.getNumber("open_price"));
-		order.takeProfitPrice = json.getNumber("take_profit_price");
-		order.stopLossPrice = json.getNumber("stop_loss_price");
+		order.SetTakeProfitPrice(json.getNumber("take_profit_price"));
+		order.SetStopLossPrice(json.getNumber("stop_loss_price"));
 
-		order.closePrice = json.getNumber("close_price");
-		order.profitInDollars = json.getNumber("profit_in_dollars");
-		order.orderCloseReason = (ENUM_DEAL_REASON)(int)json.getNumber("order_close_reason");
+		order.SetClosePrice(json.getNumber("close_price"));
+		order.SetProfitInDollars(json.getNumber("profit_in_dollars"));
+		order.SetCloseReason((ENUM_DEAL_REASON)(int)json.getNumber("order_close_reason"));
 
 		SDateTime signalAt = dtime.FromTimestamp((datetime)json.getNumber("signal_at"));
 		SDateTime openAt = dtime.FromTimestamp((datetime)json.getNumber("open_at"));
 		SDateTime closeAt = dtime.FromTimestamp((datetime)json.getNumber("close_at"));
 		order.SetSignalAt(signalAt);
 		order.SetOpenAt(openAt);
-		order.closeAt = closeAt;
+		order.SetCloseAt(closeAt);
 
 		return true;
 	}
@@ -324,14 +324,14 @@ private:
 			datetime dealTimestamp = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
 			SDateTime dealTime = dtime.FromTimestamp(dealTimestamp);
 
-			order.closeAt = dealTime;
-			order.closePrice = dealPrice;
-			order.profitInDollars = netProfit;
+			order.SetCloseAt(dealTime);
+			order.SetClosePrice(dealPrice);
+			order.SetProfitInDollars(netProfit);
 			order.SetGrossProfit(dealProfit);
 			order.SetCommission(dealCommission);
 			order.SetSwap(dealSwap);
-			order.orderCloseReason = dealReason;
-			order.status = ORDER_STATUS_CLOSED;
+			order.SetCloseReason(dealReason);
+			order.SetStatus(ORDER_STATUS_CLOSED);
 
 			ordersCollection.UpdateOne("_id", order.GetId(), serializeOrder(order));
 

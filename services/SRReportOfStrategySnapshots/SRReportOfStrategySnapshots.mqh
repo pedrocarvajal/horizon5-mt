@@ -90,26 +90,9 @@ private:
 		obj.setProperty("nav_peak", snapshot.navPeak);
 		obj.setProperty("drawdown_max_in_dollars", snapshot.drawdownMaxInDollars);
 		obj.setProperty("drawdown_max_in_percentage", snapshot.drawdownMaxInPercentage);
-		obj.setProperty("winning_orders", snapshot.winningOrders);
-		obj.setProperty("winning_orders_performance", snapshot.winningOrdersPerformance);
-		obj.setProperty("losing_orders", snapshot.losingOrders);
-		obj.setProperty("losing_orders_performance", snapshot.losingOrdersPerformance);
-		obj.setProperty("max_loss", snapshot.maxLoss);
-
-		obj.setProperty("r_squared", snapshot.rSquared);
-		obj.setProperty("sharpe_ratio", snapshot.sharpeRatio);
-		obj.setProperty("risk_reward_ratio", snapshot.riskRewardRatio);
-		obj.setProperty("win_rate", snapshot.winRate);
-		obj.setProperty("recovery_factor", snapshot.recoveryFactor);
-		obj.setProperty("cagr", snapshot.cagr);
-		obj.setProperty("stability", snapshot.stability);
-		obj.setProperty("stability_sq3", snapshot.stabilitySQ3);
 
 		obj.setProperty("quality", snapshot.quality);
 		obj.setProperty("quality_reason", snapshot.qualityReason);
-
-		obj.setProperty("max_exposure_in_lots", snapshot.maxExposureInLots);
-		obj.setProperty("max_exposure_in_percentage", snapshot.maxExposureInPercentage);
 
 		obj.setProperty("daily_performance", snapshot.dailyPerformance);
 

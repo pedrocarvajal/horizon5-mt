@@ -121,11 +121,11 @@ public:
 		order.SetIsMarketOrder(isMarketOrder);
 
 		if (stopLoss > 0) {
-			order.stopLossPrice = stopLoss;
+			order.SetStopLossPrice(stopLoss);
 		}
 
 		if (takeProfit > 0) {
-			order.takeProfitPrice = takeProfit;
+			order.SetTakeProfitPrice(takeProfit);
 		}
 
 		AddOrder(order);
@@ -148,7 +148,7 @@ public:
 			ENUM_ORDER_STATUSES statusBefore = orders[i].GetStatus();
 
 			if (statusBefore == ORDER_STATUS_PENDING) {
-				if (orders[i].pendingToClose) {
+				if (orders[i].IsPendingToClose()) {
 					CheckToCancel(orders[i]);
 
 					if (orders[i].GetStatus() == ORDER_STATUS_CANCELLED) {
@@ -210,17 +210,17 @@ public:
 	}
 
 	void CheckToOpen(EOrder &order) {
-		if (!order.pendingToOpen || order.isProcessed) {
+		if (!order.IsPendingToOpen() || order.IsProcessed()) {
 			return;
 		}
 
 		datetime currentTime = dtime.Timestamp();
 
-		if (order.retryAfter > 0 && currentTime < order.retryAfter) {
+		if (order.GetRetryAfter() > 0 && currentTime < order.GetRetryAfter()) {
 			return;
 		}
 
-		if (order.retryCount >= MAX_RETRY_COUNT) {
+		if (order.GetRetryCount() >= MAX_RETRY_COUNT) {
 			logger.Error(StringFormat("[%s] Max retry count reached, cancelling order", order.GetId()));
 			CancelOrder(order);
 			return;
@@ -233,7 +233,7 @@ public:
 	void CheckToCancel(EOrder &order) {
 		datetime currentTime = dtime.Timestamp();
 
-		if (order.retryAfter > 0 && currentTime < order.retryAfter) {
+		if (order.GetRetryAfter() > 0 && currentTime < order.GetRetryAfter()) {
 			return;
 		}
 
@@ -246,20 +246,20 @@ public:
 	}
 
 	void CheckToClose(EOrder &order) {
-		if (!order.pendingToClose) {
+		if (!order.IsPendingToClose()) {
 			return;
 		}
 
 		datetime currentTime = dtime.Timestamp();
 
-		if (order.retryAfter > 0 && currentTime < order.retryAfter) {
+		if (order.GetRetryAfter() > 0 && currentTime < order.GetRetryAfter()) {
 			return;
 		}
 
-		if (order.retryCount >= MAX_RETRY_COUNT) {
+		if (order.GetRetryCount() >= MAX_RETRY_COUNT) {
 			logger.Error(StringFormat("[%s] Max retry count reached for close, giving up", order.GetId()));
-			order.pendingToClose = false;
-			order.retryCount = 0;
+			order.SetPendingToClose(false);
+			order.SetRetryCount(0);
 			return;
 		}
 
@@ -270,7 +270,7 @@ public:
 		SMarketStatus marketStatus = GetMarketStatus(symbol);
 
 		if (marketStatus.isClosed) {
-			order.retryAfter = dtime.Timestamp() + marketStatus.opensInSeconds;
+			order.SetRetryAfter(dtime.Timestamp() + marketStatus.opensInSeconds);
 			return;
 		}
 
@@ -279,11 +279,11 @@ public:
 			return;
 		}
 
-		bool isBuy = (order.side == ORDER_TYPE_BUY || order.side == ORDER_TYPE_BUY_STOP || order.side == ORDER_TYPE_BUY_LIMIT);
+		bool isBuy = (order.GetSide() == ORDER_TYPE_BUY || order.GetSide() == ORDER_TYPE_BUY_STOP || order.GetSide() == ORDER_TYPE_BUY_LIMIT);
 		ENUM_ORDER_TYPE orderType;
 		double price;
 
-		if (order.isMarketOrder) {
+		if (order.IsMarketOrder()) {
 			orderType = isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
 			price = isBuy
 				? SymbolInfoDouble(symbol, SYMBOL_ASK)
@@ -295,12 +295,12 @@ public:
 			double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
 			double minDistance = (double)SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL) * point;
 
-			price = order.openAtPrice;
+			price = order.GetOpenAtPrice();
 
 			if (isBuy) {
-				orderType = (order.openAtPrice < currentPrice) ? ORDER_TYPE_BUY_LIMIT : ORDER_TYPE_BUY_STOP;
+				orderType = (order.GetOpenAtPrice() < currentPrice) ? ORDER_TYPE_BUY_LIMIT : ORDER_TYPE_BUY_STOP;
 			} else {
-				orderType = (order.openAtPrice > currentPrice) ? ORDER_TYPE_SELL_LIMIT : ORDER_TYPE_SELL_STOP;
+				orderType = (order.GetOpenAtPrice() > currentPrice) ? ORDER_TYPE_SELL_LIMIT : ORDER_TYPE_SELL_STOP;
 			}
 
 			if (orderType == ORDER_TYPE_BUY_STOP && price <= ask + minDistance) {
@@ -316,9 +316,9 @@ public:
 			BuildOrderComment(order),
 			orderType,
 			price,
-			order.volume,
-			order.takeProfitPrice,
-			order.stopLossPrice,
+			order.GetVolume(),
+			order.GetTakeProfitPrice(),
+			order.GetStopLossPrice(),
 			magicNumber
 		);
 
@@ -326,12 +326,12 @@ public:
 	}
 
 	void CloseOrder(EOrder &order) {
-		if (order.status == ORDER_STATUS_OPEN) {
+		if (order.GetStatus() == ORDER_STATUS_OPEN) {
 			SMarketStatus marketStatus = GetMarketStatus(symbol);
 
 			if (marketStatus.isClosed) {
-				order.pendingToClose = true;
-				order.retryAfter = dtime.Timestamp() + marketStatus.opensInSeconds;
+				order.SetPendingToClose(true);
+				order.SetRetryAfter(dtime.Timestamp() + marketStatus.opensInSeconds);
 				logger.Info(StringFormat(
 					"[%s] Close pending: Market closed, will retry in %d seconds",
 					order.GetId(),
@@ -347,29 +347,29 @@ public:
 			));
 
 			if (!trade.Close(order.GetPositionId())) {
-				order.retryCount++;
+				order.SetRetryCount(order.GetRetryCount() + 1);
 				logger.Error(StringFormat(
 					"[%s] Failed to close open position, retry %d/%d",
 					order.GetId(),
-					order.retryCount,
+					order.GetRetryCount(),
 					MAX_RETRY_COUNT
 				));
 				return;
 			}
 
 			logger.Info(StringFormat("[%s] Close order sent to broker, waiting for confirmation...", order.GetId()));
-			order.status = ORDER_STATUS_CLOSING;
-			order.pendingToClose = false;
-			order.retryCount = 0;
+			order.SetStatus(ORDER_STATUS_CLOSING);
+			order.SetPendingToClose(false);
+			order.SetRetryCount(0);
 			return;
 		}
 
-		if (order.status == ORDER_STATUS_PENDING) {
+		if (order.GetStatus() == ORDER_STATUS_PENDING) {
 			SMarketStatus pendingMarketStatus = GetMarketStatus(symbol);
 
 			if (pendingMarketStatus.isClosed) {
-				order.pendingToClose = true;
-				order.retryAfter = dtime.Timestamp() + pendingMarketStatus.opensInSeconds;
+				order.SetPendingToClose(true);
+				order.SetRetryAfter(dtime.Timestamp() + pendingMarketStatus.opensInSeconds);
 
 				logger.Info(StringFormat(
 					"[%s] Cancel pending: Market closed, will retry in %d seconds",
@@ -397,45 +397,46 @@ public:
 			}
 
 			if (!validateClose(order)) {
-				order.retryCount++;
-				order.pendingToClose = true;
-				order.retryAfter = dtime.Timestamp() + 30;
+				order.SetRetryCount(order.GetRetryCount() + 1);
+				order.SetPendingToClose(true);
+				order.SetRetryAfter(dtime.Timestamp() + 30);
 				logger.Warning(StringFormat(
 					"[%s] Cancel deferred - validation failed, retry %d",
 					order.GetId(),
-					order.retryCount
+					order.GetRetryCount()
 				));
 				return;
 			}
 
 			if (!trade.Cancel(order.GetOrderId())) {
-				order.retryCount++;
-				order.pendingToClose = true;
-				order.retryAfter = dtime.Timestamp() + 10;
+				order.SetRetryCount(order.GetRetryCount() + 1);
+				order.SetPendingToClose(true);
+				order.SetRetryAfter(dtime.Timestamp() + 10);
 				logger.Error(StringFormat(
 					"[%s] Failed to cancel pending order, orderId: %llu, retry %d",
 					order.GetId(),
 					order.GetOrderId(),
-					order.retryCount
+					order.GetRetryCount()
 				));
 				return;
 			}
 
 			logger.Info(StringFormat("[%s] Cancel order sent to broker, waiting for confirmation...", order.GetId()));
-			order.status = ORDER_STATUS_CLOSING;
-			order.pendingToOpen = false;
-			order.pendingToClose = false;
-			order.retryCount = 0;
+			order.SetStatus(ORDER_STATUS_CLOSING);
+			order.SetPendingToOpen(false);
+			order.SetPendingToClose(false);
+			order.SetRetryCount(0);
 			return;
 		}
 	}
 
 	void CancelOrder(EOrder &order) {
-		order.status = ORDER_STATUS_CANCELLED;
-		order.pendingToOpen = false;
-		order.pendingToClose = false;
-		order.isProcessed = true;
-		order.closeAt = dtime.Now();
+		order.SetStatus(ORDER_STATUS_CANCELLED);
+		order.SetPendingToOpen(false);
+		order.SetPendingToClose(false);
+		order.SetIsProcessed(true);
+		SDateTime cancelTime = dtime.Now();
+		order.SetCloseAt(cancelTime);
 		order.BuildSnapshot();
 
 		if (CheckPointer(orderPersistence) != POINTER_INVALID) {
@@ -446,29 +447,30 @@ public:
 	void OnOpenOrder(EOrder &order, const MqlTradeResult &result) {
 		if (result.retcode != TRADE_RETCODE_DONE &&
 		    result.retcode != TRADE_RETCODE_DONE_PARTIAL) {
-			order.retryCount++;
+			order.SetRetryCount(order.GetRetryCount() + 1);
 			logger.Error(StringFormat(
 				"[%s] Error opening order: %s (%d), retry %d/%d",
 				order.GetId(),
 				ATrade::DescribeRetcode(result.retcode),
 				result.retcode,
-				order.retryCount,
+				order.GetRetryCount(),
 				MAX_RETRY_COUNT
 			));
 
-			if (order.retryCount >= MAX_RETRY_COUNT) {
+			if (order.GetRetryCount() >= MAX_RETRY_COUNT) {
 				CancelOrder(order);
 			}
 
 			return;
 		}
 
-		bool wasPending = (order.status == ORDER_STATUS_PENDING);
-		order.isProcessed = true;
-		order.pendingToOpen = false;
-		order.retryCount = 0;
-		order.openAt = dtime.Now();
-		order.openPrice = result.price;
+		bool wasPending = (order.GetStatus() == ORDER_STATUS_PENDING);
+		order.SetIsProcessed(true);
+		order.SetPendingToOpen(false);
+		order.SetRetryCount(0);
+		SDateTime openTime = dtime.Now();
+		order.SetOpenAt(openTime);
+		order.SetOpenPrice(result.price);
 		order.SetDealId(result.deal);
 		order.SetOrderId(result.order);
 
@@ -478,7 +480,7 @@ public:
 		}
 
 		if (order.GetDealId() == 0) {
-			order.status = ORDER_STATUS_PENDING;
+			order.SetStatus(ORDER_STATUS_PENDING);
 			logger.Info(StringFormat(
 				"[%s] Order opened as pending, orderId: %llu",
 				order.GetId(),
@@ -503,7 +505,7 @@ public:
 				));
 			}
 
-			order.status = ORDER_STATUS_OPEN;
+			order.SetStatus(ORDER_STATUS_OPEN);
 		}
 
 		order.BuildSnapshot();
@@ -520,17 +522,17 @@ public:
 		double profits,
 		ENUM_DEAL_REASON reason
 	) {
-		order.closeAt = time;
-		order.closePrice = price;
-		order.profitInDollars = profits;
-		order.status = ORDER_STATUS_CLOSED;
+		order.SetCloseAt(time);
+		order.SetClosePrice(price);
+		order.SetProfitInDollars(profits);
+		order.SetStatus(ORDER_STATUS_CLOSED);
 
 		if (profits == 0.0 && price == 0.0) {
-			order.status = ORDER_STATUS_CANCELLED;
+			order.SetStatus(ORDER_STATUS_CANCELLED);
 			logger.Error(StringFormat("[%s] Order cancelled", order.GetId()));
 		}
 
-		order.orderCloseReason = reason;
+		order.SetCloseReason(reason);
 		order.BuildSnapshot();
 
 		switch (reason) {
@@ -566,7 +568,7 @@ public:
 			return false;
 		}
 
-		if (order.status == ORDER_STATUS_OPEN) {
+		if (order.GetStatus() == ORDER_STATUS_OPEN) {
 			trade.SetPositionId(order.GetPositionId());
 
 			if (!trade.ModifyStopLoss(newStopLossPrice, magicNumber)) {
@@ -582,7 +584,7 @@ public:
 			));
 		}
 
-		order.stopLossPrice = newStopLossPrice;
+		order.SetStopLossPrice(newStopLossPrice);
 		return true;
 	}
 
@@ -591,7 +593,7 @@ public:
 			return false;
 		}
 
-		if (order.status == ORDER_STATUS_OPEN) {
+		if (order.GetStatus() == ORDER_STATUS_OPEN) {
 			trade.SetPositionId(order.GetPositionId());
 
 			if (!trade.ModifyTakeProfit(newTakeProfitPrice, magicNumber)) {
@@ -607,7 +609,7 @@ public:
 			));
 		}
 
-		order.takeProfitPrice = newTakeProfitPrice;
+		order.SetTakeProfitPrice(newTakeProfitPrice);
 		return true;
 	}
 
@@ -616,7 +618,7 @@ public:
 			return false;
 		}
 
-		if (order.status == ORDER_STATUS_OPEN) {
+		if (order.GetStatus() == ORDER_STATUS_OPEN) {
 			trade.SetPositionId(order.GetPositionId());
 
 			if (!trade.ModifyStopLossAndTakeProfit(newStopLossPrice, newTakeProfitPrice, magicNumber)) {
@@ -635,18 +637,18 @@ public:
 		}
 
 		if (newStopLossPrice > 0) {
-			order.stopLossPrice = newStopLossPrice;
+			order.SetStopLossPrice(newStopLossPrice);
 		}
 
 		if (newTakeProfitPrice > 0) {
-			order.takeProfitPrice = newTakeProfitPrice;
+			order.SetTakeProfitPrice(newTakeProfitPrice);
 		}
 
 		return true;
 	}
 
 	double GetFloatingProfitAndLoss(EOrder &order) {
-		if (order.status != ORDER_STATUS_OPEN) {
+		if (order.GetStatus() != ORDER_STATUS_OPEN) {
 			return 0.0;
 		}
 
@@ -889,7 +891,7 @@ private:
 	void NotifyOrderPlaced(EOrder &order);
 
 	bool validateOrder(EOrder &order) {
-		bool isBuy = (order.side == ORDER_TYPE_BUY || order.side == ORDER_TYPE_BUY_STOP || order.side == ORDER_TYPE_BUY_LIMIT);
+		bool isBuy = (order.GetSide() == ORDER_TYPE_BUY || order.GetSide() == ORDER_TYPE_BUY_STOP || order.GetSide() == ORDER_TYPE_BUY_LIMIT);
 		int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
 
 		ENUM_SYMBOL_TRADE_MODE tradeMode = (ENUM_SYMBOL_TRADE_MODE)SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE);
@@ -923,21 +925,22 @@ private:
 		double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
 		double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
 
-		if (order.volume <= 0) {
-			logger.Warning(StringFormat("[%s] Validation failed - Volume is zero or negative: %.5f", order.GetId(), order.volume));
+		if (order.GetVolume() <= 0) {
+			logger.Warning(StringFormat("[%s] Validation failed - Volume is zero or negative: %.5f", order.GetId(), order.GetVolume()));
 			return false;
 		}
 
-		order.volume = MathFloor(order.volume / lotStep) * lotStep;
-		order.volume = NormalizeDouble(order.volume, 2);
+		double normalizedVolume = MathFloor(order.GetVolume() / lotStep) * lotStep;
+		normalizedVolume = NormalizeDouble(normalizedVolume, 2);
+		order.SetVolume(normalizedVolume);
 
-		if (order.volume < minLot) {
-			logger.Warning(StringFormat("[%s] Validation failed - Volume %.5f below minimum %.5f", order.GetId(), order.volume, minLot));
+		if (order.GetVolume() < minLot) {
+			logger.Warning(StringFormat("[%s] Validation failed - Volume %.5f below minimum %.5f", order.GetId(), order.GetVolume(), minLot));
 			return false;
 		}
-		if (order.volume > maxLot) {
-			logger.Warning(StringFormat("[%s] Validation failed - Volume %.5f exceeds maximum %.5f, clamped", order.GetId(), order.volume, maxLot));
-			order.volume = maxLot;
+		if (order.GetVolume() > maxLot) {
+			logger.Warning(StringFormat("[%s] Validation failed - Volume %.5f exceeds maximum %.5f, clamped", order.GetId(), order.GetVolume(), maxLot));
+			order.SetVolume(maxLot);
 		}
 
 		long maxOrders = AccountInfoInteger(ACCOUNT_LIMIT_ORDERS);
@@ -946,8 +949,8 @@ private:
 			return false;
 		}
 
-		if (!order.isMarketOrder && order.openAtPrice <= 0) {
-			logger.Warning(StringFormat("[%s] Validation failed - Pending order price is invalid: %.*f", order.GetId(), digits, order.openAtPrice));
+		if (!order.IsMarketOrder() && order.GetOpenAtPrice() <= 0) {
+			logger.Warning(StringFormat("[%s] Validation failed - Pending order price is invalid: %.*f", order.GetId(), digits, order.GetOpenAtPrice()));
 			return false;
 		}
 
@@ -956,41 +959,41 @@ private:
 		double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
 		long stopsLevel = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
 		double minStopsDistance = stopsLevel * point;
-		double entryPrice = order.isMarketOrder ? (isBuy ? ask : bid) : order.openAtPrice;
+		double entryPrice = order.IsMarketOrder() ? (isBuy ? ask : bid) : order.GetOpenAtPrice();
 
-		if (order.stopLossPrice > 0) {
-			if (isBuy && order.stopLossPrice >= entryPrice) {
-				logger.Warning(StringFormat("[%s] Validation failed - BUY stop loss %.*f must be below entry price %.*f", order.GetId(), digits, order.stopLossPrice, digits, entryPrice));
+		if (order.GetStopLossPrice() > 0) {
+			if (isBuy && order.GetStopLossPrice() >= entryPrice) {
+				logger.Warning(StringFormat("[%s] Validation failed - BUY stop loss %.*f must be below entry price %.*f", order.GetId(), digits, order.GetStopLossPrice(), digits, entryPrice));
 				return false;
 			}
-			if (!isBuy && order.stopLossPrice <= entryPrice) {
-				logger.Warning(StringFormat("[%s] Validation failed - SELL stop loss %.*f must be above entry price %.*f", order.GetId(), digits, order.stopLossPrice, digits, entryPrice));
+			if (!isBuy && order.GetStopLossPrice() <= entryPrice) {
+				logger.Warning(StringFormat("[%s] Validation failed - SELL stop loss %.*f must be above entry price %.*f", order.GetId(), digits, order.GetStopLossPrice(), digits, entryPrice));
 				return false;
 			}
-			if (minStopsDistance > 0 && MathAbs(entryPrice - order.stopLossPrice) < minStopsDistance) {
-				logger.Warning(StringFormat("[%s] Validation failed - Stop loss too close to entry, distance: %.*f, minimum: %.*f", order.GetId(), digits, MathAbs(entryPrice - order.stopLossPrice), digits, minStopsDistance));
+			if (minStopsDistance > 0 && MathAbs(entryPrice - order.GetStopLossPrice()) < minStopsDistance) {
+				logger.Warning(StringFormat("[%s] Validation failed - Stop loss too close to entry, distance: %.*f, minimum: %.*f", order.GetId(), digits, MathAbs(entryPrice - order.GetStopLossPrice()), digits, minStopsDistance));
 				return false;
 			}
 		}
 
-		if (order.takeProfitPrice > 0) {
-			if (isBuy && order.takeProfitPrice <= entryPrice) {
-				logger.Warning(StringFormat("[%s] Validation failed - BUY take profit %.*f must be above entry price %.*f", order.GetId(), digits, order.takeProfitPrice, digits, entryPrice));
+		if (order.GetTakeProfitPrice() > 0) {
+			if (isBuy && order.GetTakeProfitPrice() <= entryPrice) {
+				logger.Warning(StringFormat("[%s] Validation failed - BUY take profit %.*f must be above entry price %.*f", order.GetId(), digits, order.GetTakeProfitPrice(), digits, entryPrice));
 				return false;
 			}
-			if (!isBuy && order.takeProfitPrice >= entryPrice) {
-				logger.Warning(StringFormat("[%s] Validation failed - SELL take profit %.*f must be below entry price %.*f", order.GetId(), digits, order.takeProfitPrice, digits, entryPrice));
+			if (!isBuy && order.GetTakeProfitPrice() >= entryPrice) {
+				logger.Warning(StringFormat("[%s] Validation failed - SELL take profit %.*f must be below entry price %.*f", order.GetId(), digits, order.GetTakeProfitPrice(), digits, entryPrice));
 				return false;
 			}
-			if (minStopsDistance > 0 && MathAbs(entryPrice - order.takeProfitPrice) < minStopsDistance) {
-				logger.Warning(StringFormat("[%s] Validation failed - Take profit too close to entry, distance: %.*f, minimum: %.*f", order.GetId(), digits, MathAbs(entryPrice - order.takeProfitPrice), digits, minStopsDistance));
+			if (minStopsDistance > 0 && MathAbs(entryPrice - order.GetTakeProfitPrice()) < minStopsDistance) {
+				logger.Warning(StringFormat("[%s] Validation failed - Take profit too close to entry, distance: %.*f, minimum: %.*f", order.GetId(), digits, MathAbs(entryPrice - order.GetTakeProfitPrice()), digits, minStopsDistance));
 				return false;
 			}
 		}
 
 		double requiredMargin = 0;
 		ENUM_ORDER_TYPE orderType = isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
-		if (!OrderCalcMargin(orderType, symbol, order.volume, entryPrice, requiredMargin)) {
+		if (!OrderCalcMargin(orderType, symbol, order.GetVolume(), entryPrice, requiredMargin)) {
 			logger.Warning(StringFormat("[%s] Validation failed - Cannot calculate required margin", order.GetId()));
 			return false;
 		}
@@ -1004,20 +1007,20 @@ private:
 	}
 
 	bool validateClose(EOrder &order) {
-		if (order.status == ORDER_STATUS_PENDING) {
+		if (order.GetStatus() == ORDER_STATUS_PENDING) {
 			long freezeLevel = SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
-			if (freezeLevel > 0 && order.openAtPrice > 0) {
+			if (freezeLevel > 0 && order.GetOpenAtPrice() > 0) {
 				double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
 				double freezeDistance = freezeLevel * point;
 				int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
-				double currentPrice = (order.side == ORDER_TYPE_BUY || order.side == ORDER_TYPE_BUY_STOP || order.side == ORDER_TYPE_BUY_LIMIT)
+				double currentPrice = (order.GetSide() == ORDER_TYPE_BUY || order.GetSide() == ORDER_TYPE_BUY_STOP || order.GetSide() == ORDER_TYPE_BUY_LIMIT)
 					? SymbolInfoDouble(symbol, SYMBOL_ASK)
 					: SymbolInfoDouble(symbol, SYMBOL_BID);
 
-				if (MathAbs(currentPrice - order.openAtPrice) <= freezeDistance) {
+				if (MathAbs(currentPrice - order.GetOpenAtPrice()) <= freezeDistance) {
 					logger.Warning(StringFormat(
 						"[%s] Close validation failed - Pending order price within freeze level (distance: %.*f, freeze: %.*f)",
-						order.GetId(), digits, MathAbs(currentPrice - order.openAtPrice), digits, freezeDistance
+						order.GetId(), digits, MathAbs(currentPrice - order.GetOpenAtPrice()), digits, freezeDistance
 					));
 					return false;
 				}
