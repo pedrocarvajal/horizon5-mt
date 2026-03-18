@@ -29,5 +29,5 @@ These are client-specific forks that must mirror the core projects, adding only 
 
 ## Sync workflow
 
-- Use `scripts/cross-check.sh <source> <target>` to diff two projects and identify drift (e.g., `./scripts/cross-check.sh /Users/memeonlymellc/horizon5-portfolio /Users/memeonlymellc/enaria/enaria-horizon5-portfolio`).
+- Use `~/.claude/hooks/cross-check.sh <source> <target>` to diff two projects and identify drift (e.g., `~/.claude/hooks/cross-check.sh /Users/memeonlymellc/horizon5-portfolio /Users/memeonlymellc/enaria/enaria-horizon5-portfolio`).
 - After working on any core project, check whether the Enaria forks or dependent projects need the same changes and notify the user.

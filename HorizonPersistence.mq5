@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "1.03"
+#property version   "1.04"
 #property strict
 
 #include "enums/EDebugLevel.mqh"
@@ -16,6 +16,7 @@
 
 #define SERVICE_VERSION "1.0.1"
 #define MESSAGE_TYPE_FLUSH "flush"
+#define DIAGNOSTIC_INTERVAL_SECONDS 300
 
 SEDateTime dtime;
 SELogger logger("Persistence");
@@ -25,6 +26,8 @@ input ENUM_DEBUG_LEVEL DebugLevel = DEBUG_LEVEL_ALL; // [1] > Debug log level
 
 input group "Persistence Settings";
 input int PollIntervalMs = 200; // [1] > Poll interval in milliseconds
+
+datetime lastDiagnosticTime = 0;
 
 struct SPendingWrite {
 	string filePath;
@@ -117,6 +120,23 @@ void processMessages(SMessage &messages[], int count) {
 	writeFiles(latestPerPath);
 }
 
+void logDiagnostics() {
+	datetime now = TimeCurrent();
+
+	if ((now - lastDiagnosticTime) < DIAGNOSTIC_INTERVAL_SECONDS) {
+		return;
+	}
+
+	lastDiagnosticTime = now;
+
+	int pendingPersistence = SEMessageBus::GetPendingCount(MB_CHANNEL_PERSISTENCE);
+
+	logger.Info(StringFormat(
+		"Queue diagnostics | persistence=%d",
+		pendingPersistence
+	));
+}
+
 int OnStart() {
 	SELogger::SetGlobalDebugLevel(DebugLevel);
 
@@ -151,6 +171,8 @@ int OnStart() {
 		if (count > 0) {
 			processMessages(messages, count);
 		}
+
+		logDiagnostics();
 	}
 
 	SEMessageBus::UnregisterService(MB_SERVICE_PERSISTENCE);

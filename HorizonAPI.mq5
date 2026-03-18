@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "2.07"
+#property version   "2.08"
 #property strict
 
 #include "enums/EDebugLevel.mqh"
@@ -23,6 +23,7 @@
 
 #define EVENT_KEYS_TRADING "post.order,delete.order,put.order,get.orders"
 #define EVENT_KEYS_SERVICE "get.account.info,get.ticker,get.klines,patch.account.disable,patch.account.enable"
+#define DIAGNOSTIC_INTERVAL_SECONDS 300
 
 SEDateTime dtime;
 SELogger hlogger("HorizonAPI");
@@ -42,6 +43,7 @@ input int HorizonAPIEventPollInterval = 3; // [1] > Event poll interval in secon
 input int MaxEventsPerPoll = 10; // [1] > Max events per ConsumeEvents call
 
 datetime lastEventPollTime = 0;
+datetime lastDiagnosticTime = 0;
 
 bool isOrderEndpoint(string path) {
 	return StringFind(path, API_ORDER_PATH_PREFIX) >= 0;
@@ -202,6 +204,26 @@ void processAckResponses() {
 	}
 }
 
+void logDiagnostics() {
+	datetime now = TimeCurrent();
+
+	if ((now - lastDiagnosticTime) < DIAGNOSTIC_INTERVAL_SECONDS) {
+		return;
+	}
+
+	lastDiagnosticTime = now;
+
+	int pendingConnector = SEMessageBus::GetPendingCount(MB_CHANNEL_CONNECTOR);
+	int pendingEventsIn = SEMessageBus::GetPendingCount(MB_CHANNEL_EVENTS_IN);
+	int pendingEventsOut = SEMessageBus::GetPendingCount(MB_CHANNEL_EVENTS_OUT);
+	int pendingEventsService = SEMessageBus::GetPendingCount(MB_CHANNEL_EVENTS_SERVICE);
+
+	hlogger.Info(StringFormat(
+		"Queue diagnostics | connector=%d | events_in=%d | events_out=%d | events_service=%d",
+		pendingConnector, pendingEventsIn, pendingEventsOut, pendingEventsService
+	));
+}
+
 int OnStart() {
 	SELogger::SetGlobalDebugLevel(DebugLevel);
 
@@ -239,6 +261,7 @@ int OnStart() {
 		}
 
 		processAckResponses();
+		logDiagnostics();
 	}
 
 	SELogger::SetRemoteLogger(NULL);

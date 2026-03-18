@@ -9,14 +9,6 @@ struct SStatisticsState {
 	double navYesterday;
 	double drawdownMaxInDollars;
 	double drawdownMaxInPercentage;
-	int winningOrders;
-	double winningOrdersPerformance;
-	int losingOrders;
-	double losingOrdersPerformance;
-	double maxLoss;
-	double maxExposureInLots;
-	double maxExposureInPercentage;
-	bool stopOutDetected;
 	double nav[];
 	double performance[];
 	double returns[];

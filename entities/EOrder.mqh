@@ -17,13 +17,9 @@ private:
 	ulong dealId;
 	ulong orderId;
 	ulong positionId;
+	SRPersistenceOfOrders *persistence;
+	SELogger logger;
 
-	void refreshId() {
-		id = GenerateUuid();
-	}
-
-public:
-	SRPersistenceOfOrders * persistence;
 	bool isInitialized;
 	bool isProcessed;
 	bool isMarketOrder;
@@ -58,8 +54,8 @@ public:
 	SDateTime closeAt;
 
 	SSOrderHistory snapshot;
-	SELogger logger;
 
+public:
 	EOrder(ulong strategyMagicNumber = 0, string strategySymbol = "") {
 		logger.SetPrefix("Order");
 
@@ -155,11 +151,37 @@ public:
 	}
 
 	void OnDeinit() {
-		id = "";
-		source = "";
-		status = ORDER_STATUS_CLOSED;
+		persistence = NULL;
+
 		isInitialized = false;
 		isProcessed = false;
+		isMarketOrder = false;
+		pendingToOpen = false;
+		pendingToClose = false;
+		retryCount = 0;
+		retryAfter = 0;
+		id = "";
+		source = "";
+
+		status = ORDER_STATUS_CLOSED;
+		side = ORDER_TYPE_BUY;
+		orderCloseReason = (ENUM_DEAL_REASON)0;
+
+		volume = 0;
+		signalPrice = 0;
+		openAtPrice = 0;
+		openPrice = 0;
+		closePrice = 0;
+		profitInDollars = 0;
+		takeProfitPrice = 0;
+		stopLossPrice = 0;
+		commission = 0;
+		swap = 0;
+		grossProfit = 0;
+
+		dealId = 0;
+		orderId = 0;
+		positionId = 0;
 	}
 
 	void BuildSnapshot() {
@@ -193,75 +215,75 @@ public:
 		return id;
 	}
 
-	string GetSource() {
+	string GetSource() const {
 		return source;
 	}
 
-	string GetSymbol() {
+	string GetSymbol() const {
 		return symbol;
 	}
 
-	ulong GetMagicNumber() {
+	ulong GetMagicNumber() const {
 		return magicNumber;
 	}
 
-	ENUM_ORDER_STATUSES GetStatus() {
+	ENUM_ORDER_STATUSES GetStatus() const {
 		return status;
 	}
 
-	ENUM_DEAL_REASON GetCloseReason() {
+	ENUM_DEAL_REASON GetCloseReason() const {
 		return orderCloseReason;
 	}
 
-	int GetSide() {
+	int GetSide() const {
 		return side;
 	}
 
-	double GetVolume() {
+	double GetVolume() const {
 		return volume;
 	}
 
-	double GetSignalPrice() {
+	double GetSignalPrice() const {
 		return signalPrice;
 	}
 
-	double GetOpenAtPrice() {
+	double GetOpenAtPrice() const {
 		return openAtPrice;
 	}
 
-	double GetOpenPrice() {
+	double GetOpenPrice() const {
 		return openPrice;
 	}
 
-	double GetClosePrice() {
+	double GetClosePrice() const {
 		return closePrice;
 	}
 
-	double GetTakeProfitPrice() {
+	double GetTakeProfitPrice() const {
 		return takeProfitPrice;
 	}
 
-	double GetStopLossPrice() {
+	double GetStopLossPrice() const {
 		return stopLossPrice;
 	}
 
-	double GetProfitInDollars() {
+	double GetProfitInDollars() const {
 		return profitInDollars;
 	}
 
-	double GetCommission() {
+	double GetCommission() const {
 		return commission;
 	}
 
-	double GetSwap() {
+	double GetSwap() const {
 		return swap;
 	}
 
-	double GetGrossProfit() {
+	double GetGrossProfit() const {
 		return grossProfit;
 	}
 
-	double GetFloatingPnL() {
+	double GetFloatingPnL() const {
 		if (status != ORDER_STATUS_OPEN) {
 			return 0.0;
 		}
@@ -277,47 +299,47 @@ public:
 		return PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP);
 	}
 
-	SDateTime GetSignalAt() {
+	SDateTime GetSignalAt() const {
 		return signalAt;
 	}
 
-	SDateTime GetOpenAt() {
+	SDateTime GetOpenAt() const {
 		return openAt;
 	}
 
-	SDateTime GetCloseAt() {
+	SDateTime GetCloseAt() const {
 		return closeAt;
 	}
 
-	SSOrderHistory GetSnapshot() {
+	SSOrderHistory GetSnapshot() const {
 		return snapshot;
 	}
 
-	bool IsMarketOrder() {
+	bool IsMarketOrder() const {
 		return isMarketOrder;
 	}
 
-	bool IsProcessed() {
+	bool IsProcessed() const {
 		return isProcessed;
 	}
 
-	bool IsInitialized() {
+	bool IsInitialized() const {
 		return isInitialized;
 	}
 
-	bool IsPendingToOpen() {
+	bool IsPendingToOpen() const {
 		return pendingToOpen;
 	}
 
-	bool IsPendingToClose() {
+	bool IsPendingToClose() const {
 		return pendingToClose;
 	}
 
-	int GetRetryCount() {
+	int GetRetryCount() const {
 		return retryCount;
 	}
 
-	datetime GetRetryAfter() {
+	datetime GetRetryAfter() const {
 		return retryAfter;
 	}
 
@@ -331,6 +353,10 @@ public:
 
 	ulong GetPositionId() const {
 		return positionId;
+	}
+
+	SRPersistenceOfOrders * GetPersistence() const {
+		return persistence;
 	}
 
 	void SetId(string newId) {
@@ -373,12 +399,36 @@ public:
 		openPrice = newOpenPrice;
 	}
 
-	void SetSignalAt(SDateTime &newSignalAt) {
+	void SetClosePrice(double newClosePrice) {
+		closePrice = newClosePrice;
+	}
+
+	void SetProfitInDollars(double newProfitInDollars) {
+		profitInDollars = newProfitInDollars;
+	}
+
+	void SetCloseReason(ENUM_DEAL_REASON newCloseReason) {
+		orderCloseReason = newCloseReason;
+	}
+
+	void SetStopLossPrice(double newStopLossPrice) {
+		stopLossPrice = newStopLossPrice;
+	}
+
+	void SetTakeProfitPrice(double newTakeProfitPrice) {
+		takeProfitPrice = newTakeProfitPrice;
+	}
+
+	void SetSignalAt(const SDateTime &newSignalAt) {
 		signalAt = newSignalAt;
 	}
 
-	void SetOpenAt(SDateTime &newOpenAt) {
+	void SetOpenAt(const SDateTime &newOpenAt) {
 		openAt = newOpenAt;
+	}
+
+	void SetCloseAt(const SDateTime &newCloseAt) {
+		closeAt = newCloseAt;
 	}
 
 	void SetIsMarketOrder(bool value) {
@@ -435,6 +485,11 @@ public:
 
 	void SetPositionId(ulong newPositionId) {
 		positionId = newPositionId;
+	}
+
+private:
+	void refreshId() {
+		id = GenerateUuid();
 	}
 };
 
