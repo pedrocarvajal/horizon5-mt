@@ -8,4 +8,9 @@ bool IsLiveTrading() {
 	       TerminalInfoInteger(TERMINAL_CONNECTED) == true;
 }
 
+bool IsLiveEnvironment() {
+	return MQLInfoInteger(MQL_TESTER) == false &&
+	       MQLInfoInteger(MQL_VISUAL_MODE) == false;
+}
+
 #endif
