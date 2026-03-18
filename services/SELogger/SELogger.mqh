@@ -97,7 +97,7 @@ private:
 	}
 
 	void sendToRemote(string level, string message) {
-		if (isSendingToRemote || remoteLogger == NULL || !IsLiveTrading()) {
+		if (isSendingToRemote || remoteLogger == NULL || !IsLiveEnvironment()) {
 			return;
 		}
 
