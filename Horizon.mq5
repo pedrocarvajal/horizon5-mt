@@ -1,5 +1,5 @@
 #property copyright "Horizon5, by Pedro Carvajal"
-#property version "1.62"
+#property version "1.81"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 #include <Trade/Trade.mqh>
@@ -9,7 +9,9 @@
 #include "configs/Assets.mqh"
 #include "constants/time.mqh"
 
+#include "entities/EAccount.mqh"
 #include "enums/EDebugLevel.mqh"
+#include "enums/ELogSystem.mqh"
 #include "structs/STradingStatus.mqh"
 
 #include "helpers/HGetPipSize.mqh"
@@ -20,13 +22,14 @@
 #include "services/SEDateTime/SEDateTime.mqh"
 #include "services/SRReportOfLogs/SRReportOfLogs.mqh"
 
-#include "integrations/HorizonAPI/HorizonAPI.mqh"
-#include "services/SRImplementationOfHorizonAPI/SRImplementationOfHorizonAPI.mqh"
+#include "services/SRImplementationOfHorizonMonitor/SRImplementationOfHorizonMonitor.mqh"
+#include "services/SRImplementationOfHorizonGateway/SRImplementationOfHorizonGateway.mqh"
 
+EAccount account;
 SEDateTime dtime;
 SELogger logger;
-HorizonAPI horizonAPI;
-SRImplementationOfHorizonAPI horizonSync;
+SRImplementationOfHorizonMonitor horizonMonitor;
+SRImplementationOfHorizonGateway horizonGateway;
 STradingStatus tradingStatus;
 
 input group "General Settings";
@@ -42,12 +45,15 @@ input group "Risk management";
 input bool EquityAtRiskCompounded = false; // [1] > Equity at risk compounded
 input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
-input group "HorizonAPI Integration";
-input string HorizonAPIUrl = ""; // [1] > HorizonAPI base URL
-input string HorizonAPIEmail = ""; // [1] > HorizonAPI email (required)
-input string HorizonAPIPassword = ""; // [1] > HorizonAPI password (required)
-input int HorizonAPIMaxEventsPerPoll = 10; // [1] > Max events per ConsumeEvents call
-input int HorizonAPIEventPollInterval = 3; // [1] > Event poll interval in seconds (0 = every tick)
+input group "Horizon Monitor";
+input bool EnableHorizonIntegration = true; // [1] > Enable Horizon integration
+input string HorizonMonitorUrl = ""; // [1] > HorizonMonitor base URL
+input string HorizonMonitorEmail = ""; // [1] > HorizonMonitor email (required)
+input string HorizonMonitorPassword = ""; // [1] > HorizonMonitor password (required)
+input group "Horizon Gateway";
+input string HorizonGatewayUrl = ""; // [1] > HorizonGateway base URL
+input string HorizonGatewayEmail = ""; // [1] > HorizonGateway email (required)
+input string HorizonGatewayPassword = ""; // [1] > HorizonGateway password (required)
 
 int lastCheckedDay = -1;
 int lastCheckedHour = -1;
@@ -102,9 +108,29 @@ bool ValidateMagicNumbers() {
 	return true;
 }
 
+int BuildRequiredServices(string &services[]) {
+	int count = 0;
+
+	ArrayResize(services, 1);
+	services[count++] = MB_SERVICE_PERSISTENCE;
+
+	if (horizonMonitor.IsEnabled()) {
+		ArrayResize(services, count + 1);
+		services[count++] = MB_SERVICE_MONITOR;
+	}
+
+	if (horizonGateway.IsEnabled()) {
+		ArrayResize(services, count + 1);
+		services[count++] = MB_SERVICE_GATEWAY;
+	}
+
+	return count;
+}
+
 void CheckServiceHealth() {
-	string requiredServices[] = { MB_SERVICE_API, MB_SERVICE_PERSISTENCE };
-	bool servicesRunning = SEMessageBus::AreServicesReady(requiredServices, 2);
+	string requiredServices[];
+	int serviceCount = BuildRequiredServices(requiredServices);
+	bool servicesRunning = SEMessageBus::AreServicesReady(requiredServices, serviceCount);
 
 	if (servicesRunning && tradingStatus.reason == TRADING_PAUSE_REASON_SERVICES_DOWN) {
 		SEMessageBus::Activate();
@@ -125,21 +151,39 @@ int OnInit() {
 	EventSetTimer(1);
 
 	dtime = SEDateTime();
-
 	logger.SetPrefix("Horizon");
-	SELogger::SetGlobalDebugLevel(DebugLevel);
 
-	if (!horizonAPI.Initialize(HorizonAPIUrl, HorizonAPIEmail, HorizonAPIPassword, IsLiveTrading())) {
+	SELogger::SetGlobalDebugLevel(DebugLevel);
+	SELogger::SetLogSystem(LOG_SYSTEM_HORIZON5);
+
+	bool integrationEnabled = IsLiveTrading() && EnableHorizonIntegration;
+
+	if (!horizonMonitor.Initialize(HorizonMonitorUrl, HorizonMonitorEmail, HorizonMonitorPassword, integrationEnabled)) {
 		return INIT_FAILED;
 	}
 
-	if (horizonAPI.IsEnabled()) {
-		SELogger::SetRemoteLogger(GetPointer(horizonAPI));
+	if (!horizonGateway.Initialize(HorizonGatewayUrl, HorizonGatewayEmail, HorizonGatewayPassword, integrationEnabled)) {
+		return INIT_FAILED;
+	}
 
-		horizonAPI.UpsertAccount();
-		SHorizonAccount remoteAccount = horizonAPI.FetchAccount();
+	if (horizonMonitor.IsEnabled()) {
+		SELogger::SetRemoteLogger(GetPointer(horizonMonitor));
 
-		if (!remoteAccount.IsActive()) {
+		if (!horizonMonitor.UpsertAccount()) {
+			logger.Error("Failed to register account on Monitor");
+			return INIT_FAILED;
+		}
+	}
+
+	if (horizonGateway.IsEnabled()) {
+		if (!horizonGateway.UpsertAccount()) {
+			logger.Error("Failed to register account on Gateway");
+			return INIT_FAILED;
+		}
+
+		string accountStatus = horizonGateway.FetchAccountStatus();
+
+		if (accountStatus != "active") {
 			logger.Warning("Account is inactive, trading paused.");
 			tradingStatus.isPaused = true;
 			tradingStatus.reason = TRADING_PAUSE_REASON_ACCOUNT_INACTIVE;
@@ -177,7 +221,7 @@ int OnInit() {
 		}
 
 		assets[i].SetWeight(weightPerAsset);
-		assets[i].SetBalance(AccountInfoDouble(ACCOUNT_BALANCE) * weightPerAsset);
+		assets[i].SetBalance(account.GetBalance() * weightPerAsset);
 
 		int result = assets[i].OnInit();
 
@@ -218,13 +262,58 @@ int OnInit() {
 		));
 	}
 
-	if (horizonAPI.IsEnabled()) {
-		horizonSync.Initialize(GetPointer(horizonAPI));
+	if (IsLiveTrading()) {
+		string requiredServices[];
+		int serviceCount = BuildRequiredServices(requiredServices);
 
-		if (!InitializeMessageBus()) {
+		if (!InitializeMessageBus(requiredServices, serviceCount)) {
 			logger.Error("Required services not running, cannot start.");
 			return INIT_FAILED;
 		}
+	}
+
+	if (horizonMonitor.IsEnabled() || horizonGateway.IsEnabled()) {
+		logger.Separator("UUID Mapping Report");
+
+		if (horizonMonitor.IsEnabled()) {
+			logger.Info(StringFormat("Monitor | account: %s", horizonMonitor.GetAccountUuid()));
+
+			for (int i = 0; i < ArraySize(assets); i++) {
+				if (!assets[i].IsEnabled()) {
+					continue;
+				}
+
+				string symbolName = assets[i].GetSymbol();
+				logger.Info(StringFormat("Monitor | asset: %s -> %s", symbolName, horizonMonitor.GetAssetUuid(symbolName)));
+
+				for (int j = 0; j < assets[i].GetStrategyCount(); j++) {
+					ulong magic = assets[i].GetStrategyAtIndex(j).GetMagicNumber();
+					string stratName = assets[i].GetStrategyAtIndex(j).GetName();
+					logger.Info(StringFormat("Monitor | strategy: %s (%llu) -> %s", stratName, magic, horizonMonitor.GetStrategyUuid(magic)));
+				}
+			}
+		}
+
+		if (horizonGateway.IsEnabled()) {
+			logger.Info(StringFormat("Gateway | account: %s", horizonGateway.GetAccountUuid()));
+
+			for (int i = 0; i < ArraySize(assets); i++) {
+				if (!assets[i].IsEnabled()) {
+					continue;
+				}
+
+				string symbolName = assets[i].GetSymbol();
+				logger.Info(StringFormat("Gateway | asset: %s -> %s", symbolName, horizonGateway.GetAssetUuid(symbolName)));
+
+				for (int j = 0; j < assets[i].GetStrategyCount(); j++) {
+					ulong magic = assets[i].GetStrategyAtIndex(j).GetMagicNumber();
+					string stratName = assets[i].GetStrategyAtIndex(j).GetName();
+					logger.Info(StringFormat("Gateway | strategy: %s (%llu) -> %s", stratName, magic, horizonGateway.GetStrategyUuid(magic)));
+				}
+			}
+		}
+
+		logger.Separator("End UUID Mapping Report");
 	}
 
 	logger.Info("Horizon EA started | built " + (string)__DATETIME__);
@@ -309,7 +398,7 @@ void OnTimer() {
 	if (isStartMinute) {
 		lastCheckedMinute = now.minute;
 
-		if (horizonAPI.IsEnabled()) {
+		if (SEMessageBus::IsActive()) {
 			CheckServiceHealth();
 		}
 
@@ -330,12 +419,12 @@ void OnTimer() {
 		assets[i].ProcessOrders();
 	}
 
-	if (horizonAPI.IsEnabled() && SEMessageBus::IsActive()) {
-		horizonSync.ProcessServiceEvents();
+	if (horizonGateway.IsEnabled() && SEMessageBus::IsActive()) {
+		horizonGateway.ProcessServiceEvents(assets);
 	}
 
-	if (isStartHour && horizonAPI.IsEnabled()) {
-		horizonSync.SyncAccount(assets, ArraySize(assets));
+	if (isStartHour && horizonMonitor.IsEnabled()) {
+		horizonMonitor.SyncAccount(assets, ArraySize(assets));
 	}
 }
 

@@ -24,12 +24,12 @@ class SEAsset;
 #include "../services/SRPersistenceOfStatistics/SRPersistenceOfStatistics.mqh"
 #include "../services/SRPersistenceOfState/SRPersistenceOfState.mqh"
 
-#include "../integrations/HorizonAPI/HorizonAPI.mqh"
+#include "../services/SRImplementationOfHorizonMonitor/SRImplementationOfHorizonMonitor.mqh"
 
 #include "../entities/EOrder.mqh"
 
 extern SEDateTime dtime;
-extern HorizonAPI horizonAPI;
+extern SRImplementationOfHorizonMonitor horizonMonitor;
 extern STradingStatus tradingStatus;
 
 void SEOrderBook::NotifyOrderCancelled(EOrder &order) {
@@ -68,6 +68,7 @@ protected:
 	string prefix;
 	ulong strategyMagicNumber;
 	double maxLotsByOrder;
+	bool isPassive;
 
 	void SetStateDouble(string key, double value) {
 		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
@@ -251,7 +252,7 @@ public:
 
 	virtual void OnCancelOrder(EOrder& order) {
 		orderBook.OnOrderCancelled();
-		horizonAPI.UpsertOrder(order);
+		horizonMonitor.UpsertOrder(order);
 
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
@@ -266,7 +267,7 @@ public:
 			statisticsPersistence.Save(statistics);
 		}
 
-		horizonAPI.UpsertOrder(order);
+		horizonMonitor.UpsertOrder(order);
 
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
@@ -321,11 +322,11 @@ public:
 
 	virtual void OnOpenOrder(EOrder& order) {
 		statistics.OnOpenOrder(order, orderBook.orders);
-		horizonAPI.UpsertOrder(order);
+		horizonMonitor.UpsertOrder(order);
 	}
 
 	virtual void OnPendingOrderPlaced(EOrder& order) {
-		horizonAPI.UpsertOrder(order);
+		horizonMonitor.UpsertOrder(order);
 	}
 
 	virtual void OnStartDay() {
@@ -385,6 +386,14 @@ public:
 		name = strategyName;
 	}
 
+	void SetPassive(bool passive) {
+		isPassive = passive;
+	}
+
+	bool IsPassive() {
+		return isPassive;
+	}
+
 	void SetPrefix(string strategyPrefix) {
 		prefix = strategyPrefix;
 	}
@@ -402,29 +411,30 @@ public:
 			EOrder *order = orderBook.GetOrderAtIndex(i);
 			if (order != NULL && (order.GetStatus() == ORDER_STATUS_OPEN ||
 					      order.GetStatus() == ORDER_STATUS_PENDING)) {
-				horizonAPI.UpsertOrder(order);
+				horizonMonitor.UpsertOrder(order);
 			}
 		}
 	}
 
 	void SyncSnapshot() {
-		double floatingPnl;
-		double exposureLots;
-		double exposureUsd;
-		double nav;
-		double drawdownPct;
+		double floatingPnl = 0;
 
-		calculateLiveMetrics(floatingPnl, exposureLots, exposureUsd, nav, drawdownPct);
+		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
+			EOrder *order = orderBook.GetOrderAtIndex(i);
+			if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
+				floatingPnl += orderBook.GetFloatingProfitAndLoss(order);
+			}
+		}
 
-		horizonAPI.StoreStrategySnapshot(
+		double realizedPnl = statistics.GetClosedNav() - statistics.GetInitialBalance();
+		double equity = balance + floatingPnl;
+
+		horizonMonitor.StoreStrategySnapshot(
 			strategyMagicNumber,
-			nav,
-			drawdownPct,
-			statistics.GetDailyPerformance(),
+			balance,
+			equity,
 			floatingPnl,
-			orderBook.GetOpenOrderCount(),
-			exposureLots,
-			exposureUsd
+			realizedPnl
 		);
 	}
 
@@ -516,9 +526,9 @@ private:
 		}
 
 		for (int i = 0; i < ArraySize(reconciledOrders); i++) {
-			horizonAPI.UpsertOrder(reconciledOrders[i]);
+			horizonMonitor.UpsertOrder(reconciledOrders[i]);
 			logger.Info(StringFormat(
-				"Synced reconciled order to HorizonAPI: %s",
+				"Synced reconciled order to Monitor: %s",
 				reconciledOrders[i].GetId()
 			));
 		}
