@@ -3,7 +3,7 @@
 
 class IRemoteLogger {
 public:
-	virtual void StoreLog(string level, string message, ulong magicNumber = 0) = 0;
+	virtual void StoreLog(string system, string level, string message, ulong magicNumber = 0) = 0;
 };
 
 #endif

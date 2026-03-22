@@ -7,7 +7,8 @@
 #define MB_CHANNEL_EVENTS_OUT      "events_outbound"
 #define MB_CHANNEL_EVENTS_SERVICE  "events_service"
 
-#define MB_SERVICE_API           "api"
+#define MB_SERVICE_MONITOR       "monitor"
+#define MB_SERVICE_GATEWAY       "gateway"
 #define MB_SERVICE_PERSISTENCE   "persistence"
 
 #endif

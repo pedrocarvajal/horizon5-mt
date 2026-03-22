@@ -2,6 +2,7 @@
 #define __SE_DB_MQH__
 
 #include "SEDbCollection.mqh"
+#include "../../entities/EAccount.mqh"
 
 class SEDb {
 private:
@@ -18,7 +19,8 @@ public:
 	}
 
 	void Initialize(string databasePath, bool commonFiles = false) {
-		long accountNumber = AccountInfoInteger(ACCOUNT_LOGIN);
+		EAccount account;
+		long accountNumber = account.GetNumber();
 		basePath = StringFormat("%lld/%s", accountNumber, databasePath);
 		useCommonFiles = commonFiles;
 		isInitialized = true;

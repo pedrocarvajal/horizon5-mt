@@ -13,6 +13,7 @@
 #include "../../services/SEDateTime/structs/SDateTime.mqh"
 #include "../../services/SRPersistenceOfOrders/SRPersistenceOfOrders.mqh"
 
+#include "../../entities/EAccount.mqh"
 #include "../../entities/EOrder.mqh"
 #include "../../adapters/ATrade.mqh"
 
@@ -30,6 +31,7 @@ public:
 	EOrder orders[];
 
 private:
+	EAccount account;
 	SELogger logger;
 	ATrade trade;
 
@@ -912,7 +914,7 @@ private:
 			return false;
 		}
 
-		if (!AccountInfoInteger(ACCOUNT_TRADE_ALLOWED)) {
+		if (!account.IsTradeAllowed()) {
 			logger.Warning(StringFormat("[%s] Validation failed - Trading not allowed on account", order.GetId()));
 			return false;
 		}
@@ -943,7 +945,7 @@ private:
 			order.SetVolume(maxLot);
 		}
 
-		long maxOrders = AccountInfoInteger(ACCOUNT_LIMIT_ORDERS);
+		long maxOrders = account.GetMaxOrders();
 		if (maxOrders > 0 && (OrdersTotal() + PositionsTotal()) >= (int)maxOrders) {
 			logger.Warning(StringFormat("[%s] Validation failed - Account order limit reached (%d/%d)", order.GetId(), OrdersTotal() + PositionsTotal(), maxOrders));
 			return false;
@@ -997,7 +999,7 @@ private:
 			logger.Warning(StringFormat("[%s] Validation failed - Cannot calculate required margin", order.GetId()));
 			return false;
 		}
-		double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
+		double freeMargin = account.GetFreeMargin();
 		if (requiredMargin > freeMargin) {
 			logger.Warning(StringFormat("[%s] Validation failed - Insufficient margin, required: %.2f, free: %.2f", order.GetId(), requiredMargin, freeMargin));
 			return false;

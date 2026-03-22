@@ -13,6 +13,7 @@ private:
 	static ENUM_DEBUG_LEVEL globalDebugLevel;
 	static string globalEntries[];
 	static IRemoteLogger *remoteLogger;
+	static string logSystem;
 	static bool isSendingToRemote;
 
 public:
@@ -54,6 +55,10 @@ public:
 
 	static void SetRemoteLogger(IRemoteLogger *remoteLoggerInstance) {
 		remoteLogger = remoteLoggerInstance;
+	}
+
+	static void SetLogSystem(string system) {
+		logSystem = system;
 	}
 
 	static void GetGlobalEntries(string &result[]) {
@@ -102,7 +107,7 @@ private:
 		}
 
 		isSendingToRemote = true;
-		remoteLogger.StoreLog(level, prefix + ": " + message);
+		remoteLogger.StoreLog(logSystem, level, prefix + ": " + message);
 		isSendingToRemote = false;
 	}
 
@@ -126,6 +131,7 @@ private:
 ENUM_DEBUG_LEVEL SELogger::globalDebugLevel = DEBUG_LEVEL_ALL;
 string SELogger::globalEntries[];
 IRemoteLogger *SELogger::remoteLogger = NULL;
+string SELogger::logSystem = "";
 bool SELogger::isSendingToRemote = false;
 
 #endif
