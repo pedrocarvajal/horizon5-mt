@@ -5,7 +5,7 @@
 #include "../services/SEMessageBus/SEMessageBusChannels.mqh"
 #include "../services/SELogger/SELogger.mqh"
 
-bool InitializeMessageBus() {
+bool InitializeMessageBus(string &requiredServices[], int serviceCount) {
 	if (SEMessageBus::IsActive()) {
 		return true;
 	}
@@ -17,9 +17,16 @@ bool InitializeMessageBus() {
 		return false;
 	}
 
-	string requiredServices[] = { MB_SERVICE_API, MB_SERVICE_PERSISTENCE };
+	for (int i = 0; i < serviceCount; i++) {
+		bool running = SEMessageBus::IsServiceRunning(requiredServices[i]);
+		messageBusLogger.Info(StringFormat(
+			"Service check | %s | running: %s",
+			requiredServices[i],
+			running ? "yes" : "no"
+		));
+	}
 
-	if (!SEMessageBus::AreServicesReady(requiredServices, 2)) {
+	if (!SEMessageBus::AreServicesReady(requiredServices, serviceCount)) {
 		messageBusLogger.Error("Services not running");
 		return false;
 	}

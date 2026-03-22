@@ -28,16 +28,4 @@ string GenerateUuid() {
 	);
 }
 
-string MagicNumberToUuid(ulong magicNumber) {
-	string hexChars = "0123456789abcdef";
-	string hexMagic = "";
-
-	for (int i = 11; i >= 0; i--) {
-		int nibble = (int)((magicNumber >> (i * 4)) & 0xF);
-		hexMagic += StringSubstr(hexChars, nibble, 1);
-	}
-
-	return StringFormat("00000000-0000-4000-8000-%s", hexMagic);
-}
-
 #endif
