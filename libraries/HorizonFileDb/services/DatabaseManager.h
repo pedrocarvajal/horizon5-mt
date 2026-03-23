@@ -4,23 +4,19 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-#include "../constants/Limits.h"
 #include "../entities/Database.h"
-#include "../entities/Collection.h"
-#include "../entities/Query.h"
 
 #include <string>
+#include <vector>
 
 class DatabaseManager {
 private:
     std::wstring basePath;
-    FdbDatabase databases[FDB_MAX_DATABASES];
-    int databaseCount;
+    std::vector<FdbDatabase> databases;
     CRITICAL_SECTION registryLock;
 
 public:
     DatabaseManager()
-        : databaseCount(0)
     {
         InitializeCriticalSection(&registryLock);
     }
@@ -45,22 +41,21 @@ public:
     {
         EnterCriticalSection(&registryLock);
 
-        for (int i = 0; i < databaseCount; i++) {
+        int count = static_cast<int>(databases.size());
+
+        for (int i = 0; i < count; i++) {
             if (databases[i].active && databases[i].path == path) {
                 LeaveCriticalSection(&registryLock);
                 return i;
             }
         }
 
-        if (databaseCount >= FDB_MAX_DATABASES) {
-            LeaveCriticalSection(&registryLock);
-            return -1;
-        }
+        FdbDatabase db;
+        db.path = path;
+        db.active = true;
 
-        int index = databaseCount;
-        databases[index].path = path;
-        databases[index].active = true;
-        databaseCount++;
+        int index = count;
+        databases.push_back(std::move(db));
 
         LeaveCriticalSection(&registryLock);
         return index;
@@ -68,7 +63,7 @@ public:
 
     FdbDatabase* GetDatabase(int databaseId)
     {
-        if (databaseId < 0 || databaseId >= databaseCount || !databases[databaseId].active) {
+        if (databaseId < 0 || databaseId >= static_cast<int>(databases.size()) || !databases[databaseId].active) {
             return nullptr;
         }
 
@@ -79,7 +74,7 @@ public:
     {
         EnterCriticalSection(&registryLock);
 
-        if (databaseId >= 0 && databaseId < databaseCount && databases[databaseId].active) {
+        if (databaseId >= 0 && databaseId < static_cast<int>(databases.size()) && databases[databaseId].active) {
             databases[databaseId].collectionIds.clear();
             databases[databaseId].active = false;
         }
@@ -91,12 +86,12 @@ public:
     {
         EnterCriticalSection(&registryLock);
 
-        for (int i = 0; i < databaseCount; i++) {
-            databases[i].collectionIds.clear();
-            databases[i].active = false;
+        for (auto& db : databases) {
+            db.collectionIds.clear();
+            db.active = false;
         }
 
-        databaseCount = 0;
+        databases.clear();
         LeaveCriticalSection(&registryLock);
     }
 };

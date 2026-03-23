@@ -3,7 +3,6 @@
 #endif
 
 #include "HorizonFileDb.h"
-#include "constants/Limits.h"
 #include "entities/Query.h"
 #include "services/DatabaseManager.h"
 #include "services/CollectionManager.h"
@@ -16,8 +15,7 @@ static DatabaseManager* databaseManager = nullptr;
 static CollectionManager* collectionManager = nullptr;
 static bool initialized = false;
 
-static FdbQuery queries[FDB_MAX_QUERIES];
-static int queryCount = 0;
+static std::vector<FdbQuery> queries;
 static CRITICAL_SECTION queryLock;
 
 thread_local std::string findOneResult;
@@ -109,7 +107,6 @@ FDB_API int __stdcall FdbInit(const wchar_t* basePath)
     databaseManager->SetBasePath(basePath);
     collectionManager = new CollectionManager(databaseManager);
     InitializeCriticalSection(&queryLock);
-    queryCount = 0;
     initialized = true;
 
     return 1;
@@ -129,11 +126,11 @@ FDB_API void __stdcall FdbShutdown()
     collectionManager = nullptr;
     databaseManager = nullptr;
 
-    for (int i = 0; i < queryCount; i++) {
-        queries[i].active = false;
-        queries[i].conditions.clear();
+    for (auto& q : queries) {
+        q.active = false;
+        q.conditions.clear();
     }
-    queryCount = 0;
+    queries.clear();
 
     initialized = false;
 }
@@ -253,7 +250,9 @@ FDB_API int __stdcall FdbQueryCreate()
 {
     EnterCriticalSection(&queryLock);
 
-    for (int i = 0; i < queryCount; i++) {
+    int count = static_cast<int>(queries.size());
+
+    for (int i = 0; i < count; i++) {
         if (!queries[i].active) {
             queries[i].active = true;
             queries[i].conditions.clear();
@@ -262,15 +261,11 @@ FDB_API int __stdcall FdbQueryCreate()
         }
     }
 
-    if (queryCount >= FDB_MAX_QUERIES) {
-        LeaveCriticalSection(&queryLock);
-        return -1;
-    }
+    FdbQuery query;
+    query.active = true;
 
-    int index = queryCount;
-    queries[index].active = true;
-    queries[index].conditions.clear();
-    queryCount++;
+    int index = count;
+    queries.push_back(std::move(query));
 
     LeaveCriticalSection(&queryLock);
     return index;
@@ -278,74 +273,74 @@ FDB_API int __stdcall FdbQueryCreate()
 
 FDB_API void __stdcall FdbQueryReset(int queryId)
 {
-    if (queryId < 0 || queryId >= queryCount || !queries[queryId].active) return;
+    if (queryId < 0 || queryId >= static_cast<int>(queries.size()) || !queries[queryId].active) return;
     queries[queryId].Reset();
 }
 
 FDB_API void __stdcall FdbQueryDestroy(int queryId)
 {
-    if (queryId < 0 || queryId >= queryCount) return;
+    if (queryId < 0 || queryId >= static_cast<int>(queries.size())) return;
     queries[queryId].conditions.clear();
     queries[queryId].active = false;
 }
 
 FDB_API void __stdcall FdbQueryWhereEquals(int queryId, const wchar_t* field, const wchar_t* value)
 {
-    if (queryId < 0 || queryId >= queryCount || !queries[queryId].active) return;
+    if (queryId < 0 || queryId >= static_cast<int>(queries.size()) || !queries[queryId].active) return;
     queries[queryId].AddStringCondition(WideToUtf8(field).c_str(), FDB_OP_EQUALS, WideToUtf8(value).c_str());
 }
 
 FDB_API void __stdcall FdbQueryWhereEqualsNumber(int queryId, const wchar_t* field, double value)
 {
-    if (queryId < 0 || queryId >= queryCount || !queries[queryId].active) return;
+    if (queryId < 0 || queryId >= static_cast<int>(queries.size()) || !queries[queryId].active) return;
     queries[queryId].AddNumberCondition(WideToUtf8(field).c_str(), FDB_OP_EQUALS, value);
 }
 
 FDB_API void __stdcall FdbQueryWhereNotEquals(int queryId, const wchar_t* field, const wchar_t* value)
 {
-    if (queryId < 0 || queryId >= queryCount || !queries[queryId].active) return;
+    if (queryId < 0 || queryId >= static_cast<int>(queries.size()) || !queries[queryId].active) return;
     queries[queryId].AddStringCondition(WideToUtf8(field).c_str(), FDB_OP_NOT_EQUALS, WideToUtf8(value).c_str());
 }
 
 FDB_API void __stdcall FdbQueryWhereNotEqualsNumber(int queryId, const wchar_t* field, double value)
 {
-    if (queryId < 0 || queryId >= queryCount || !queries[queryId].active) return;
+    if (queryId < 0 || queryId >= static_cast<int>(queries.size()) || !queries[queryId].active) return;
     queries[queryId].AddNumberCondition(WideToUtf8(field).c_str(), FDB_OP_NOT_EQUALS, value);
 }
 
 FDB_API void __stdcall FdbQueryWhereContains(int queryId, const wchar_t* field, const wchar_t* value)
 {
-    if (queryId < 0 || queryId >= queryCount || !queries[queryId].active) return;
+    if (queryId < 0 || queryId >= static_cast<int>(queries.size()) || !queries[queryId].active) return;
     queries[queryId].AddStringCondition(WideToUtf8(field).c_str(), FDB_OP_CONTAINS, WideToUtf8(value).c_str());
 }
 
 FDB_API void __stdcall FdbQueryWhereGreaterThan(int queryId, const wchar_t* field, double value)
 {
-    if (queryId < 0 || queryId >= queryCount || !queries[queryId].active) return;
+    if (queryId < 0 || queryId >= static_cast<int>(queries.size()) || !queries[queryId].active) return;
     queries[queryId].AddNumberCondition(WideToUtf8(field).c_str(), FDB_OP_GREATER_THAN, value);
 }
 
 FDB_API void __stdcall FdbQueryWhereGreaterThanOrEqual(int queryId, const wchar_t* field, double value)
 {
-    if (queryId < 0 || queryId >= queryCount || !queries[queryId].active) return;
+    if (queryId < 0 || queryId >= static_cast<int>(queries.size()) || !queries[queryId].active) return;
     queries[queryId].AddNumberCondition(WideToUtf8(field).c_str(), FDB_OP_GREATER_THAN_OR_EQUAL, value);
 }
 
 FDB_API void __stdcall FdbQueryWhereLessThan(int queryId, const wchar_t* field, double value)
 {
-    if (queryId < 0 || queryId >= queryCount || !queries[queryId].active) return;
+    if (queryId < 0 || queryId >= static_cast<int>(queries.size()) || !queries[queryId].active) return;
     queries[queryId].AddNumberCondition(WideToUtf8(field).c_str(), FDB_OP_LESS_THAN, value);
 }
 
 FDB_API void __stdcall FdbQueryWhereLessThanOrEqual(int queryId, const wchar_t* field, double value)
 {
-    if (queryId < 0 || queryId >= queryCount || !queries[queryId].active) return;
+    if (queryId < 0 || queryId >= static_cast<int>(queries.size()) || !queries[queryId].active) return;
     queries[queryId].AddNumberCondition(WideToUtf8(field).c_str(), FDB_OP_LESS_THAN_OR_EQUAL, value);
 }
 
 FDB_API int __stdcall FdbFind(int collectionId, int queryId)
 {
-    if (!initialized || queryId < 0 || queryId >= queryCount || !queries[queryId].active) return 0;
+    if (!initialized || queryId < 0 || queryId >= static_cast<int>(queries.size()) || !queries[queryId].active) return 0;
 
     findResults.clear();
     findResultsWide.clear();
