@@ -1,12 +1,6 @@
 #ifndef HORIZON_FDB_LIMITS_H
 #define HORIZON_FDB_LIMITS_H
 
-constexpr int FDB_MAX_DATABASES = 32;
-constexpr int FDB_MAX_COLLECTIONS = 256;
-constexpr int FDB_MAX_QUERIES = 64;
-constexpr int FDB_MAX_FIND_RESULTS = 65536;
-constexpr int FDB_MAX_PATH_LENGTH = 512;
-constexpr int FDB_INITIAL_DOCUMENT_CAPACITY = 1024;
 constexpr int FDB_FLUSH_BUFFER_INITIAL_SIZE = 1024 * 256;
 
 #endif
