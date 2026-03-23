@@ -3,152 +3,94 @@
 
 #include "../../libraries/Json/index.mqh"
 
-#include "structs/SSDbCondition.mqh"
+#include "SEFileDbDLL.mqh"
 
 class SEDbQuery {
 private:
-	SSDbCondition conditions[];
+	int queryHandle;
 
 public:
 	SEDbQuery() {
+		queryHandle = FdbQueryCreate();
 	}
 
-	int GetConditionCount() {
-		return ArraySize(conditions);
+	~SEDbQuery() {
+		if (queryHandle != -1) {
+			FdbQueryDestroy(queryHandle);
+		}
 	}
 
-	bool Matches(JSON::Object *document) {
-		if (document == NULL) {
-			return false;
-		}
-
-		int size = ArraySize(conditions);
-		for (int i = 0; i < size; i++) {
-			if (!evaluateCondition(document, conditions[i])) {
-				return false;
-			}
-		}
-
-		return true;
+	int GetHandle() {
+		return queryHandle;
 	}
 
 	void Reset() {
-		ArrayResize(conditions, 0);
+		if (queryHandle != -1) {
+			FdbQueryReset(queryHandle);
+		}
 	}
 
 	SEDbQuery *WhereContains(string field, string value) {
-		return addCondition(field, SE_DB_OP_CONTAINS, value);
+		if (queryHandle != -1) {
+			FdbQueryWhereContains(queryHandle, field, value);
+		}
+		return &this;
 	}
 
 	SEDbQuery *WhereEquals(string field, string value) {
-		return addCondition(field, SE_DB_OP_EQUALS, value);
+		if (queryHandle != -1) {
+			FdbQueryWhereEquals(queryHandle, field, value);
+		}
+		return &this;
 	}
 
 	SEDbQuery *WhereEquals(string field, double value) {
-		return addCondition(field, SE_DB_OP_EQUALS, value);
+		if (queryHandle != -1) {
+			FdbQueryWhereEqualsNumber(queryHandle, field, value);
+		}
+		return &this;
 	}
 
 	SEDbQuery *WhereGreaterThan(string field, double value) {
-		return addCondition(field, SE_DB_OP_GREATER_THAN, value);
+		if (queryHandle != -1) {
+			FdbQueryWhereGreaterThan(queryHandle, field, value);
+		}
+		return &this;
 	}
 
 	SEDbQuery *WhereGreaterThanOrEqual(string field, double value) {
-		return addCondition(field, SE_DB_OP_GREATER_THAN_OR_EQUAL, value);
+		if (queryHandle != -1) {
+			FdbQueryWhereGreaterThanOrEqual(queryHandle, field, value);
+		}
+		return &this;
 	}
 
 	SEDbQuery *WhereLessThan(string field, double value) {
-		return addCondition(field, SE_DB_OP_LESS_THAN, value);
+		if (queryHandle != -1) {
+			FdbQueryWhereLessThan(queryHandle, field, value);
+		}
+		return &this;
 	}
 
 	SEDbQuery *WhereLessThanOrEqual(string field, double value) {
-		return addCondition(field, SE_DB_OP_LESS_THAN_OR_EQUAL, value);
+		if (queryHandle != -1) {
+			FdbQueryWhereLessThanOrEqual(queryHandle, field, value);
+		}
+		return &this;
 	}
 
 	SEDbQuery *WhereNotEquals(string field, string value) {
-		return addCondition(field, SE_DB_OP_NOT_EQUALS, value);
+		if (queryHandle != -1) {
+			FdbQueryWhereNotEquals(queryHandle, field, value);
+		}
+		return &this;
 	}
 
 	SEDbQuery *WhereNotEquals(string field, double value) {
-		return addCondition(field, SE_DB_OP_NOT_EQUALS, value);
-	}
-
-private:
-	SEDbQuery *addCondition(string field, ENUM_SE_DB_OPERATOR op, string value) {
-		int size = ArraySize(conditions);
-
-		ArrayResize(conditions, size + 1);
-		conditions[size].field = field;
-		conditions[size].op = op;
-		conditions[size].stringValue = value;
-		conditions[size].numberValue = 0;
-		conditions[size].useStringValue = true;
-
+		if (queryHandle != -1) {
+			FdbQueryWhereNotEqualsNumber(queryHandle, field, value);
+		}
 		return &this;
-	}
-
-	SEDbQuery *addCondition(string field, ENUM_SE_DB_OPERATOR op, double value) {
-		int size = ArraySize(conditions);
-
-		ArrayResize(conditions, size + 1);
-		conditions[size].field = field;
-		conditions[size].op = op;
-		conditions[size].stringValue = "";
-		conditions[size].numberValue = value;
-		conditions[size].useStringValue = false;
-
-		return &this;
-	}
-
-	bool evaluateCondition(JSON::Object *document, const SSDbCondition &condition) {
-		if (!document.hasValue(condition.field)) {
-			return false;
-		}
-
-		if (condition.useStringValue) {
-			string documentValue = document.getString(condition.field);
-
-			if (condition.op == SE_DB_OP_EQUALS) {
-				return documentValue == condition.stringValue;
-			}
-
-			if (condition.op == SE_DB_OP_NOT_EQUALS) {
-				return documentValue != condition.stringValue;
-			}
-
-			if (condition.op == SE_DB_OP_CONTAINS) {
-				return StringFind(documentValue, condition.stringValue) != -1;
-			}
-
-			return false;
-		}
-
-		double documentValue = document.getNumber(condition.field);
-
-		if (condition.op == SE_DB_OP_EQUALS) {
-			return documentValue == condition.numberValue;
-		}
-
-		if (condition.op == SE_DB_OP_NOT_EQUALS) {
-			return documentValue != condition.numberValue;
-		}
-
-		if (condition.op == SE_DB_OP_GREATER_THAN) {
-			return documentValue > condition.numberValue;
-		}
-
-		if (condition.op == SE_DB_OP_LESS_THAN) {
-			return documentValue < condition.numberValue;
-		}
-
-		if (condition.op == SE_DB_OP_GREATER_THAN_OR_EQUAL) {
-			return documentValue >= condition.numberValue;
-		}
-
-		if (condition.op == SE_DB_OP_LESS_THAN_OR_EQUAL) {
-			return documentValue <= condition.numberValue;
-		}
-
-		return false;
 	}
 };
 

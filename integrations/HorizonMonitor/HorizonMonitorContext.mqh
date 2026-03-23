@@ -78,7 +78,7 @@ public:
 		accountUuid = uuid;
 	}
 
-	SRequestResponse Post(string path, JSON::Object &body, int timeout = 0, bool async = true) {
+	SRequestResponse Post(string path, JSON::Object &body, bool async = true) {
 		if (async && SEMessageBus::IsActive()) {
 			JSON::Object payload;
 			payload.setProperty("path", path);
@@ -93,7 +93,7 @@ public:
 			return emptyResponse;
 		}
 
-		return request.Post(path, body, timeout);
+		return request.Post(path, body);
 	}
 
 	SRequestResponse Get(string path) {

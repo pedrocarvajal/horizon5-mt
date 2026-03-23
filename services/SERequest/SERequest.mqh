@@ -82,43 +82,40 @@ private:
 	}
 
 public:
-	SERequest(const string url, int maxTimeout = 5000) {
+	SERequest(const string url) {
 		baseUrl = url;
 		defaultHeaders = "";
-		timeout = maxTimeout;
+		timeout = 60000;
 		logger.SetPrefix("SERequest");
 	}
 
-	SRequestResponse Get(const string path, int customTimeout = 0, int slowThreshold = 1000) {
+	SRequestResponse Get(const string path, int slowThreshold = 1000) {
 		string url = buildUrl(path);
 		char data[];
 		ArrayResize(data, 0);
-		int effectiveTimeout = (customTimeout > 0) ? customTimeout : timeout;
 
-		return execute("GET", url, data, effectiveTimeout, "", slowThreshold);
+		return execute("GET", url, data, timeout, "", slowThreshold);
 	}
 
-	SRequestResponse Post(const string path, JSON::Object &body, int customTimeout = 0, const string extraHeaders = "", int slowThreshold = 1000) {
+	SRequestResponse Post(const string path, JSON::Object &body, const string extraHeaders = "", int slowThreshold = 1000) {
 		string url = buildUrl(path);
 		string bodyString = body.toString();
-		int effectiveTimeout = (customTimeout > 0) ? customTimeout : timeout;
 		string headers = (extraHeaders != "") ? defaultHeaders + extraHeaders : "";
 
 		char data[];
 		StringToCharArray(bodyString, data, 0, StringLen(bodyString), CP_UTF8);
 
-		return execute("POST", url, data, effectiveTimeout, headers, slowThreshold);
+		return execute("POST", url, data, timeout, headers, slowThreshold);
 	}
 
-	SRequestResponse Patch(const string path, JSON::Object &body, int customTimeout = 0, int slowThreshold = 1000) {
+	SRequestResponse Patch(const string path, JSON::Object &body, int slowThreshold = 1000) {
 		string url = buildUrl(path);
 		string bodyString = body.toString();
-		int effectiveTimeout = (customTimeout > 0) ? customTimeout : timeout;
 
 		char data[];
 		StringToCharArray(bodyString, data, 0, StringLen(bodyString), CP_UTF8);
 
-		return execute("PATCH", url, data, effectiveTimeout, "", slowThreshold);
+		return execute("PATCH", url, data, timeout, "", slowThreshold);
 	}
 
 	SRequestResponse PostMultipart(const string path, const string fieldName, const string fileName, char &fileData[], const string contentType = "text/csv") {

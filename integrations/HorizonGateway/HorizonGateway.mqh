@@ -168,7 +168,7 @@ private:
 		loginBody.setProperty("email", email);
 		loginBody.setProperty("password", password);
 
-		SRequestResponse response = authRequest.Post("api/v1/auth/login", loginBody, 10000);
+		SRequestResponse response = authRequest.Post("api/v1/auth/login", loginBody);
 
 		if (response.status != 200) {
 			logger.Error(StringFormat("Authentication failed with status %d", response.status));
@@ -257,7 +257,7 @@ public:
 		body.setProperty("broker_name", account.GetBrokerName());
 		body.setProperty("currency", account.GetCurrency());
 
-		SRequestResponse response = context.Post("api/v1/account", body, 10000);
+		SRequestResponse response = context.Post("api/v1/account", body);
 
 		if (response.status != 200 && response.status != 201) {
 			logger.Error(StringFormat("Account upsert failed with status %d", response.status));
@@ -284,7 +284,7 @@ public:
 		body.setProperty("name", symbolName);
 		body.setProperty("symbol", symbolName);
 
-		context.Post("api/v1/asset", body, 10000);
+		context.Post("api/v1/asset", body);
 
 		registerAsset(symbolName, assetUuid);
 		logger.Info(StringFormat("Asset registered | %s | uuid: %s", symbolName, assetUuid));
@@ -308,7 +308,7 @@ public:
 		body.setProperty("name", strategyName);
 		body.setProperty("magic_number", (long)magicNumber);
 
-		context.Post("api/v1/strategy", body, 10000);
+		context.Post("api/v1/strategy", body);
 
 		registerStrategy(magicNumber, strategyUuid);
 		logger.Info(StringFormat("Strategy registered | %s | magic: %llu | uuid: %s", strategyName, magicNumber, strategyUuid));

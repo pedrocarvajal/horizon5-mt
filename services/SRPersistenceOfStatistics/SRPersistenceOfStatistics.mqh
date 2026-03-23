@@ -184,6 +184,7 @@ public:
 		bool result;
 
 		if (existing != NULL) {
+			delete existing;
 			result = statisticsCollection.UpdateOne("_id", "state", json);
 		} else {
 			result = statisticsCollection.InsertOne(json);
@@ -214,6 +215,7 @@ public:
 		}
 
 		bool result = deserialize(document, stats);
+		delete document;
 
 		if (result) {
 			logger.Debug("Statistics restored from database");

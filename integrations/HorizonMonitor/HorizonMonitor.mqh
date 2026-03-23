@@ -71,7 +71,7 @@ private:
 		loginBody.setProperty("email", email);
 		loginBody.setProperty("password", password);
 
-		SRequestResponse response = authRequest.Post("api/v1/auth/login", loginBody, 10000);
+		SRequestResponse response = authRequest.Post("api/v1/auth/login", loginBody);
 
 		if (response.status != 200) {
 			logger.Error(StringFormat("Authentication failed with status %d", response.status));

@@ -21,9 +21,10 @@ private:
 		stateDocument = stateCollection.FindOne("_id", "state");
 
 		if (stateDocument == NULL) {
-			stateDocument = new JSON::Object();
-			stateDocument.setProperty("_id", "state");
-			stateCollection.InsertOne(stateDocument);
+			JSON::Object *seed = new JSON::Object();
+			seed.setProperty("_id", "state");
+			stateCollection.InsertOne(seed);
+			delete seed;
 			stateDocument = stateCollection.FindOne("_id", "state");
 		}
 	}
@@ -34,6 +35,9 @@ private:
 		}
 
 		stateCollection.UpdateOne("_id", "state", stateDocument);
+
+		delete stateDocument;
+		stateDocument = stateCollection.FindOne("_id", "state");
 	}
 
 public:
@@ -56,6 +60,10 @@ public:
 
 		if (stateCollection == NULL) {
 			return false;
+		}
+
+		if (stateDocument != NULL) {
+			delete stateDocument;
 		}
 
 		stateDocument = stateCollection.FindOne("_id", "state");
