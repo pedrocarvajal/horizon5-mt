@@ -123,11 +123,11 @@ For a detailed breakdown, see [Project Structure](docs/getting-started/project-s
 
 ## Ecosystem
 
-| Project                                                                   | Description                                                   |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| **Horizon EA** (this repo)                                                | MetaTrader 5 Expert Advisor                                   |
-| [**Horizon API**](https://github.com/pedrocarvajal/horizon5-mt-api)       | Django REST API for persistence, events, and order management |
-| [**Horizon War Room**](https://github.com/pedrocarvajal/horizon5-warroom) | Grafana-based monitoring dashboard                            |
+| Project                    | Description                                                          | Status  |
+| -------------------------- | -------------------------------------------------------------------- | ------- |
+| **Horizon EA** (this repo) | MetaTrader 5 Expert Advisor                                          | Public  |
+| **Horizon Gateway**        | Laravel REST API for account/strategy management and event streaming | Private |
+| **Horizon Monitor**        | Laravel REST API for trade monitoring, snapshots, and EA heartbeats  | Private |
 
 ## Project Status
 
