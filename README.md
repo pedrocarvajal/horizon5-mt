@@ -1,391 +1,148 @@
-# Horizon Portfolio Framework
+# Horizon5
 
-## Table of Contents
+![MQL5](https://img.shields.io/badge/MQL5-MetaTrader%205-blue.svg)
+![Platform](https://img.shields.io/badge/platform-windows-lightgrey.svg)
+![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-orange.svg)
 
-1. [Overview](#overview)
-2. [Architecture](#architecture)
-3. [Creating Assets](#creating-assets)
-4. [Creating Strategies](#creating-strategies)
-5. [Reporting System](#reporting-system)
-6. [Tips for Large Portfolios](#tips-for-large-portfolios)
-7. [Viewing Backtest Reports](#viewing-backtest-reports)
-
----
+A portfolio-based algorithmic trading framework for MetaTrader 5. Build, backtest, and deploy multiple trading strategies across different assets with event-driven architecture, risk-adjusted position sizing, and optional remote integrations.
 
 ## Overview
 
-Horizon is an algorithmic trading framework for MetaTrader 5 that enables multi-asset portfolio management with a single broker connection. The framework provides:
+Horizon5 uses a hierarchical portfolio pattern where the Expert Advisor manages multiple assets, each containing independent strategies that generate signals and manage orders. Capital is allocated equally across enabled assets, then split equally among each asset's active strategies.
 
-- **Multi-asset support**: Trade multiple symbols (XAUUSD, EURUSD, etc.) simultaneously
-- **Strategy modularity**: Each asset can have multiple independent strategies
-- **Unified order management**: Centralized order tracking, persistence, and lifecycle management
-- **Built-in statistics**: Automatic calculation of performance metrics (Sharpe ratio, drawdown, R-squared, win rate)
-- **Quality scoring**: Configurable optimization criteria for backtesting
-- **Event-driven architecture**: Lifecycle hooks for tick, minute, hour, day, week, and month events
+```text
+Horizon.mq5 --> SEAsset[] --> SEStrategy[] --> EOrder[]
+```
 
----
+## Key Features
+
+- **Multi-asset portfolio** -- Trade Gold, Bitcoin, SP500, Nikkei225 (or add your own) from a single EA
+- **Event-driven architecture** -- Timer-based system with day, hour, and minute transitions propagated down the hierarchy
+- **Risk-adjusted position sizing** -- ATR-based dynamic stops with configurable equity-at-risk percentage
+- **Order state machine** -- Full lifecycle (PENDING, OPEN, CLOSING, CLOSED) with JSON persistence for live trading recovery
+- **Performance tracking** -- NAV, drawdown, quality metrics per strategy
+- **Message bus IPC** -- DLL-based inter-process communication between the EA and companion services
+- **Remote integrations** -- Optional Gateway (remote order management) and Monitor (observability) via Horizon API
+- **Persistence service** -- Async file writer for order and state recovery across EA restarts
+
+## Quick Start
+
+1. Clone into your MetaTrader 5 Experts folder:
+
+```bash
+git clone <repo-url> /path/to/MetaTrader5/MQL5/Experts/Horizon5/
+```
+
+2. Open `Horizon.mq5` in MetaEditor and compile
+3. Attach the Expert Advisor to any chart
+4. Enable strategies via the input parameters panel
+
+For companion services setup and full configuration, see [Installation Guide](docs/getting-started/installation.md).
 
 ## Architecture
 
-```
-Horizon.mq5 (Entry Point)
-    |
-    +-- Assets[]
-    |       |
-    |       +-- XAUUSD (IAsset)
-    |       |       +-- Strategy1 (IStrategy)
-    |       |       +-- Strategy2 (IStrategy)
-    |       |
-    |       +-- EURUSD (IAsset)
-    |               +-- Strategy3 (IStrategy)
-    |
-    +-- Orders[] (Global order tracking)
-    |
-    +-- Services
-            +-- Statistics (Per-strategy metrics)
-            +-- ReportOfOrderHistory (JSON export)
-            +-- OrderPersistence (Live trading recovery)
-```
-
-### Core Components
-
-| Component              | Location                            | Purpose                           |
-| ---------------------- | ----------------------------------- | --------------------------------- |
-| `IAsset`               | `interfaces/Asset.mqh`              | Base class for tradeable symbols  |
-| `IStrategy`            | `interfaces/Strategy.mqh`           | Base class for trading strategies |
-| `Order`                | `services/Order.mqh`                | Order lifecycle management        |
-| `Statistics`           | `services/Statistics.mqh`           | Performance metrics calculation   |
-| `ReportOfOrderHistory` | `services/ReportOfOrderHistory.mqh` | JSON report generation            |
-
-### Event Flow
-
-```
-OnTimer() -> onStartDay() -> onStartHour() -> onStartMinute() -> onTick()
+```text
++------------------+      +---------------------+
+|   Horizon.mq5    |      | HorizonPersistence  |
+|   (Expert Advisor) <---->  (Service .mq5)     |
+|                  |  MB  |  Async file writer   |
+|  Assets[]        |      +---------------------+
+|   Strategies[]   |
+|    Orders[]      |      +---------------------+
+|                  | MB   | HorizonGateway       |
+|  Event loop      <-----> (Service .mq5)       |
+|  Risk management |      |  Remote order sync   |
+|  Statistics      |      +---------------------+
+|                  |
+|                  |      +---------------------+
+|                  | MB   | HorizonMonitor       |
+|                  <-----> (Service .mq5)       |
++------------------+      |  Monitoring push     |
+                          +---------------------+
+       MB = MessageBus (DLL-based IPC)
 ```
 
-Each event propagates to all assets and their strategies sequentially.
+The EA runs as the main process. Three companion services run as separate `.mq5` service scripts, communicating through a shared message bus:
 
----
+| Service     | File                     | Required     | Purpose                                                 |
+| ----------- | ------------------------ | ------------ | ------------------------------------------------------- |
+| Persistence | `HorizonPersistence.mq5` | Live trading | Async file writer for order/state recovery              |
+| Gateway     | `HorizonGateway.mq5`     | Optional     | Event bridge to Horizon API for remote order management |
+| Monitor     | `HorizonMonitor.mq5`     | Optional     | Pushes account/strategy data to monitoring dashboard    |
 
-## Creating Assets
+Gateway and Monitor require a running [Horizon API](https://github.com/pedrocarvajal/horizon5-mt-api) instance. If you don't use the Horizon API, leave these services disabled.
 
-Assets represent tradeable symbols. Create a new file in `assets/` directory.
+For details on the service architecture and message bus, see [Service Architecture](docs/explanation/service-architecture.md).
 
-### Step 1: Create the Asset File
+## Project Structure
 
-**File:** `assets/EURUSD.mqh`
-
-```cpp
-#ifndef __ASSET_EURUSD_MQH__
-#define __ASSET_EURUSD_MQH__
-
-#include "../interfaces/Asset.mqh"
-#include "../strategies/MyStrategy/MyStrategy.mqh"
-
-class EURUSD:
-public IAsset {
-public:
-    EURUSD() {
-        SetName("eurusd");
-        SetSymbol("EURUSD");
-        SetupStrategies();
-    }
-
-    void SetupStrategies() {
-        SetNewStrategy(new MyStrategy(symbol));
-    }
-};
-
-#endif
+```text
+horizon5-portfolio/
++-- Horizon.mq5                     Main Expert Advisor
++-- HorizonGateway.mq5              Gateway service (optional)
++-- HorizonMonitor.mq5              Monitor service (optional)
++-- HorizonPersistence.mq5          Persistence service (live trading)
++-- adapters/                       Trade execution adapter (CTrade wrapper)
++-- assets/                         Asset definitions by class
+|   +-- Commodities/Gold.mqh        Gold (XAUUSD) - 10 strategies
+|   +-- Crypto/Bitcoin.mqh          Bitcoin (BTCUSD)
+|   +-- Indices/SP500.mqh           S&P 500 (US500) - 10 strategies
+|   +-- Indices/Nikkei225.mqh       Nikkei 225 - 10 strategies
++-- configs/                        Asset registry
++-- constants/                      Time constants
++-- entities/                       Domain entities (Account, Asset, Order)
++-- enums/                          Enumerations (statuses, debug levels)
++-- helpers/                        Utility functions (UUID, pip calc, market status)
++-- indicators/                     Market data functions (CopyXxx-based)
++-- integrations/                   External API integrations
+|   +-- HorizonGateway/             Remote order management
+|   +-- HorizonMonitor/             Monitoring data push
++-- interfaces/                     Abstract contracts (IAsset, IStrategy)
++-- libraries/                      External MQL5 libraries
++-- services/                       Business logic (20 services)
++-- strategies/                     Strategy implementations
+|   +-- Strategy.mqh                SEStrategy base class
+|   +-- Commodities/Gold/           Australian city names (Ballarat, Bendigo, ...)
+|   +-- Indices/Nikkei225/          Japanese city names (Kyoto, Osaka, ...)
+|   +-- Indices/SP500/              American city names (Austin, Denver, ...)
+|   +-- Generic/                    Gateway and Test strategies
++-- structs/                        Data structures
++-- docs/                           Documentation
 ```
 
-### Step 2: Register in Horizon.mq5
+For a detailed breakdown, see [Project Structure](docs/getting-started/project-structure.md).
 
-```cpp
-#include "assets/XAUUSD.mqh"
-#include "assets/EURUSD.mqh"
+## Documentation
 
-IAsset *xauusd = new XAUUSD();
-IAsset *eurusd = new EURUSD();
+| Section                                  | Description                                            |
+| ---------------------------------------- | ------------------------------------------------------ |
+| [Getting Started](docs/getting-started/) | Installation, project structure, first strategy        |
+| [How-To Guides](docs/how-to/)            | Add strategies, configure risk, go live                |
+| [Reference](docs/reference/)             | Configuration, services, events, naming conventions    |
+| [Explanation](docs/explanation/)         | Architecture decisions, order lifecycle, observability |
 
-IAsset *assets[] = {
-    xauusd,
-    eurusd
-};
-```
+## Ecosystem
 
----
+| Project                                                                   | Description                                                   |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Horizon EA** (this repo)                                                | MetaTrader 5 Expert Advisor                                   |
+| [**Horizon API**](https://github.com/pedrocarvajal/horizon5-mt-api)       | Django REST API for persistence, events, and order management |
+| [**Horizon War Room**](https://github.com/pedrocarvajal/horizon5-warroom) | Grafana-based monitoring dashboard                            |
 
-## Creating Strategies
+## Project Status
 
-Strategies contain trading logic. Create a directory in `strategies/` with your strategy name.
+This project is currently in **unstable pre-release** (version `0.x`). The API, architecture, and conventions may change without notice. Version `1.0` will mark the first stable release.
 
-### Step 1: Create Strategy File
+## About
 
-**File:** `strategies/MyStrategy/MyStrategy.mqh`
+Horizon5 is the codebase behind a personal live trading portfolio. I built it for my own use and I maintain it as long as I'm actively trading with it. Strategies are not published as they are proprietary intellectual property.
 
-```cpp
-#ifndef __STRATEGY_MY_STRATEGY_MQH__
-#define __STRATEGY_MY_STRATEGY_MQH__
+If you're interested in collaborating, building on this framework, or need support, feel free to reach out through my [GitHub profile](https://github.com/pedrocarvajal).
 
-#include "../../interfaces/Strategy.mqh"
-#include "../../structs/SQualityThresholds.mqh"
+## Disclaimer
 
-input group "MyStrategy Settings";
-input double my_take_profit = 500; // Take Profit (points)
-input double my_stop_loss = 250;   // Stop Loss (points)
-
-class MyStrategy:
-public IStrategy {
-public:
-    MyStrategy(string strategy_symbol) {
-        symbol = strategy_symbol;
-        name = "MyStrategy";
-        prefix = "MST";  // Unique 3-letter prefix
-    }
-
-private:
-    int onInit() {
-        IStrategy::onInit();
-        setupQualityThresholds();
-        return INIT_SUCCEEDED;
-    }
-
-    void onStartDay() {
-        IStrategy::onStartDay();
-        // Your daily trading logic here
-        executeTradeLogic();
-    }
-
-    void executeTradeLogic() {
-        double lot_size = getLotSize();
-        if (lot_size <= 0) return;
-
-        double price = SymbolInfoDouble(symbol, SYMBOL_ASK);
-        double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-
-        Order *order = openNewOrder(
-            1,                  // layer
-            ORDER_TYPE_BUY,     // side
-            price,              // entry price
-            lot_size,           // volume
-            true                // is_market_order
-        );
-
-        if (order == NULL) return;
-
-        order.take_profit = price + (my_take_profit * point);
-        order.stop_loss = price - (my_stop_loss * point);
-
-        ArrayResize(orders, ArraySize(orders) + 1);
-        orders[ArraySize(orders) - 1] = order;
-    }
-
-    void setupQualityThresholds() {
-        SQualityThresholds thresholds;
-        thresholds.optimization_formula = OPTIMIZATION_BY_PERFORMANCE;
-        thresholds.expected_total_return_pct_by_month = 0.01;
-        thresholds.expected_max_drawdown_pct = 0.01;
-        thresholds.min_total_return_pct = 0.0;
-        thresholds.max_max_drawdown_pct = 0.30;
-        thresholds.min_trades = 5;
-        setQualityThresholds(thresholds);
-    }
-};
-
-#endif
-```
-
-### Strategy Lifecycle Hooks
-
-| Hook              | Trigger            | Use Case                     |
-| ----------------- | ------------------ | ---------------------------- |
-| `onInit()`        | EA initialization  | Setup indicators, thresholds |
-| `onTick()`        | Every price tick   | Real-time signal detection   |
-| `onStartMinute()` | New minute candle  | Minute-based logic           |
-| `onStartHour()`   | New hour candle    | Hourly rebalancing           |
-| `onStartDay()`    | New trading day    | Daily signals                |
-| `onStartWeek()`   | Monday             | Weekly analysis              |
-| `onStartMonth()`  | First day of month | Monthly rebalancing          |
-| `onOpenOrder()`   | Order executed     | Post-trade actions           |
-| `onCloseOrder()`  | Order closed       | Performance tracking         |
-
----
-
-## Reporting System
-
-The framework generates automatic reports through two services:
-
-### Statistics Service
-
-Tracks per-strategy metrics in real-time:
-
-- **NAV (Net Asset Value)**: Equity curve tracking
-- **Drawdown**: Maximum drawdown in dollars and percentage
-- **Win Rate**: Winning trades / Total trades
-- **Risk/Reward Ratio**: Average win / Maximum loss
-- **R-Squared**: Equity curve linearity (0-1)
-- **Sharpe Ratio**: Risk-adjusted returns
-- **Recovery Factor**: Total profit / Maximum drawdown
-
-### ReportOfOrderHistory Service
-
-Exports all closed orders to JSON format with:
-
-- Order ID, strategy name, magic number
-- Entry/exit prices and times
-- Profit in dollars
-- Take profit and stop loss levels
-- Close reason (TP, SL, Expert, Manual)
-
-### Quality Scoring
-
-The `OnTester()` function returns a quality score (0-1) based on configured thresholds:
-
-```cpp
-thresholds.optimization_formula = OPTIMIZATION_BY_PERFORMANCE;  // Or:
-// OPTIMIZATION_BY_DRAWDOWN
-// OPTIMIZATION_BY_RISK_REWARD
-// OPTIMIZATION_BY_WIN_RATE
-// OPTIMIZATION_BY_R_SQUARED
-// OPTIMIZATION_BY_RECOVERY_FACTOR
-```
-
----
-
-## Tips for Large Portfolios
-
-### 1. Use Unique Prefixes
-
-Each strategy must have a unique 3-letter `prefix` for order identification:
-
-```cpp
-prefix = "DHB";  // DailyHighBreakout
-prefix = "TST";  // Test
-prefix = "MOM";  // Momentum
-```
-
-### 2. Organize by Asset
-
-```
-strategies/
-    XAUUSD/
-        Breakout/Breakout.mqh
-        MeanReversion/MeanReversion.mqh
-    EURUSD/
-        TrendFollowing/TrendFollowing.mqh
-```
-
-### 3. Isolate Strategy Helpers
-
-Keep strategy-specific helpers within the strategy folder:
-
-```
-strategies/MyStrategy/
-    MyStrategy.mqh
-    helpers/
-        calculateSignal.mqh
-        validateEntry.mqh
-```
-
-### 4. Risk Management
-
-Configure equity at risk per portfolio, not per strategy:
-
-```cpp
-input double equity_at_risk = 1;  // Total lots for entire portfolio
-input bool equity_at_risk_multiply_by_strategy = false;
-```
-
-### 5. Layer System
-
-Use layers (0-5) to categorize order types:
-
-- Layer 0: Primary entries
-- Layer 1-5: Recovery or scaling positions
-
-The framework tracks layer distribution quality automatically.
-
----
-
-## Viewing Backtest Reports
-
-### Report Location
-
-Reports are saved to the MetaTrader 5 Files directory:
-
-```
-[MT5 Data Folder]/MQL5/Files/Reports/[SYMBOL]/[TIMESTAMP]/
-```
-
-**Full path example:**
-
-```
-C:\Users\[User]\AppData\Roaming\MetaQuotes\Terminal\[ID]\MQL5\Files\Reports\XAUUSD\20241222_143052\
-```
-
-### Finding the Path
-
-The path is logged at the end of each backtest:
-
-```
-Order history reports saved to: C:\...\Files\Reports\XAUUSD\20241222_143052
-```
-
-### Report Files
-
-| File                | Content                             |
-| ------------------- | ----------------------------------- |
-| `OrdersReport.json` | All closed orders with full details |
-
-### JSON Structure
-
-```json
-{
-  "name": "Orders Report",
-  "data": [
-    {
-      "order_id": "TST_1_abc123",
-      "strategy_name": "Test",
-      "strategy_prefix": "TST",
-      "side": 0,
-      "layer": 1,
-      "open_time": 1703260800,
-      "open_price": 2050.5,
-      "close_time": 1703264400,
-      "close_price": 2055.0,
-      "profit_in_dollars": 450.0,
-      "main_take_profit_at_price": 2055.0,
-      "main_stop_loss_at_price": 2045.0
-    }
-  ]
-}
-```
-
-### Accessing Reports Programmatically
-
-```cpp
-ReportOfOrderHistory *reporter = new ReportOfOrderHistory("/Reports/Custom", true);
-reporter.PrintCurrentPath();  // Logs full filesystem path
-reporter.ExportOrderHistoryToJsonFile();
-```
-
----
-
-## Source Files Reference
-
-| Category    | Files                                                                                |
-| ----------- | ------------------------------------------------------------------------------------ |
-| Entry Point | `Horizon.mq5`                                                                        |
-| Interfaces  | `interfaces/Asset.mqh`, `interfaces/Strategy.mqh`                                    |
-| Services    | `services/Order.mqh`, `services/Statistics.mqh`, `services/ReportOfOrderHistory.mqh` |
-| Assets      | `assets/XAUUSD.mqh`                                                                  |
-| Strategies  | `strategies/Test/Test.mqh`                                                           |
-| Enums       | `enums/EOrderStatuses.mqh`, `enums/EOptimizationResultFormula.mqh`                   |
-| Structs     | `structs/SQualityThresholds.mqh`, `structs/SOrderHistory.mqh`                        |
-
----
+This software is provided for educational and research purposes. Algorithmic trading involves substantial risk of financial loss. Past performance does not guarantee future results. The authors are not responsible for any trading losses incurred through the use of this software. Always test thoroughly in a demo environment before deploying to live markets.
 
 ## License
 
-MIT License - See LICENSE file for details.
+This project is licensed under the PolyForm Noncommercial License. See [LICENSE.md](LICENSE.md) for details.
