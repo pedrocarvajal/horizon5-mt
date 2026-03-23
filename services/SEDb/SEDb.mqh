@@ -19,8 +19,8 @@ public:
 	}
 
 	void Initialize(string databasePath, bool commonFiles = false) {
-		EAccount account;
-		long accountNumber = account.GetNumber();
+		EAccount localAccount;
+		long accountNumber = localAccount.GetNumber();
 		basePath = StringFormat("%lld/%s", accountNumber, databasePath);
 		useCommonFiles = commonFiles;
 		isInitialized = true;

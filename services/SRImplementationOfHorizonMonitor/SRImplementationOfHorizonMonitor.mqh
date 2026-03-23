@@ -63,28 +63,28 @@ public:
 		monitor.UpsertOrder(order);
 	}
 
-	void StoreHeartbeat(ulong magicNumber, ENUM_HEARTBEAT_EVENT event, string systemName = "strategy") {
-		monitor.StoreHeartbeat(magicNumber, event, systemName);
+	void StoreHeartbeat(ulong magicNumber, string systemName = "horizon5") {
+		monitor.StoreHeartbeat(magicNumber, systemName);
 	}
 
-	void StoreSystemHeartbeat(ENUM_HEARTBEAT_EVENT event) {
-		monitor.StoreSystemHeartbeat(event);
+	void StoreSystemHeartbeat(string systemName) {
+		monitor.StoreSystemHeartbeat(systemName);
 	}
 
 	void StoreLog(string system, string level, string message, ulong magicNumber = 0) {
 		monitor.StoreLog(system, level, message, magicNumber);
 	}
 
-	void StoreAccountSnapshot(double floatingPnl, double realizedPnl) {
-		monitor.StoreAccountSnapshot(floatingPnl, realizedPnl);
+	void StoreAccountSnapshot(double floatingPnl, double realizedPnl, string event) {
+		monitor.StoreAccountSnapshot(floatingPnl, realizedPnl, event);
 	}
 
-	void StoreStrategySnapshot(ulong magicNumber, double balance, double equity, double floatingPnl, double realizedPnl) {
-		monitor.StoreStrategySnapshot(magicNumber, balance, equity, floatingPnl, realizedPnl);
+	void StoreStrategySnapshot(ulong magicNumber, double balance, double equity, double floatingPnl, double realizedPnl, string event) {
+		monitor.StoreStrategySnapshot(magicNumber, balance, equity, floatingPnl, realizedPnl, event);
 	}
 
-	void StoreAssetSnapshot(string assetUuid, double balance, double equity, double floatingPnl, double realizedPnl, double bid, double ask, double usdRate) {
-		monitor.StoreAssetSnapshot(assetUuid, balance, equity, floatingPnl, realizedPnl, bid, ask, usdRate);
+	void StoreAssetSnapshot(string assetUuid, double balance, double equity, double floatingPnl, double realizedPnl, double bid, double ask, double usdRate, string event) {
+		monitor.StoreAssetSnapshot(assetUuid, balance, equity, floatingPnl, realizedPnl, bid, ask, usdRate, event);
 	}
 
 	void PostDirect(string path, JSON::Object &body) {
@@ -95,7 +95,7 @@ public:
 		return GetPointer(monitor);
 	}
 
-	void SyncAccount(SEAsset *&registeredAssets[], int assetCount) {
+	void SyncAccount(SEAsset *&registeredAssets[], int assetCount, string event) {
 		monitor.UpsertAccount();
 		monitor.UpsertAccountMetadata();
 
@@ -104,14 +104,14 @@ public:
 
 		for (int i = 0; i < assetCount; i++) {
 			registeredAssets[i].RegisterEntities();
-			registeredAssets[i].SyncToMonitor();
+			registeredAssets[i].SyncToMonitor(event);
 			registeredAssets[i].AggregateSnapshotData(
 				totalFloatingPnl,
 				totalRealizedPnl
 			);
 		}
 
-		monitor.StoreAccountSnapshot(totalFloatingPnl, totalRealizedPnl);
+		monitor.StoreAccountSnapshot(totalFloatingPnl, totalRealizedPnl, event);
 	}
 };
 

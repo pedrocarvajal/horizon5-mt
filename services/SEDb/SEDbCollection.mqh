@@ -96,21 +96,8 @@ public:
 	}
 
 	bool Flush() {
-		JSON::Array *array = new JSON::Array();
 		int size = ArraySize(documents);
-
-		for (int i = 0; i < size; i++) {
-			if (documents[i] == NULL) {
-				continue;
-			}
-
-			string objectJson = documents[i].toString();
-			JSON::Object *copy = new JSON::Object(objectJson);
-			array.add(copy);
-		}
-
-		string jsonData = array.toString();
-		delete array;
+		string jsonData = buildJsonString(size);
 
 		if (SEMessageBus::IsActive()) {
 			JSON::Object payload;
@@ -270,6 +257,27 @@ public:
 	}
 
 private:
+	string buildJsonString(int size) {
+		string jsonData = "[";
+		bool first = true;
+
+		for (int i = 0; i < size; i++) {
+			if (documents[i] == NULL) {
+				continue;
+			}
+
+			if (!first) {
+				jsonData += ",";
+			}
+
+			jsonData += documents[i].toString();
+			first = false;
+		}
+
+		jsonData += "]";
+		return jsonData;
+	}
+
 	string generateId() {
 		return GenerateUuid();
 	}

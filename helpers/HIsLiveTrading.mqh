@@ -4,10 +4,10 @@
 #include "../entities/EAccount.mqh"
 
 bool IsLiveTrading() {
-	EAccount account;
+	EAccount localAccount;
 	return MQLInfoInteger(MQL_TESTER) == false &&
 	       MQLInfoInteger(MQL_VISUAL_MODE) == false &&
-	       account.IsTradeAllowed() &&
+	       localAccount.IsTradeAllowed() &&
 	       TerminalInfoInteger(TERMINAL_CONNECTED) == true;
 }
 

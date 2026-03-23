@@ -5,20 +5,20 @@
 
 void HandleGetAccountInfo(SGatewayEvent &event, HorizonGateway &gateway, SELogger &eventLogger) {
 	eventLogger.Info(StringFormat("Event received | %s | id=%s", event.key, event.id));
-	EAccount account;
+	EAccount localAccount;
 
 	JSON::Object ackBody;
 	SEventResponse response;
 	response.Success();
 	response.ApplyTo(ackBody);
-	ackBody.setProperty("balance", ClampNumeric(account.GetBalance(), 13, 2));
-	ackBody.setProperty("equity", ClampNumeric(account.GetEquity(), 13, 2));
-	ackBody.setProperty("margin", ClampNumeric(account.GetMargin(), 13, 2));
-	ackBody.setProperty("free_margin", ClampNumeric(account.GetFreeMargin(), 13, 2));
-	ackBody.setProperty("profit", ClampNumeric(account.GetProfit(), 13, 2));
-	ackBody.setProperty("margin_level", ClampNumeric(account.GetSafeMarginLevel(), 8, 2));
-	ackBody.setProperty("currency", account.GetCurrency());
-	ackBody.setProperty("leverage", account.GetLeverage());
+	ackBody.setProperty("balance", ClampNumeric(localAccount.GetBalance(), 13, 2));
+	ackBody.setProperty("equity", ClampNumeric(localAccount.GetEquity(), 13, 2));
+	ackBody.setProperty("margin", ClampNumeric(localAccount.GetMargin(), 13, 2));
+	ackBody.setProperty("free_margin", ClampNumeric(localAccount.GetFreeMargin(), 13, 2));
+	ackBody.setProperty("profit", ClampNumeric(localAccount.GetProfit(), 13, 2));
+	ackBody.setProperty("margin_level", ClampNumeric(localAccount.GetSafeMarginLevel(), 8, 2));
+	ackBody.setProperty("currency", localAccount.GetCurrency());
+	ackBody.setProperty("leverage", localAccount.GetLeverage());
 
 	eventLogger.Info(StringFormat("Event ack | %s | id=%s", event.key, event.id));
 	gateway.AckEvent(event.id, ackBody);

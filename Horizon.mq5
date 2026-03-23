@@ -1,5 +1,5 @@
 #property copyright "Horizon5, by Pedro Carvajal"
-#property version "0.340"
+#property version "0.346"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 #include <Trade/Trade.mqh>
@@ -18,12 +18,15 @@
 #include "helpers/HGetPipValue.mqh"
 #include "helpers/HIsLiveTrading.mqh"
 #include "helpers/HGetLogsPath.mqh"
+#include "helpers/HGetSnapshotEvent.mqh"
+#include "helpers/HGetSystemName.mqh"
 #include "helpers/HInitializeMessageBus.mqh"
 #include "services/SEDateTime/SEDateTime.mqh"
 #include "services/SRReportOfLogs/SRReportOfLogs.mqh"
 
 #include "services/SRImplementationOfHorizonMonitor/SRImplementationOfHorizonMonitor.mqh"
 #include "services/SRImplementationOfHorizonGateway/SRImplementationOfHorizonGateway.mqh"
+#include "services/SRReportOfMonitorSeed/SRReportOfMonitorSeed.mqh"
 
 EAccount account;
 SEDateTime dtime;
@@ -31,26 +34,41 @@ SELogger logger;
 SRImplementationOfHorizonMonitor horizonMonitor;
 SRImplementationOfHorizonGateway horizonGateway;
 STradingStatus tradingStatus;
+SRReportOfMonitorSeed *monitorSeedReporter = NULL;
 
 input group "General Settings";
 input int TickIntervalTime = 60; // [1] > Tick interval (1 = 1 second by tick)
 input ENUM_ORDER_TYPE_FILLING FillingMode = ORDER_FILLING_IOC; // [1] > Order filling mode
 input ENUM_DEBUG_LEVEL DebugLevel = DEBUG_LEVEL_ALL; // [1] > Debug log level
-input group "Reporting";
-input bool EnableOrderHistoryReport = false; // [1] > Enable order history report on tester
-input bool EnableSnapshotHistoryReport = false; // [1] > Enable snapshot history report on tester
-input bool EnableMarketHistoryReport = false; // [1] > Enable market history report on tester
+
+input group "Reporting > Strategy Reports";
+input bool EnableOrderHistoryReport = false; // [1] > Export per-strategy order history
+input bool EnableSnapshotHistoryReport = false; // [1] > Export per-strategy snapshots
+input bool EnableMarketHistoryReport = false; // [1] > Export per-asset market snapshots
+
+input group "Reporting > Monitor Seed";
+input bool EnableSeedAccounts = false; // [1] > Export accounts collection
+input bool EnableSeedAssets = false; // [1] > Export assets collection
+input bool EnableSeedStrategies = false; // [1] > Export strategies collection
+input bool EnableSeedMetadata = false; // [1] > Export metadata collection
+input bool EnableSeedOrders = false; // [1] > Export orders collection
+input bool EnableSeedSnapshots = false; // [1] > Export account/asset/strategy snapshots
+
+input group "Reporting > Logs";
+input bool EnableLogExport = false; // [1] > Export portfolio logs on shutdown
 
 input group "Risk management";
 input bool EquityAtRiskCompounded = false; // [1] > Equity at risk compounded
 input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
 input group "Horizon Monitor";
-input bool EnableHorizonIntegration = true; // [1] > Enable Horizon integration
+input bool EnableHorizonMonitor = false; // [1] > Enable Horizon Monitor integration
 input string HorizonMonitorUrl = ""; // [1] > HorizonMonitor base URL
 input string HorizonMonitorEmail = ""; // [1] > HorizonMonitor email (required)
 input string HorizonMonitorPassword = ""; // [1] > HorizonMonitor password (required)
+
 input group "Horizon Gateway";
+input bool EnableHorizonGateway = false; // [1] > Enable Horizon Gateway integration
 input string HorizonGatewayUrl = ""; // [1] > HorizonGateway base URL
 input string HorizonGatewayEmail = ""; // [1] > HorizonGateway email (required)
 input string HorizonGatewayPassword = ""; // [1] > HorizonGateway password (required)
@@ -127,6 +145,16 @@ int BuildRequiredServices(string &services[]) {
 	return count;
 }
 
+void SendServiceHeartbeats() {
+	if (horizonGateway.IsEnabled() && SEMessageBus::IsActive() && SEMessageBus::IsServiceRunning(MB_SERVICE_GATEWAY)) {
+		horizonMonitor.StoreSystemHeartbeat(GetSystemName(SYSTEM_GATEWAY_SERVICE));
+	}
+
+	if (SEMessageBus::IsActive() && SEMessageBus::IsServiceRunning(MB_SERVICE_PERSISTENCE)) {
+		horizonMonitor.StoreSystemHeartbeat(GetSystemName(SYSTEM_PERSISTENCE_SERVICE));
+	}
+}
+
 void CheckServiceHealth() {
 	string requiredServices[];
 	int serviceCount = BuildRequiredServices(requiredServices);
@@ -147,6 +175,34 @@ void CheckServiceHealth() {
 	}
 }
 
+void CollectAccountSeedSnapshot(ENUM_SNAPSHOT_EVENT event) {
+	double seedFloatingPnl = 0;
+	double seedRealizedPnl = 0;
+
+	for (int i = 0; i < ArraySize(assets); i++) {
+		assets[i].AggregateSnapshotData(seedFloatingPnl, seedRealizedPnl);
+	}
+
+	monitorSeedReporter.AddAccountSnapshot(
+		account.GetBalance(), account.GetEquity(), account.GetMargin(),
+		seedFloatingPnl, seedRealizedPnl, event, dtime.Timestamp()
+	);
+}
+
+void InitializeMonitorSeedReporter() {
+	string firstSymbol = "";
+	for (int i = 0; i < ArraySize(assets); i++) {
+		if (assets[i].IsEnabled()) {
+			firstSymbol = assets[i].GetSymbol();
+			break;
+		}
+	}
+
+	monitorSeedReporter = new SRReportOfMonitorSeed();
+	monitorSeedReporter.Initialize(firstSymbol, "MonitorSeed");
+	monitorSeedReporter.RegisterAccount();
+}
+
 int OnInit() {
 	EventSetTimer(1);
 
@@ -156,13 +212,14 @@ int OnInit() {
 	SELogger::SetGlobalDebugLevel(DebugLevel);
 	SELogger::SetLogSystem(LOG_SYSTEM_HORIZON5);
 
-	bool integrationEnabled = IsLiveTrading() && EnableHorizonIntegration;
+	bool monitorEnabled = IsLiveTrading() && EnableHorizonMonitor;
+	bool gatewayEnabled = IsLiveTrading() && EnableHorizonGateway;
 
-	if (!horizonMonitor.Initialize(HorizonMonitorUrl, HorizonMonitorEmail, HorizonMonitorPassword, integrationEnabled)) {
+	if (!horizonMonitor.Initialize(HorizonMonitorUrl, HorizonMonitorEmail, HorizonMonitorPassword, monitorEnabled)) {
 		return INIT_FAILED;
 	}
 
-	if (!horizonGateway.Initialize(HorizonGatewayUrl, HorizonGatewayEmail, HorizonGatewayPassword, integrationEnabled)) {
+	if (!horizonGateway.Initialize(HorizonGatewayUrl, HorizonGatewayEmail, HorizonGatewayPassword, gatewayEnabled)) {
 		return INIT_FAILED;
 	}
 
@@ -214,6 +271,13 @@ int OnInit() {
 	}
 
 	double weightPerAsset = 1.0 / enabledAssetCount;
+
+	bool isMonitorSeedEnabled = EnableSeedAccounts || EnableSeedAssets || EnableSeedStrategies
+				    || EnableSeedMetadata || EnableSeedOrders || EnableSeedSnapshots;
+
+	if (isMonitorSeedEnabled) {
+		InitializeMonitorSeedReporter();
+	}
 
 	for (int i = 0; i < assetCount; i++) {
 		if (!assets[i].IsEnabled()) {
@@ -316,6 +380,10 @@ int OnInit() {
 		logger.Separator("End UUID Mapping Report");
 	}
 
+	if (horizonMonitor.IsEnabled()) {
+		SendServiceHeartbeats();
+	}
+
 	logger.Info("Horizon EA started | built " + (string)__DATETIME__);
 
 	return INIT_SUCCEEDED;
@@ -333,7 +401,7 @@ void OnDeinit(const int reason) {
 			assets[i].OnEnd();
 		}
 
-		if (SELogger::GetGlobalEntryCount() > 0) {
+		if (EnableLogExport && SELogger::GetGlobalEntryCount() > 0) {
 			string logEntries[];
 			SELogger::GetGlobalEntries(logEntries);
 
@@ -385,6 +453,14 @@ void OnTimer() {
 		for (int i = 0; i < ArraySize(assets); i++) {
 			assets[i].OnStartDay();
 		}
+
+		if (horizonMonitor.IsEnabled()) {
+			horizonMonitor.SyncAccount(assets, ArraySize(assets), GetSnapshotEvent(SNAPSHOT_ON_END_DAY));
+		}
+
+		if (monitorSeedReporter != NULL) {
+			CollectAccountSeedSnapshot(SNAPSHOT_ON_END_DAY);
+		}
 	}
 
 	if (isStartHour) {
@@ -424,7 +500,11 @@ void OnTimer() {
 	}
 
 	if (isStartHour && horizonMonitor.IsEnabled()) {
-		horizonMonitor.SyncAccount(assets, ArraySize(assets));
+		if (!isStartDay) {
+			horizonMonitor.SyncAccount(assets, ArraySize(assets), GetSnapshotEvent(SNAPSHOT_ON_HOUR));
+		}
+
+		SendServiceHeartbeats();
 	}
 }
 
@@ -544,6 +624,12 @@ double OnTester() {
 		assets[i].ExportOrderHistory();
 		assets[i].ExportStrategySnapshots();
 		assets[i].ExportMarketSnapshots();
+	}
+
+	if (monitorSeedReporter != NULL) {
+		monitorSeedReporter.Export();
+		delete monitorSeedReporter;
+		monitorSeedReporter = NULL;
 	}
 
 	return quality;

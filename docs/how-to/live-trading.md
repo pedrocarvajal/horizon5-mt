@@ -18,7 +18,7 @@ Sends order updates, account snapshots, and log entries to the Horizon API for t
 
 Configure in EA inputs:
 
-- `EnableHorizonIntegration` = true
+- `EnableHorizonMonitor` = true
 - `HorizonMonitorUrl` = base URL of the Horizon API
 - `HorizonMonitorEmail` = account email
 - `HorizonMonitorPassword` = account password
@@ -29,6 +29,7 @@ Enables remote order creation and management through the Horizon API. The Gatewa
 
 Configure in EA inputs:
 
+- `EnableHorizonGateway` = true
 - `HorizonGatewayUrl` = base URL of the Gateway API
 - `HorizonGatewayEmail` = account email
 - `HorizonGatewayPassword` = account password
@@ -40,7 +41,7 @@ Both Monitor and Gateway authenticate on startup by calling `UpsertAccount()`. I
 The EA continuously monitors all required services through `CheckServiceHealth()`:
 
 - **HorizonPersistence** is always required.
-- **HorizonMonitor** is required only when `EnableHorizonIntegration` is true and Monitor is configured.
+- **HorizonMonitor** is required only when `EnableHorizonMonitor` is true and Monitor is configured.
 - **HorizonGateway** is required only when Gateway is configured.
 
 If any required service stops responding:

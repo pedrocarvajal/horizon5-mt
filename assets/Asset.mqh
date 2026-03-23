@@ -5,9 +5,11 @@
 
 #include "../helpers/HStringToNumber.mqh"
 #include "../helpers/HGetAssetRate.mqh"
+#include "../helpers/HGetSnapshotEvent.mqh"
 
 #include "../services/SELogger/SELogger.mqh"
 #include "../services/SRReportOfMarketSnapshots/SRReportOfMarketSnapshots.mqh"
+#include "../services/SRReportOfMonitorSeed/SRReportOfMonitorSeed.mqh"
 
 #include "../services/SRImplementationOfHorizonMonitor/SRImplementationOfHorizonMonitor.mqh"
 #include "../services/SRImplementationOfHorizonGateway/SRImplementationOfHorizonGateway.mqh"
@@ -24,6 +26,7 @@
 extern SEDateTime dtime;
 extern SRImplementationOfHorizonMonitor horizonMonitor;
 extern SRImplementationOfHorizonGateway horizonGateway;
+extern SRReportOfMonitorSeed *monitorSeedReporter;
 
 #define ROLLING_PERIOD_DAYS 90
 
@@ -126,6 +129,23 @@ public:
 
 		RegisterEntities();
 
+		if (monitorSeedReporter != NULL) {
+			monitorSeedReporter.RegisterAsset(symbol);
+
+			for (int i = 0; i < strategyCount; i++) {
+				if (strategies[i].IsPassive()) {
+					continue;
+				}
+
+				monitorSeedReporter.RegisterStrategy(
+					strategies[i].GetName(),
+					symbol,
+					strategies[i].GetPrefix(),
+					strategies[i].GetMagicNumber()
+				);
+			}
+		}
+
 		int initResult = initializeStrategies(strategyCount);
 
 		if (initResult != INIT_SUCCEEDED) {
@@ -148,8 +168,8 @@ public:
 
 		remoteOrderManager.Initialize(symbol, strategies);
 
-		SyncToMonitor();
-		SendHeartbeats(HEARTBEAT_RUNNING);
+		SyncToMonitor(GetSnapshotEvent(SNAPSHOT_ON_INIT));
+		SendHeartbeats();
 
 		return INIT_SUCCEEDED;
 	}
@@ -183,7 +203,7 @@ public:
 	}
 
 	virtual void OnStartHour() {
-		SendHeartbeats(HEARTBEAT_RUNNING);
+		SendHeartbeats();
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].OnStartHour();
@@ -193,6 +213,10 @@ public:
 	virtual void OnStartDay() {
 		if (CheckPointer(marketSnapshotsReporter) != POINTER_INVALID) {
 			marketSnapshotsReporter.AddSnapshot(BuildMarketSnapshot());
+		}
+
+		if (monitorSeedReporter != NULL) {
+			CollectMonitorSeedSnapshots(SNAPSHOT_ON_END_DAY);
 		}
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
@@ -556,7 +580,7 @@ public:
 		}
 	}
 
-	void SyncToMonitor() {
+	void SyncToMonitor(string event) {
 		if (!horizonMonitor.IsEnabled()) {
 			return;
 		}
@@ -566,23 +590,23 @@ public:
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
 			strategies[i].SyncOrders();
-			strategies[i].SyncSnapshot();
+			strategies[i].SyncSnapshot(event);
 		}
 
-		StoreAssetSnapshot(assetUuid);
+		StoreAssetSnapshot(assetUuid, event);
 	}
 
-	void SendHeartbeats(ENUM_HEARTBEAT_EVENT event) {
+	void SendHeartbeats() {
 		if (!horizonMonitor.IsEnabled()) {
 			return;
 		}
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			horizonMonitor.StoreHeartbeat(strategies[i].GetMagicNumber(), event);
+			horizonMonitor.StoreHeartbeat(strategies[i].GetMagicNumber());
 		}
 	}
 
-	void StoreAssetSnapshot(string assetUuid) {
+	void StoreAssetSnapshot(string assetUuid, string event) {
 		if (assetUuid == "") {
 			return;
 		}
@@ -612,7 +636,62 @@ public:
 		string profitCurrency = SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT);
 		double usdRate = GetAssetRate(profitCurrency);
 
-		horizonMonitor.StoreAssetSnapshot(assetUuid, balance, equity, floatingPnl, realizedPnl, bid, ask, usdRate);
+		horizonMonitor.StoreAssetSnapshot(assetUuid, balance, equity, floatingPnl, realizedPnl, bid, ask, usdRate, event);
+	}
+
+	void CollectMonitorSeedSnapshots(ENUM_SNAPSHOT_EVENT event) {
+		double totalFloatingPnl = 0;
+		double totalRealizedPnl = 0;
+
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			if (strategies[i].IsPassive()) {
+				continue;
+			}
+
+			collectStrategySeedSnapshot(strategies[i], event, totalFloatingPnl, totalRealizedPnl);
+		}
+
+		collectAssetSeedSnapshot(totalFloatingPnl, totalRealizedPnl, event);
+	}
+
+	void collectStrategySeedSnapshot(SEStrategy *strategy, ENUM_SNAPSHOT_EVENT event, double &totalFloatingPnl, double &totalRealizedPnl) {
+		double strategyFloatingPnl = 0;
+		SEOrderBook *book = strategy.GetOrderBook();
+
+		for (int j = 0; j < book.GetOrdersCount(); j++) {
+			EOrder *order = book.GetOrderAtIndex(j);
+			if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
+				strategyFloatingPnl += book.GetFloatingProfitAndLoss(order);
+			}
+		}
+
+		SEStatistics *stats = strategy.GetStatistics();
+		double strategyBalance = strategy.GetBalance();
+		double strategyRealizedPnl = (stats != NULL) ? stats.GetClosedNav() - stats.GetInitialBalance() : 0.0;
+		double strategyEquity = strategyBalance + strategyFloatingPnl;
+
+		monitorSeedReporter.AddStrategySnapshot(
+			strategy.GetMagicNumber(),
+			strategyBalance,
+			strategyEquity,
+			strategyFloatingPnl,
+			strategyRealizedPnl,
+			event,
+			dtime.Timestamp()
+		);
+
+		totalFloatingPnl += strategyFloatingPnl;
+		totalRealizedPnl += strategyRealizedPnl;
+	}
+
+	void collectAssetSeedSnapshot(double totalFloatingPnl, double totalRealizedPnl, ENUM_SNAPSHOT_EVENT event) {
+		double equity = balance + totalFloatingPnl;
+		double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+		double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+		string profitCurrency = SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT);
+		double usdRate = GetAssetRate(profitCurrency);
+
+		monitorSeedReporter.AddAssetSnapshot(symbol, balance, equity, totalFloatingPnl, totalRealizedPnl, bid, ask, usdRate, event, dtime.Timestamp());
 	}
 
 	void AggregateSnapshotData(

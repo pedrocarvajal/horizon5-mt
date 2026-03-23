@@ -11,6 +11,7 @@
 #include "../../../helpers/HGetOrderStatus.mqh"
 #include "../../../helpers/HGetOrderSide.mqh"
 #include "../../../helpers/HGetCloseReason.mqh"
+#include "../../../helpers/HGetOrderUuid.mqh"
 #include "StrategyResource.mqh"
 #include "AssetResource.mqh"
 
@@ -66,8 +67,17 @@ public:
 	}
 
 	void Upsert(EOrder &order) {
+		string orderUuid = GetDeterministicOrderUuid(
+			context.GetAccountNumber(),
+			context.GetBrokerServer(),
+			order.GetSymbol(),
+			order.GetMagicNumber(),
+			order.GetOrderId(),
+			order.GetPositionId()
+		);
+
 		JSON::Object body;
-		body.setProperty("id", order.GetId());
+		body.setProperty("id", orderUuid);
 		body.setProperty("account_id", context.GetAccountUuid());
 		body.setProperty("strategy_id", strategies.GetUuid(order.GetMagicNumber()));
 		body.setProperty("deal_id", (long)order.GetDealId());
