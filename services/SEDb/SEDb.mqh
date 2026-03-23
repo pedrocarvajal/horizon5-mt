@@ -1,28 +1,39 @@
 #ifndef __SE_DB_MQH__
 #define __SE_DB_MQH__
 
+#include "SEFileDbDLL.mqh"
 #include "SEDbCollection.mqh"
 #include "../../entities/EAccount.mqh"
 
 class SEDb {
 private:
+	int databaseHandle;
 	string basePath;
 	bool useCommonFiles;
 	bool isInitialized;
+	static bool dllInitialized;
 	SEDbCollection *collections[];
 
 public:
 	SEDb() {
+		databaseHandle = -1;
 		basePath = "";
 		useCommonFiles = false;
 		isInitialized = false;
 	}
 
 	void Initialize(string databasePath, bool commonFiles = false) {
+		if (!dllInitialized) {
+			string commonDataPath = TerminalInfoString(TERMINAL_COMMONDATA_PATH) + "\\Files";
+			FdbInit(commonDataPath);
+			dllInitialized = true;
+		}
+
 		EAccount localAccount;
 		long accountNumber = localAccount.GetNumber();
 		basePath = StringFormat("%lld/%s", accountNumber, databasePath);
 		useCommonFiles = commonFiles;
+		databaseHandle = FdbDatabaseCreate(basePath);
 		isInitialized = true;
 	}
 
@@ -50,9 +61,17 @@ public:
 			return collections[index];
 		}
 
+		int collectionHandle = FdbCollectionGet(databaseHandle, collectionName);
+
+		if (collectionHandle == -1) {
+			Print("[ERROR] SEDb: Cannot create collection '", collectionName, "'");
+			return NULL;
+		}
+
+		FdbCollectionLoad(collectionHandle);
+
 		SEDbCollection *collection = new SEDbCollection();
-		collection.Initialize(collectionName, basePath, useCommonFiles);
-		collection.Load();
+		collection.Initialize(collectionName, collectionHandle, basePath, useCommonFiles);
 
 		int size = ArraySize(collections);
 		ArrayResize(collections, size + 1);
@@ -104,5 +123,7 @@ private:
 		return -1;
 	}
 };
+
+bool SEDb::dllInitialized = false;
 
 #endif

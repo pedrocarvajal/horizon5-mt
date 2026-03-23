@@ -54,7 +54,7 @@ public:
 		body.setProperty("name", symbolName);
 		body.setProperty("symbol", symbolName);
 
-		context.Post("api/v1/asset", body, 10000, false);
+		context.Post("api/v1/asset", body, false);
 
 		registerAsset(symbolName, assetUuid);
 		logger.Info(StringFormat("Asset registered | %s | uuid: %s", symbolName, assetUuid));

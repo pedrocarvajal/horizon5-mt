@@ -3,3 +3,4 @@
 .DS_Store
 .claude/.env
 libraries/HorizonMessageBus/build/
+libraries/HorizonFileDb/build/
