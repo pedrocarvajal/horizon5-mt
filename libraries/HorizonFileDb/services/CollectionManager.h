@@ -17,19 +17,18 @@
 #include <rapidjson/stringbuffer.h>
 
 #include <string>
+#include <vector>
 #include <algorithm>
 
 class CollectionManager {
 private:
-    FdbCollection collections[FDB_MAX_COLLECTIONS];
-    int collectionCount;
+    std::vector<FdbCollection*> collections;
     CRITICAL_SECTION registryLock;
     DatabaseManager* databaseManager;
 
 public:
     CollectionManager(DatabaseManager* dbManager)
-        : collectionCount(0)
-        , databaseManager(dbManager)
+        : databaseManager(dbManager)
     {
         InitializeCriticalSection(&registryLock);
     }
@@ -44,18 +43,15 @@ public:
     {
         EnterCriticalSection(&registryLock);
 
-        for (int i = 0; i < collectionCount; i++) {
-            if (collections[i].active &&
-                collections[i].databaseId == databaseId &&
-                collections[i].name == collectionName) {
+        int count = static_cast<int>(collections.size());
+
+        for (int i = 0; i < count; i++) {
+            if (collections[i]->active &&
+                collections[i]->databaseId == databaseId &&
+                collections[i]->name == collectionName) {
                 LeaveCriticalSection(&registryLock);
                 return i;
             }
-        }
-
-        if (collectionCount >= FDB_MAX_COLLECTIONS) {
-            LeaveCriticalSection(&registryLock);
-            return -1;
         }
 
         FdbDatabase* db = databaseManager->GetDatabase(databaseId);
@@ -64,22 +60,24 @@ public:
             return -1;
         }
 
-        int index = collectionCount;
-        collections[index].name = collectionName;
-        collections[index].databaseId = databaseId;
-        collections[index].autoFlush = true;
-        collections[index].active = true;
-        InitializeCriticalSection(&collections[index].lock);
+        FdbCollection* col = new FdbCollection();
+        col->name = collectionName;
+        col->databaseId = databaseId;
+        col->autoFlush = true;
+        col->active = true;
+        InitializeCriticalSection(&col->lock);
 
         std::wstring dbPath = db->path;
         std::wstring basePath = databaseManager->GetBasePath();
 
         std::replace(dbPath.begin(), dbPath.end(), L'/', L'\\');
 
-        collections[index].filePath = basePath + L"\\" + dbPath + L"\\" + collectionName + L".json";
+        col->filePath = basePath + L"\\" + dbPath + L"\\" + collectionName + L".json";
+
+        int index = count;
+        collections.push_back(col);
 
         db->collectionIds.push_back(index);
-        collectionCount++;
 
         LeaveCriticalSection(&registryLock);
         return index;
@@ -89,18 +87,18 @@ public:
     {
         if (!IsValidCollection(collectionId)) return;
 
-        EnterCriticalSection(&collections[collectionId].lock);
-        collections[collectionId].autoFlush = enabled;
-        LeaveCriticalSection(&collections[collectionId].lock);
+        EnterCriticalSection(&collections[collectionId]->lock);
+        collections[collectionId]->autoFlush = enabled;
+        LeaveCriticalSection(&collections[collectionId]->lock);
     }
 
     int Count(int collectionId)
     {
         if (!IsValidCollection(collectionId)) return 0;
 
-        EnterCriticalSection(&collections[collectionId].lock);
-        int count = static_cast<int>(collections[collectionId].documents.size());
-        LeaveCriticalSection(&collections[collectionId].lock);
+        EnterCriticalSection(&collections[collectionId]->lock);
+        int count = static_cast<int>(collections[collectionId]->documents.size());
+        LeaveCriticalSection(&collections[collectionId]->lock);
 
         return count;
     }
@@ -109,17 +107,17 @@ public:
     {
         if (!IsValidCollection(collectionId)) return false;
 
-        FdbCollection& col = collections[collectionId];
-        EnterCriticalSection(&col.lock);
+        FdbCollection* col = collections[collectionId];
+        EnterCriticalSection(&col->lock);
 
         std::string fileContent;
-        if (!FileIO::ReadFile(col.filePath, fileContent)) {
-            LeaveCriticalSection(&col.lock);
+        if (!FileIO::ReadFile(col->filePath, fileContent)) {
+            LeaveCriticalSection(&col->lock);
             return false;
         }
 
         if (fileContent.empty()) {
-            LeaveCriticalSection(&col.lock);
+            LeaveCriticalSection(&col->lock);
             return true;
         }
 
@@ -127,12 +125,12 @@ public:
         arrayDoc.Parse(fileContent.c_str());
 
         if (arrayDoc.HasParseError() || !arrayDoc.IsArray()) {
-            LeaveCriticalSection(&col.lock);
+            LeaveCriticalSection(&col->lock);
             return false;
         }
 
-        col.ClearDocuments();
-        col.documents.reserve(arrayDoc.Size());
+        col->ClearDocuments();
+        col->documents.reserve(arrayDoc.Size());
 
         for (rapidjson::SizeType i = 0; i < arrayDoc.Size(); i++) {
             if (!arrayDoc[i].IsObject()) continue;
@@ -143,13 +141,13 @@ public:
 
             FdbDocument* doc = new FdbDocument();
             if (doc->ParseFromUtf8(buffer.GetString())) {
-                col.AddDocument(doc);
+                col->AddDocument(doc);
             } else {
                 delete doc;
             }
         }
 
-        LeaveCriticalSection(&col.lock);
+        LeaveCriticalSection(&col->lock);
         return true;
     }
 
@@ -157,24 +155,24 @@ public:
     {
         if (!IsValidCollection(collectionId)) return false;
 
-        FdbCollection& col = collections[collectionId];
-        EnterCriticalSection(&col.lock);
+        FdbCollection* col = collections[collectionId];
+        EnterCriticalSection(&col->lock);
 
         rapidjson::StringBuffer buffer;
         buffer.Reserve(FDB_FLUSH_BUFFER_INITIAL_SIZE);
         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
 
         writer.StartArray();
-        for (const auto* doc : col.documents) {
+        for (const auto* doc : col->documents) {
             if (doc != nullptr) {
                 doc->SerializeToBuffer(writer);
             }
         }
         writer.EndArray();
 
-        bool success = FileIO::WriteFile(col.filePath, buffer.GetString(), buffer.GetSize());
+        bool success = FileIO::WriteFile(col->filePath, buffer.GetString(), buffer.GetSize());
 
-        LeaveCriticalSection(&col.lock);
+        LeaveCriticalSection(&col->lock);
         return success;
     }
 
@@ -182,13 +180,13 @@ public:
     {
         if (!IsValidCollection(collectionId) || jsonUtf8 == nullptr) return false;
 
-        FdbCollection& col = collections[collectionId];
-        EnterCriticalSection(&col.lock);
+        FdbCollection* col = collections[collectionId];
+        EnterCriticalSection(&col->lock);
 
         FdbDocument* doc = new FdbDocument();
         if (!doc->ParseFromUtf8(jsonUtf8)) {
             delete doc;
-            LeaveCriticalSection(&col.lock);
+            LeaveCriticalSection(&col->lock);
             return false;
         }
 
@@ -203,10 +201,10 @@ public:
             doc->cachedId = uuid;
         }
 
-        col.AddDocument(doc);
+        col->AddDocument(doc);
 
-        bool shouldFlush = col.autoFlush;
-        LeaveCriticalSection(&col.lock);
+        bool shouldFlush = col->autoFlush;
+        LeaveCriticalSection(&col->lock);
 
         if (shouldFlush) {
             Flush(collectionId);
@@ -219,18 +217,18 @@ public:
     {
         if (!IsValidCollection(collectionId)) return 0;
 
-        FdbCollection& col = collections[collectionId];
-        EnterCriticalSection(&col.lock);
+        FdbCollection* col = collections[collectionId];
+        EnterCriticalSection(&col->lock);
 
-        int index = col.FindByKeyValue(key, value);
+        int index = col->FindByKeyValue(key, value);
         if (index == -1) {
-            LeaveCriticalSection(&col.lock);
+            LeaveCriticalSection(&col->lock);
             return 0;
         }
 
-        resultJson = col.documents[index]->Serialize();
+        resultJson = col->documents[index]->Serialize();
 
-        LeaveCriticalSection(&col.lock);
+        LeaveCriticalSection(&col->lock);
         return 1;
     }
 
@@ -238,18 +236,18 @@ public:
     {
         if (!IsValidCollection(collectionId)) return 0;
 
-        FdbCollection& col = collections[collectionId];
-        EnterCriticalSection(&col.lock);
+        FdbCollection* col = collections[collectionId];
+        EnterCriticalSection(&col->lock);
 
         results.clear();
 
-        for (const auto* doc : col.documents) {
+        for (const auto* doc : col->documents) {
             if (doc != nullptr && QueryEngine::Matches(doc, query)) {
                 results.push_back(doc->Serialize());
             }
         }
 
-        LeaveCriticalSection(&col.lock);
+        LeaveCriticalSection(&col->lock);
         return static_cast<int>(results.size());
     }
 
@@ -257,15 +255,15 @@ public:
     {
         if (!IsValidCollection(collectionId)) return "[]";
 
-        FdbCollection& col = collections[collectionId];
-        EnterCriticalSection(&col.lock);
+        FdbCollection* col = collections[collectionId];
+        EnterCriticalSection(&col->lock);
 
         rapidjson::StringBuffer buffer;
         buffer.Reserve(FDB_FLUSH_BUFFER_INITIAL_SIZE);
         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
 
         writer.StartArray();
-        for (const auto* doc : col.documents) {
+        for (const auto* doc : col->documents) {
             if (doc != nullptr) {
                 doc->SerializeToBuffer(writer);
             }
@@ -273,7 +271,7 @@ public:
         writer.EndArray();
 
         std::string result(buffer.GetString(), buffer.GetSize());
-        LeaveCriticalSection(&col.lock);
+        LeaveCriticalSection(&col->lock);
         return result;
     }
 
@@ -281,12 +279,12 @@ public:
     {
         if (!IsValidCollection(collectionId) || patchJsonUtf8 == nullptr) return false;
 
-        FdbCollection& col = collections[collectionId];
-        EnterCriticalSection(&col.lock);
+        FdbCollection* col = collections[collectionId];
+        EnterCriticalSection(&col->lock);
 
-        int index = col.FindByKeyValue(key, value);
+        int index = col->FindByKeyValue(key, value);
         if (index == -1) {
-            LeaveCriticalSection(&col.lock);
+            LeaveCriticalSection(&col->lock);
             return false;
         }
 
@@ -294,11 +292,11 @@ public:
         patch.Parse(patchJsonUtf8);
 
         if (patch.HasParseError() || !patch.IsObject()) {
-            LeaveCriticalSection(&col.lock);
+            LeaveCriticalSection(&col->lock);
             return false;
         }
 
-        FdbDocument* doc = col.documents[index];
+        FdbDocument* doc = col->documents[index];
         auto& allocator = doc->dom.GetAllocator();
 
         for (auto it = patch.MemberBegin(); it != patch.MemberEnd(); ++it) {
@@ -317,15 +315,15 @@ public:
             std::string newId = doc->dom["_id"].GetString();
             if (newId != doc->cachedId) {
                 if (!doc->cachedId.empty()) {
-                    col.idIndex.erase(doc->cachedId);
+                    col->idIndex.erase(doc->cachedId);
                 }
                 doc->cachedId = newId;
-                col.idIndex[newId] = index;
+                col->idIndex[newId] = index;
             }
         }
 
-        bool shouldFlush = col.autoFlush;
-        LeaveCriticalSection(&col.lock);
+        bool shouldFlush = col->autoFlush;
+        LeaveCriticalSection(&col->lock);
 
         if (shouldFlush) {
             Flush(collectionId);
@@ -338,19 +336,19 @@ public:
     {
         if (!IsValidCollection(collectionId)) return false;
 
-        FdbCollection& col = collections[collectionId];
-        EnterCriticalSection(&col.lock);
+        FdbCollection* col = collections[collectionId];
+        EnterCriticalSection(&col->lock);
 
-        int index = col.FindByKeyValue(key, value);
+        int index = col->FindByKeyValue(key, value);
         if (index == -1) {
-            LeaveCriticalSection(&col.lock);
+            LeaveCriticalSection(&col->lock);
             return false;
         }
 
-        col.RemoveAtIndex(index);
+        col->RemoveAtIndex(index);
 
-        bool shouldFlush = col.autoFlush;
-        LeaveCriticalSection(&col.lock);
+        bool shouldFlush = col->autoFlush;
+        LeaveCriticalSection(&col->lock);
 
         if (shouldFlush) {
             Flush(collectionId);
@@ -363,13 +361,13 @@ public:
     {
         if (!IsValidCollection(collectionId)) return false;
 
-        FdbCollection& col = collections[collectionId];
-        EnterCriticalSection(&col.lock);
+        FdbCollection* col = collections[collectionId];
+        EnterCriticalSection(&col->lock);
 
-        col.ClearDocuments();
-        bool success = FileIO::DeleteFileByPath(col.filePath);
+        col->ClearDocuments();
+        bool success = FileIO::DeleteFileByPath(col->filePath);
 
-        LeaveCriticalSection(&col.lock);
+        LeaveCriticalSection(&col->lock);
         return success;
     }
 
@@ -377,15 +375,15 @@ public:
     {
         if (!IsValidCollection(collectionId)) return false;
 
-        FdbCollection& col = collections[collectionId];
-        EnterCriticalSection(&col.lock);
+        FdbCollection* col = collections[collectionId];
+        EnterCriticalSection(&col->lock);
 
-        col.ClearDocuments();
-        FileIO::DeleteFileByPath(col.filePath);
-        col.active = false;
+        col->ClearDocuments();
+        FileIO::DeleteFileByPath(col->filePath);
+        col->active = false;
 
-        LeaveCriticalSection(&col.lock);
-        DeleteCriticalSection(&col.lock);
+        LeaveCriticalSection(&col->lock);
+        DeleteCriticalSection(&col->lock);
 
         return true;
     }
@@ -394,15 +392,16 @@ public:
     {
         EnterCriticalSection(&registryLock);
 
-        for (int i = 0; i < collectionCount; i++) {
-            if (collections[i].active) {
-                collections[i].ClearDocuments();
-                collections[i].active = false;
-                DeleteCriticalSection(&collections[i].lock);
+        for (auto* col : collections) {
+            if (col->active) {
+                col->ClearDocuments();
+                col->active = false;
+                DeleteCriticalSection(&col->lock);
             }
+            delete col;
         }
 
-        collectionCount = 0;
+        collections.clear();
         LeaveCriticalSection(&registryLock);
     }
 
@@ -410,8 +409,8 @@ private:
     bool IsValidCollection(int collectionId) const
     {
         return collectionId >= 0 &&
-               collectionId < collectionCount &&
-               collections[collectionId].active;
+               collectionId < static_cast<int>(collections.size()) &&
+               collections[collectionId]->active;
     }
 };
 
