@@ -41,22 +41,23 @@ These inputs control CSV report generation during strategy tester runs.
 
 Connection to the Horizon Monitor API for remote logging, account sync, and dashboard reporting.
 
-| Parameter                  | Type     | Default | Description                                                              |
-| -------------------------- | -------- | ------- | ------------------------------------------------------------------------ |
-| `EnableHorizonIntegration` | `bool`   | `true`  | Master toggle for all Horizon integrations. Only active in live trading. |
-| `HorizonMonitorUrl`        | `string` | `""`    | Base URL for the Horizon Monitor API.                                    |
-| `HorizonMonitorEmail`      | `string` | `""`    | Authentication email for Horizon Monitor.                                |
-| `HorizonMonitorPassword`   | `string` | `""`    | Authentication password for Horizon Monitor.                             |
+| Parameter                | Type     | Default | Description                                                          |
+| ------------------------ | -------- | ------- | -------------------------------------------------------------------- |
+| `EnableHorizonMonitor`   | `bool`   | `true`  | Toggle for Horizon Monitor integration. Only active in live trading. |
+| `HorizonMonitorUrl`      | `string` | `""`    | Base URL for the Horizon Monitor API.                                |
+| `HorizonMonitorEmail`    | `string` | `""`    | Authentication email for Horizon Monitor.                            |
+| `HorizonMonitorPassword` | `string` | `""`    | Authentication password for Horizon Monitor.                         |
 
 ## Horizon Gateway
 
 Connection to the Horizon Gateway API for remote order management and account status.
 
-| Parameter                | Type     | Default | Description                                  |
-| ------------------------ | -------- | ------- | -------------------------------------------- |
-| `HorizonGatewayUrl`      | `string` | `""`    | Base URL for the Horizon Gateway API.        |
-| `HorizonGatewayEmail`    | `string` | `""`    | Authentication email for Horizon Gateway.    |
-| `HorizonGatewayPassword` | `string` | `""`    | Authentication password for Horizon Gateway. |
+| Parameter                | Type     | Default | Description                                                          |
+| ------------------------ | -------- | ------- | -------------------------------------------------------------------- |
+| `EnableHorizonGateway`   | `bool`   | `true`  | Toggle for Horizon Gateway integration. Only active in live trading. |
+| `HorizonGatewayUrl`      | `string` | `""`    | Base URL for the Horizon Gateway API.                                |
+| `HorizonGatewayEmail`    | `string` | `""`    | Authentication email for Horizon Gateway.                            |
+| `HorizonGatewayPassword` | `string` | `""`    | Authentication password for Horizon Gateway.                         |
 
 ## Asset-level Strategy Toggles
 

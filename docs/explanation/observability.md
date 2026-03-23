@@ -66,4 +66,4 @@ Reports are generated per-asset by calling `ExportOrderHistory()`, `ExportStrate
 
 ## Standalone mode
 
-When `EnableHorizonIntegration` is `false` or the EA runs in backtesting mode, no external services are needed. Order persistence still works via direct file writes (bypassing the message bus), and all reports are generated locally. This makes the EA fully self-contained for development, testing, and environments without API access.
+When both `EnableHorizonMonitor` and `EnableHorizonGateway` are `false`, or the EA runs in backtesting mode, no external services are needed. Order persistence still works via direct file writes (bypassing the message bus), and all reports are generated locally. This makes the EA fully self-contained for development, testing, and environments without API access.

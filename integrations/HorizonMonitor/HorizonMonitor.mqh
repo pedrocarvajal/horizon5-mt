@@ -232,20 +232,20 @@ public:
 		orders.Upsert(order);
 	}
 
-	void StoreHeartbeat(ulong magicNumber, ENUM_HEARTBEAT_EVENT event, string systemName = "strategy") {
+	void StoreHeartbeat(ulong magicNumber, string systemName = "horizon5") {
 		if (!context.IsEnabled()) {
 			return;
 		}
 
-		heartbeats.Store(magicNumber, event, systemName);
+		heartbeats.Store(magicNumber, systemName);
 	}
 
-	void StoreSystemHeartbeat(ENUM_HEARTBEAT_EVENT event) {
+	void StoreSystemHeartbeat(string systemName) {
 		if (!context.IsEnabled()) {
 			return;
 		}
 
-		heartbeats.StoreSystem(event);
+		heartbeats.StoreSystem(systemName);
 	}
 
 	void StoreLog(string system, string level, string message, ulong magicNumber = 0) {
@@ -256,12 +256,12 @@ public:
 		logs.Store(system, level, message, magicNumber);
 	}
 
-	void StoreAccountSnapshot(double floatingPnl, double realizedPnl) {
+	void StoreAccountSnapshot(double floatingPnl, double realizedPnl, string event) {
 		if (!context.IsEnabled()) {
 			return;
 		}
 
-		snapshots.StoreAccount(floatingPnl, realizedPnl);
+		snapshots.StoreAccount(floatingPnl, realizedPnl, event);
 	}
 
 	void StoreStrategySnapshot(
@@ -269,13 +269,14 @@ public:
 		double balance,
 		double equity,
 		double floatingPnl,
-		double realizedPnl
+		double realizedPnl,
+		string event
 	) {
 		if (!context.IsEnabled()) {
 			return;
 		}
 
-		snapshots.StoreStrategy(magicNumber, balance, equity, floatingPnl, realizedPnl);
+		snapshots.StoreStrategy(magicNumber, balance, equity, floatingPnl, realizedPnl, event);
 	}
 
 	void StoreAssetSnapshot(
@@ -286,13 +287,14 @@ public:
 		double realizedPnl,
 		double bid,
 		double ask,
-		double usdRate
+		double usdRate,
+		string event
 	) {
 		if (!context.IsEnabled()) {
 			return;
 		}
 
-		assets.StoreSnapshot(assetUuid, balance, equity, floatingPnl, realizedPnl, bid, ask, usdRate);
+		assets.StoreSnapshot(assetUuid, balance, equity, floatingPnl, realizedPnl, bid, ask, usdRate, event);
 	}
 
 	void PostDirect(string path, JSON::Object &body) {

@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "0.02"
+#property version   "0.05"
 #property strict
 
 #include "enums/EDebugLevel.mqh"
@@ -8,6 +8,7 @@
 
 #include "helpers/HIsLiveTrading.mqh"
 #include "helpers/HGetLogsPath.mqh"
+#include "helpers/HGetSystemName.mqh"
 
 #include "services/SELogger/SELogger.mqh"
 #include "services/SEMessageBus/SEMessageBus.mqh"
@@ -38,6 +39,9 @@ input string HorizonMonitorPassword = ""; // [1] > HorizonMonitor password (requ
 #define POLL_INTERVAL_MS 100
 
 datetime lastDiagnosticTime = 0;
+datetime lastHeartbeatTime = 0;
+
+#define HEARTBEAT_INTERVAL_SECONDS 3600
 
 bool isOrderEndpoint(string path) {
 	return StringFind(path, API_ORDER_PATH_PREFIX) >= 0;
@@ -112,6 +116,18 @@ void executeMessage(SMessage &message, string path) {
 	SEMessageBus::Ack(MB_CHANNEL_CONNECTOR, message.sequence);
 }
 
+void sendHeartbeat() {
+	datetime now = TimeCurrent();
+
+	if ((now - lastHeartbeatTime) < HEARTBEAT_INTERVAL_SECONDS) {
+		return;
+	}
+
+	lastHeartbeatTime = now;
+
+	horizonMonitor.StoreSystemHeartbeat(GetSystemName(SYSTEM_MONITOR_SERVICE));
+}
+
 void logDiagnostics() {
 	datetime now = TimeCurrent();
 
@@ -143,8 +159,13 @@ int OnStart() {
 	}
 
 	if (horizonMonitor.IsEnabled()) {
-		horizonMonitor.UpsertAccount();
+		if (!horizonMonitor.UpsertAccount()) {
+			monitorLogger.Error("Failed to register account, service idle");
+			return 0;
+		}
+
 		SELogger::SetRemoteLogger(GetPointer(horizonMonitor));
+		sendHeartbeat();
 	}
 
 	if (!SEMessageBus::Initialize()) {
@@ -159,6 +180,7 @@ int OnStart() {
 		SEMessageBus::WaitForMessage(MB_CHANNEL_CONNECTOR, POLL_INTERVAL_MS);
 
 		processConnectorMessages();
+		sendHeartbeat();
 		logDiagnostics();
 	}
 

@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "0.02"
+#property version   "0.03"
 #property strict
 
 #include "enums/EDebugLevel.mqh"
@@ -164,7 +164,10 @@ int OnStart() {
 	}
 
 	if (horizonGateway.IsEnabled()) {
-		horizonGateway.UpsertAccount();
+		if (!horizonGateway.UpsertAccount()) {
+			gatewayLogger.Error("Failed to register account, service idle");
+			return 0;
+		}
 	}
 
 	if (!SEMessageBus::Initialize()) {

@@ -28,8 +28,8 @@ void HandleGetKlines(SGatewayEvent &event, HorizonGateway &gateway, SELogger &ev
 	}
 
 	string csvFileName = event.symbol + "_" + event.timeframe + ".csv";
-	EAccount account;
-	string csvPath = StringFormat("/Klines/%lld/%s", account.GetNumber(), csvFileName);
+	EAccount localAccount;
+	string csvPath = StringFormat("/Klines/%lld/%s", localAccount.GetNumber(), csvFileName);
 
 	int fileHandle = FileOpen(csvPath, FILE_WRITE | FILE_ANSI | FILE_COMMON, ",", CP_UTF8);
 

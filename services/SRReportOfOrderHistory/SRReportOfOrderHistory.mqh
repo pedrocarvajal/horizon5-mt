@@ -55,7 +55,7 @@ private:
 
 public:
 	SRReportOfOrderHistory(string symbol, string customReportName) {
-		initialize(GetReportsPath(symbol), customReportName);
+		initialize(REPORTS_PATH, customReportName);
 	}
 
 	void AddOrderSnapshot(const SSOrderHistory &snapshot) {
