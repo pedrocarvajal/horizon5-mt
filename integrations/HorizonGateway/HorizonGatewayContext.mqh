@@ -55,8 +55,8 @@ public:
 		accountUuid = uuid;
 	}
 
-	SRequestResponse Post(string path, JSON::Object &body, int timeout = 0) {
-		return request.Post(path, body, timeout);
+	SRequestResponse Post(string path, JSON::Object &body) {
+		return request.Post(path, body);
 	}
 
 	SRequestResponse Get(string path) {

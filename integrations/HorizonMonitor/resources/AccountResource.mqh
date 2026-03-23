@@ -28,7 +28,7 @@ public:
 		body.setProperty("broker_name", account.GetBrokerName());
 		body.setProperty("currency", account.GetCurrency());
 
-		context.Post("api/v1/account", body, 10000, false);
+		context.Post("api/v1/account", body, false);
 
 		context.SetAccountUuid(accountUuid);
 		logger.Info(StringFormat("Account registered | uuid: %s", accountUuid));

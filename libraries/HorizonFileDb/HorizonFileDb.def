@@ -1,0 +1,37 @@
+LIBRARY HorizonFileDb
+
+EXPORTS
+    FdbInit
+    FdbShutdown
+    FdbDatabaseCreate
+    FdbDatabaseDrop
+    FdbCollectionGet
+    FdbCollectionSetAutoFlush
+    FdbCollectionCount
+    FdbCollectionFlush
+    FdbCollectionLoad
+    FdbCollectionDrop
+    FdbCollectionDeleteFile
+    FdbInsertOne
+    FdbUpdateOne
+    FdbDeleteOne
+    FdbFindOne
+    FdbFindOneResultSize
+    FdbFindOneGetResult
+    FdbQueryCreate
+    FdbQueryReset
+    FdbQueryDestroy
+    FdbQueryWhereEquals
+    FdbQueryWhereEqualsNumber
+    FdbQueryWhereNotEquals
+    FdbQueryWhereNotEqualsNumber
+    FdbQueryWhereContains
+    FdbQueryWhereGreaterThan
+    FdbQueryWhereGreaterThanOrEqual
+    FdbQueryWhereLessThan
+    FdbQueryWhereLessThanOrEqual
+    FdbFind
+    FdbFindResultCount
+    FdbFindResultSize
+    FdbFindGetResult
+    FdbGetLastError

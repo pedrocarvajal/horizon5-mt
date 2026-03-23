@@ -62,7 +62,7 @@ public:
 		body.setProperty("name", strategyName);
 		body.setProperty("magic_number", (long)magicNumber);
 
-		context.Post("api/v1/strategy", body, 10000, false);
+		context.Post("api/v1/strategy", body, false);
 
 		registerStrategy(magicNumber, strategyUuid);
 		logger.Info(StringFormat("Strategy registered | %s | magic: %llu | uuid: %s", strategyName, magicNumber, strategyUuid));

@@ -54,8 +54,12 @@ public:
 
 		for (int i = 0; i < foundCount; i++) {
 			int result = loadAndValidateOrder(documents[i], restoredOrders, idsToDelete, i);
+			delete documents[i];
 
 			if (result == -1) {
+				for (int j = i + 1; j < foundCount; j++) {
+					delete documents[j];
+				}
 				return -1;
 			}
 
@@ -86,6 +90,7 @@ public:
 		bool result;
 
 		if (existing != NULL) {
+			delete existing;
 			result = ordersCollection.UpdateOne("_id", order.GetId(), json);
 		} else {
 			result = ordersCollection.InsertOne(json);
