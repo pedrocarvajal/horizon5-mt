@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "1.04"
+#property version   "0.05"
 #property strict
 
 #include "enums/EDebugLevel.mqh"
