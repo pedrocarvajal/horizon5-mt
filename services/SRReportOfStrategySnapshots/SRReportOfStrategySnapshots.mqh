@@ -26,7 +26,7 @@ public:
 		reportSymbol = symbol;
 		strategyName = name;
 		strategyPrefix = prefix;
-		initialize(GetReportsPath(symbol), customReportName);
+		initialize(REPORTS_PATH, customReportName);
 	}
 
 	void AddSnapshot(const SSStatisticsSnapshot &snapshot) {

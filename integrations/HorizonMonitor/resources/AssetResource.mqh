@@ -70,7 +70,8 @@ public:
 		double realizedPnl,
 		double bid,
 		double ask,
-		double usdRate
+		double usdRate,
+		string event
 	) {
 		JSON::Object body;
 		body.setProperty("asset_id", assetUuid);
@@ -81,6 +82,7 @@ public:
 		body.setProperty("bid", ClampNumeric(bid, 10, 5));
 		body.setProperty("ask", ClampNumeric(ask, 10, 5));
 		body.setProperty("usd_rate", ClampNumeric(usdRate, 7, 8));
+		body.setProperty("event", event);
 
 		context.Post("api/v1/assets/snapshots", body);
 	}

@@ -25,12 +25,14 @@ class SEAsset;
 #include "../services/SRPersistenceOfState/SRPersistenceOfState.mqh"
 
 #include "../services/SRImplementationOfHorizonMonitor/SRImplementationOfHorizonMonitor.mqh"
+#include "../services/SRReportOfMonitorSeed/SRReportOfMonitorSeed.mqh"
 
 #include "../entities/EOrder.mqh"
 
 extern SEDateTime dtime;
 extern SRImplementationOfHorizonMonitor horizonMonitor;
 extern STradingStatus tradingStatus;
+extern SRReportOfMonitorSeed *monitorSeedReporter;
 
 void SEOrderBook::NotifyOrderCancelled(EOrder &order) {
 	if (CheckPointer(listener) != POINTER_INVALID) {
@@ -257,6 +259,10 @@ public:
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
 		}
+
+		if (monitorSeedReporter != NULL && !isPassive) {
+			monitorSeedReporter.AddOrder(order);
+		}
 	}
 
 	virtual void OnCloseOrder(EOrder& order, ENUM_DEAL_REASON reason) {
@@ -271,6 +277,10 @@ public:
 
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
+		}
+
+		if (monitorSeedReporter != NULL && !isPassive) {
+			monitorSeedReporter.AddOrder(order);
 		}
 
 		detectManualClose(reason);
@@ -416,7 +426,7 @@ public:
 		}
 	}
 
-	void SyncSnapshot() {
+	void SyncSnapshot(string event) {
 		double floatingPnl = 0;
 
 		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
@@ -434,7 +444,8 @@ public:
 			balance,
 			equity,
 			floatingPnl,
-			realizedPnl
+			realizedPnl,
+			event
 		);
 	}
 

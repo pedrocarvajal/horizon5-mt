@@ -21,7 +21,7 @@ private:
 public:
 	SRReportOfMarketSnapshots(string symbol, string customReportName) {
 		reportSymbol = symbol;
-		initialize(GetReportsPath(symbol), customReportName);
+		initialize(REPORTS_PATH, customReportName);
 	}
 
 	void AddSnapshot(const SSMarketSnapshot &snapshot) {
