@@ -1,6 +1,9 @@
 *.log
 *.logs
 .DS_Store
+.env
 .claude/.env
 libraries/HorizonMessageBus/build/
 libraries/HorizonFileDb/build/
+scripts/cli/storage/results/
+scripts/cli/logs/

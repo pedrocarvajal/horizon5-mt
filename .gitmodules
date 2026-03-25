@@ -1,0 +1,4 @@
+[submodule "scripts/cli"]
+	path = scripts/cli
+	url = git@github.com:pedrocarvajal/horizon5-mt5-cli.git
+	ignore = dirty
