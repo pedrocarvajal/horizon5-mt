@@ -556,7 +556,7 @@ public:
 	}
 
 	void RegisterEntities() {
-		if (!horizonMonitor.IsEnabled()) {
+		if (!horizonMonitor.IsEnabled() && !horizonGateway.IsEnabled()) {
 			return;
 		}
 
