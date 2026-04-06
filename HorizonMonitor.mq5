@@ -18,7 +18,6 @@
 
 #include "integrations/HorizonMonitor/HorizonMonitor.mqh"
 
-
 #define MESSAGE_TYPE_HTTP_POST "http_post"
 #define API_ORDER_PATH_PREFIX  "api/v1/order"
 

@@ -1,5 +1,5 @@
 #property copyright "Horizon5, by Pedro Carvajal"
-#property version "0.346"
+#property version "0.358"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 #include <Trade/Trade.mqh>
@@ -27,6 +27,7 @@
 #include "services/SRImplementationOfHorizonMonitor/SRImplementationOfHorizonMonitor.mqh"
 #include "services/SRImplementationOfHorizonGateway/SRImplementationOfHorizonGateway.mqh"
 #include "services/SRReportOfMonitorSeed/SRReportOfMonitorSeed.mqh"
+#include "services/SRAccountAuditor/SRAccountAuditor.mqh"
 
 EAccount account;
 SEDateTime dtime;
@@ -35,6 +36,7 @@ SRImplementationOfHorizonMonitor horizonMonitor;
 SRImplementationOfHorizonGateway horizonGateway;
 STradingStatus tradingStatus;
 SRReportOfMonitorSeed *monitorSeedReporter = NULL;
+SRAccountAuditor accountAuditor;
 
 input group "General Settings";
 input int TickIntervalTime = 60; // [1] > Tick interval (1 = 1 second by tick)
@@ -176,17 +178,7 @@ void CheckServiceHealth() {
 }
 
 void CollectAccountSeedSnapshot(ENUM_SNAPSHOT_EVENT event) {
-	double seedFloatingPnl = 0;
-	double seedRealizedPnl = 0;
-
-	for (int i = 0; i < ArraySize(assets); i++) {
-		assets[i].AggregateSnapshotData(seedFloatingPnl, seedRealizedPnl);
-	}
-
-	monitorSeedReporter.AddAccountSnapshot(
-		account.GetBalance(), account.GetEquity(), account.GetMargin(),
-		seedFloatingPnl, seedRealizedPnl, event, dtime.Timestamp()
-	);
+	accountAuditor.CollectAccountSeedSnapshot(event);
 }
 
 void InitializeMonitorSeedReporter() {
@@ -298,33 +290,8 @@ int OnInit() {
 		return INIT_FAILED;
 	}
 
-	if (IsLiveTrading()) {
-		int trackedOrderCount = 0;
-		int trackedStrategyCount = 0;
-
-		for (int i = 0; i < assetCount; i++) {
-			if (!assets[i].IsEnabled()) {
-				continue;
-			}
-
-			for (int j = 0; j < assets[i].GetStrategyCount(); j++) {
-				trackedStrategyCount++;
-				SEOrderBook *book = assets[i].GetStrategyAtIndex(j).GetOrderBook();
-				trackedOrderCount += book.GetOpenOrderCount();
-			}
-		}
-
-		int metatraderPositions = PositionsTotal();
-		int metatraderPendingOrders = OrdersTotal();
-
-		logger.Info(StringFormat(
-			"Order summary | MT5 positions: %d | MT5 pending: %d | Tracked orders: %d | Strategies: %d",
-			metatraderPositions,
-			metatraderPendingOrders,
-			trackedOrderCount,
-			trackedStrategyCount
-		));
-	}
+	accountAuditor.Initialize(assets, assetCount);
+	accountAuditor.AuditOrders();
 
 	if (IsLiveTrading()) {
 		string requiredServices[];
@@ -505,6 +472,10 @@ void OnTimer() {
 		}
 
 		SendServiceHeartbeats();
+	}
+
+	if (isStartHour) {
+		accountAuditor.AuditOrders();
 	}
 }
 
