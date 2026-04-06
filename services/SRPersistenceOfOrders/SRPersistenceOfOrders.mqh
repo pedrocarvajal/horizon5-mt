@@ -9,6 +9,8 @@
 
 #include "../../entities/EOrder.mqh"
 
+#define EXPIRED_ORDER_THRESHOLD_SECONDS 3600
+
 extern SEDateTime dtime;
 
 class SRPersistenceOfOrders {
@@ -99,6 +101,7 @@ public:
 		delete json;
 
 		if (result) {
+			ordersCollection.Flush();
 			logger.Debug(StringFormat("Order saved to database: %s", order.GetId()));
 		}
 
@@ -117,6 +120,7 @@ public:
 		bool result = ordersCollection.DeleteOne("_id", orderId);
 
 		if (result) {
+			ordersCollection.Flush();
 			logger.Debug(StringFormat("Order deleted from database: %s", orderId));
 		}
 
@@ -133,76 +137,18 @@ public:
 	}
 
 private:
-	bool isExpiredOrder(EOrder &order) {
-		if (order.GetStatus() != ORDER_STATUS_CLOSED && order.GetStatus() != ORDER_STATUS_CANCELLED) {
-			return false;
-		}
-
-		datetime closeTimestamp = order.GetCloseAt().timestamp;
-
-		if (closeTimestamp == 0) {
-			return false;
-		}
-
-		return (TimeCurrent() - closeTimestamp) > 3600;
-	}
-
-	int loadAndValidateOrder(JSON::Object *document, EOrder &restoredOrders[], string &idsToDelete[], int index) {
-		EOrder order;
-
-		if (!deserializeOrder(document, order)) {
-			logger.Error(StringFormat(
-				"CRITICAL ERROR: Failed to deserialize order document at index %d",
-				index
-			));
-			return -1;
-		}
-
-		if (isExpiredOrder(order)) {
-			int deleteSize = ArraySize(idsToDelete);
-			ArrayResize(idsToDelete, deleteSize + 1);
-			idsToDelete[deleteSize] = order.GetId();
-			return 0;
-		}
-
-		if (!validateOrderExists(order)) {
-			if (reconcileClosedOrder(order)) {
-				logger.Info(StringFormat(
-					"Order reconciled from MT5 history: %s (closed while EA was offline)",
-					order.GetId()
-				));
-
-				ArrayResize(restoredOrders, ArraySize(restoredOrders) + 1);
-				restoredOrders[ArraySize(restoredOrders) - 1] = order;
-				return 1;
-			}
-
-			logger.Warning(StringFormat(
-				"Order no longer exists in MetaTrader and not found in history, cleaning up: %s",
-				order.GetId()
-			));
-
-			int deleteSize = ArraySize(idsToDelete);
-			ArrayResize(idsToDelete, deleteSize + 1);
-			idsToDelete[deleteSize] = order.GetId();
-			return 0;
-		}
-
+	void appendOrder(EOrder &restoredOrders[], EOrder &order) {
 		ArrayResize(restoredOrders, ArraySize(restoredOrders) + 1);
 		restoredOrders[ArraySize(restoredOrders) - 1] = order;
-
-		logger.Info(StringFormat(
-			"Order loaded successfully: %s (Status: %s)",
-			order.GetId(),
-			EnumToString(order.GetStatus())
-		));
-
-		return 1;
 	}
 
 	void cleanupOrphanedOrders(string &idsToDelete[]) {
 		for (int i = 0; i < ArraySize(idsToDelete); i++) {
 			ordersCollection.DeleteOne("_id", idsToDelete[i]);
+		}
+
+		if (ArraySize(idsToDelete) > 0) {
+			ordersCollection.Flush();
 		}
 	}
 
@@ -251,44 +197,72 @@ private:
 		return true;
 	}
 
-	JSON::Object *serializeOrder(EOrder &order) {
-		JSON::Object *json = new JSON::Object();
+	bool isExpiredOrder(EOrder &order) {
+		if (order.GetStatus() != ORDER_STATUS_CLOSED && order.GetStatus() != ORDER_STATUS_CANCELLED) {
+			return false;
+		}
 
-		json.setProperty("_id", order.GetId());
-		json.setProperty("is_initialized", order.IsInitialized());
-		json.setProperty("is_processed", order.IsProcessed());
-		json.setProperty("is_market_order", order.IsMarketOrder());
-		json.setProperty("pending_to_open", order.IsPendingToOpen());
-		json.setProperty("pending_to_close", order.IsPendingToClose());
-		json.setProperty("retry_count", order.GetRetryCount());
-		json.setProperty("retry_after", (long)order.GetRetryAfter());
-		json.setProperty("status", (int)order.GetStatus());
+		datetime closeTimestamp = order.GetCloseAt().timestamp;
 
-		json.setProperty("source", order.GetSource());
-		json.setProperty("symbol", order.GetSymbol());
-		json.setProperty("magic_number", (long)order.GetMagicNumber());
-		json.setProperty("side", order.GetSide());
-		json.setProperty("order_id", (long)order.GetOrderId());
-		json.setProperty("deal_id", (long)order.GetDealId());
-		json.setProperty("position_id", (long)order.GetPositionId());
+		if (closeTimestamp == 0) {
+			return false;
+		}
 
-		json.setProperty("volume", order.GetVolume());
-		json.setProperty("signal_price", order.GetSignalPrice());
-		json.setProperty("open_at_price", order.GetOpenAtPrice());
-		json.setProperty("open_price", order.GetOpenPrice());
-		json.setProperty("take_profit_price", order.GetTakeProfitPrice());
-		json.setProperty("stop_loss_price", order.GetStopLossPrice());
+		return (TimeCurrent() - closeTimestamp) > EXPIRED_ORDER_THRESHOLD_SECONDS;
+	}
 
-		json.setProperty("close_price", order.GetClosePrice());
-		json.setProperty("profit_in_dollars", order.GetProfitInDollars());
-		json.setProperty("order_close_reason", (int)order.GetCloseReason());
+	int loadAndValidateOrder(JSON::Object *document, EOrder &restoredOrders[], string &idsToDelete[], int index) {
+		EOrder order;
 
-		json.setProperty("signal_at", (long)order.GetSignalAt().timestamp);
-		json.setProperty("open_at", (long)order.GetOpenAt().timestamp);
-		json.setProperty("close_at", (long)order.GetCloseAt().timestamp);
-		json.setProperty("saved_at", (long)dtime.Timestamp());
+		if (!deserializeOrder(document, order)) {
+			logger.Error(StringFormat(
+				"CRITICAL ERROR: Failed to deserialize order document at index %d",
+				index
+			));
+			return -1;
+		}
 
-		return json;
+		if (isExpiredOrder(order)) {
+			int deleteSize = ArraySize(idsToDelete);
+			ArrayResize(idsToDelete, deleteSize + 1);
+			idsToDelete[deleteSize] = order.GetId();
+			return 0;
+		}
+
+		if (!validateOrderExists(order)) {
+			if (reconcileClosedOrder(order)) {
+				logger.Info(StringFormat(
+					"Order reconciled from MT5 history: %s (closed while EA was offline)",
+					order.GetId()
+				));
+
+				appendOrder(restoredOrders, order);
+				return 1;
+			}
+
+			logger.Warning(StringFormat(
+				"Order no longer exists in MetaTrader and not found in history, marking as cancelled: %s",
+				order.GetId()
+			));
+
+			order.SetStatus(ORDER_STATUS_CANCELLED);
+			order.SetIsProcessed(true);
+			SDateTime cancelTime = dtime.Now();
+			order.SetCloseAt(cancelTime);
+
+			appendOrder(restoredOrders, order);
+			return 1;
+		}
+
+		appendOrder(restoredOrders, order);
+
+		logger.Info(StringFormat(
+			"Order loaded successfully: %s (Status: %s)",
+			order.GetId(),
+			EnumToString(order.GetStatus())
+		));
+
+		return 1;
 	}
 
 	bool reconcileClosedOrder(EOrder &order) {
@@ -338,12 +312,54 @@ private:
 			order.SetCloseReason(dealReason);
 			order.SetStatus(ORDER_STATUS_CLOSED);
 
-			ordersCollection.UpdateOne("_id", order.GetId(), serializeOrder(order));
+			JSON::Object *json = serializeOrder(order);
+			ordersCollection.UpdateOne("_id", order.GetId(), json);
+			delete json;
 
 			return true;
 		}
 
 		return false;
+	}
+
+	JSON::Object *serializeOrder(EOrder &order) {
+		JSON::Object *json = new JSON::Object();
+
+		json.setProperty("_id", order.GetId());
+		json.setProperty("is_initialized", order.IsInitialized());
+		json.setProperty("is_processed", order.IsProcessed());
+		json.setProperty("is_market_order", order.IsMarketOrder());
+		json.setProperty("pending_to_open", order.IsPendingToOpen());
+		json.setProperty("pending_to_close", order.IsPendingToClose());
+		json.setProperty("retry_count", order.GetRetryCount());
+		json.setProperty("retry_after", (long)order.GetRetryAfter());
+		json.setProperty("status", (int)order.GetStatus());
+
+		json.setProperty("source", order.GetSource());
+		json.setProperty("symbol", order.GetSymbol());
+		json.setProperty("magic_number", (long)order.GetMagicNumber());
+		json.setProperty("side", order.GetSide());
+		json.setProperty("order_id", (long)order.GetOrderId());
+		json.setProperty("deal_id", (long)order.GetDealId());
+		json.setProperty("position_id", (long)order.GetPositionId());
+
+		json.setProperty("volume", order.GetVolume());
+		json.setProperty("signal_price", order.GetSignalPrice());
+		json.setProperty("open_at_price", order.GetOpenAtPrice());
+		json.setProperty("open_price", order.GetOpenPrice());
+		json.setProperty("take_profit_price", order.GetTakeProfitPrice());
+		json.setProperty("stop_loss_price", order.GetStopLossPrice());
+
+		json.setProperty("close_price", order.GetClosePrice());
+		json.setProperty("profit_in_dollars", order.GetProfitInDollars());
+		json.setProperty("order_close_reason", (int)order.GetCloseReason());
+
+		json.setProperty("signal_at", (long)order.GetSignalAt().timestamp);
+		json.setProperty("open_at", (long)order.GetOpenAt().timestamp);
+		json.setProperty("close_at", (long)order.GetCloseAt().timestamp);
+		json.setProperty("saved_at", (long)dtime.Timestamp());
+
+		return json;
 	}
 
 	bool validateOrderExists(EOrder &order) {

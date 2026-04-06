@@ -46,6 +46,12 @@ void SEOrderBook::NotifyOrderPlaced(EOrder &order) {
 	}
 }
 
+void SEOrderBook::NotifyOrderUpdated(EOrder &order) {
+	if (CheckPointer(listener) != POINTER_INVALID) {
+		listener.OnOrderUpdated(order);
+	}
+}
+
 class SEStrategy:
 public IStrategy {
 private:
@@ -265,6 +271,10 @@ public:
 		}
 	}
 
+	virtual void OnOrderUpdated(EOrder& order) {
+		horizonMonitor.UpsertOrder(order);
+	}
+
 	virtual void OnCloseOrder(EOrder& order, ENUM_DEAL_REASON reason) {
 		statistics.OnCloseOrder(order, orderBook.orders);
 		orderBook.OnOrderClosed();
@@ -419,8 +429,7 @@ public:
 	void SyncOrders() {
 		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
 			EOrder *order = orderBook.GetOrderAtIndex(i);
-			if (order != NULL && (order.GetStatus() == ORDER_STATUS_OPEN ||
-					      order.GetStatus() == ORDER_STATUS_PENDING)) {
+			if (order != NULL && order.GetStatus() != ORDER_STATUS_CLOSED) {
 				horizonMonitor.UpsertOrder(order);
 			}
 		}

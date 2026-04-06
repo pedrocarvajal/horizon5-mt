@@ -92,6 +92,10 @@ public:
 		dealId = 0;
 		orderId = 0;
 		positionId = 0;
+
+		ZeroMemory(signalAt);
+		ZeroMemory(openAt);
+		ZeroMemory(closeAt);
 	}
 
 	EOrder(const EOrder& other) {
@@ -182,6 +186,10 @@ public:
 		dealId = 0;
 		orderId = 0;
 		positionId = 0;
+
+		ZeroMemory(signalAt);
+		ZeroMemory(openAt);
+		ZeroMemory(closeAt);
 	}
 
 	void BuildSnapshot() {

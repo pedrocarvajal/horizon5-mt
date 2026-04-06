@@ -7,3 +7,4 @@ libraries/HorizonMessageBus/build/
 libraries/HorizonFileDb/build/
 scripts/cli/storage/results/
 scripts/cli/logs/
+NOTES.md
