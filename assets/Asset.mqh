@@ -279,7 +279,6 @@ public:
 		}
 
 		book.CancelOrder(order);
-		strategies[strategyIndex].OnCancelOrder(order);
 		remoteOrderManager.OnCancelOrder(order);
 
 		return true;
