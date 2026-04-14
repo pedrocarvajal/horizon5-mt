@@ -1,5 +1,5 @@
 #property copyright "Horizon5, by Pedro Carvajal"
-#property version "0.401"
+#property version "0.406"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 #include <Trade/Trade.mqh>
@@ -371,10 +371,8 @@ int OnInit() {
 		SendServiceHeartbeats();
 	}
 
-	logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat(
-		"service started | system=Horizon version=0.401 built='%s'",
-		(string)__DATETIME__
-	));
+	logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+		"service started | system=Horizon version=0.406 built='2026-04-14 19:59:38'");
 
 	return INIT_SUCCEEDED;
 }
