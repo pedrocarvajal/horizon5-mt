@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join, dirname, resolve } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { log, STEPS } from "./report/logger.js";
@@ -27,16 +33,31 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const STORAGE_DIR = join(SCRIPT_DIR, "storage");
 
 async function main() {
-  const reportPath = process.argv[2];
-  const reportName = process.argv[3] || `HZ5_${Date.now()}`;
+  const args = process.argv.slice(2);
+  let clean = true;
+  const positional = [];
+  for (const arg of args) {
+    if (arg === "--no-clean" || arg === "--clean=false") {
+      clean = false;
+    } else if (arg === "--clean" || arg === "--clean=true") {
+      clean = true;
+    } else {
+      positional.push(arg);
+    }
+  }
+  const reportPath = positional[0];
+  const reportName = positional[1] || `HZ5_${Date.now()}`;
 
   if (!reportPath) {
-    console.error("Usage: node generate_report.js <report_path> [report_name]");
+    console.error(
+      "Usage: node generate_report.js <report_path> [report_name] [--no-clean]",
+    );
     console.error(
       "Example: node generate_report.js /path/to/storage/results/1744329600 MyReport",
     );
+    console.error("  If report_name is omitted, defaults to HZ5_{timestamp}");
     console.error(
-      "  If report_name is omitted, defaults to HZ5_{timestamp}",
+      "  --no-clean: keep intermediate files in storage/ (default: cleaned)",
     );
     process.exit(1);
   }
@@ -225,6 +246,15 @@ async function main() {
   const pdfPath = join(STORAGE_DIR, `${reportName}.pdf`);
   await renderHtmlToPdf(htmlContent, pdfPath);
   log(STEPS.pdf, `  PDF saved to: ${pdfPath}`);
+
+  if (clean) {
+    log(STEPS.clean, "Cleaning intermediate files (keeping PDF)...");
+    const pdfFile = basename(pdfPath);
+    for (const entry of readdirSync(STORAGE_DIR, { withFileTypes: true })) {
+      if (entry.name === pdfFile) continue;
+      rmSync(join(STORAGE_DIR, entry.name), { recursive: true, force: true });
+    }
+  }
 
   log(STEPS.done, "Report generation complete!");
 }
