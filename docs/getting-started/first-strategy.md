@@ -135,7 +135,7 @@ private:
 - **Set name and prefix in the constructor** -- `SetName("Savannah")` and `SetPrefix("SVN")`. The 3-letter prefix must be unique across all strategies in the entire portfolio.
 - **Call the parent in overrides** -- always call `SEStrategy::OnInit()` at the start of `OnInit()` and `SEStrategy::OnStartHour()` at the start of `OnStartHour()`. The base class performs critical setup in these methods.
 - **Use shift=1** -- when reading indicator values, use shift 1 (the previous closed bar) to avoid repainting signals on the current forming bar.
-- **Guard against duplicate orders** -- use `orderBook.HasActiveOrders()`, `orderBook.HasOpenPosition()`, or `orderBook.HasPendingOrder()` before placing orders.
+- **Guard against duplicate orders** -- use `orderBook.HasActiveOrders()` or `orderBook.HasPendingOrder()` before placing orders.
 - **Position sizing** -- `GetLotSizeByStopLoss(stopLossDistance)` calculates the lot size based on the equity-at-risk percentage configured in the EA inputs.
 - **Release indicator handles** -- always release handles in the destructor with `IndicatorRelease()`.
 - **Normalize before placing** -- use `NormalizeLotSize()` and `FixMarketPrice()` to round values to broker-valid increments.

@@ -10,121 +10,43 @@
 
 #include "../../entities/EOrder.mqh"
 
-extern SEDateTime dtime;
+#include "components/NavTracker.mqh"
+#include "components/PerformanceTracker.mqh"
+#include "components/DrawdownTracker.mqh"
+#include "components/OrderHistoryTracker.mqh"
 
-#define DRAWDOWN_EPSILON 0.0000001
+#include "helpers/HCalculateFloatingPnl.mqh"
+#include "helpers/HCalculateQuality.mqh"
+#include "helpers/HBuildStatisticsSnapshot.mqh"
+
+extern SEDateTime dtime;
 
 class SEStatistics {
 private:
 	string id;
 	datetime startTime;
-
-	double nav[];
-	double performance[];
-	double returns[];
-
-	double navPeak;
-	double navYesterday;
-	double dailyPerformance;
-
-	double drawdownMaxInDollars;
-	double drawdownMaxInPercentage;
-
-	SSOrderHistory ordersHistory[];
-	EOrder lastClosedOrders[];
-
 	double initialBalance;
 
-	void updatePerformance(double nextPerformance) {
-		performance[ArraySize(performance) - 1] = nextPerformance;
-	}
+	NavTracker navTracker;
+	PerformanceTracker performanceTracker;
+	DrawdownTracker drawdownTracker;
+	OrderHistoryTracker orderHistoryTracker;
 
 	void processPendingOrders() {
-		if (ArraySize(lastClosedOrders) == 0) {
+		if (!orderHistoryTracker.HasPending()) {
 			return;
 		}
 
-		int lastIndex = ArraySize(performance) - 1;
-		double prevPerformance = (lastIndex >= 0) ? performance[lastIndex] : 0;
-		double nextPerformance = prevPerformance;
-
-		for (int i = 0; i < ArraySize(lastClosedOrders); i++) {
-			nextPerformance += lastClosedOrders[i].GetProfitInDollars();
-		}
-
-		updatePerformance(nextPerformance);
-
-		ArrayResize(lastClosedOrders, 0);
+		double pending = orderHistoryTracker.ConsumePendingClosedProfit();
+		performanceTracker.ApplyPendingProfit(pending);
 	}
 
-	SSStatisticsSnapshot buildSnapshotData(SSQualityResult &quality) {
-		SSStatisticsSnapshot snapshotData;
-		snapshotData.timestamp = dtime.Now().timestamp;
-		snapshotData.id = id;
-
-		ArrayResize(snapshotData.orders, ArraySize(ordersHistory));
-		for (int i = 0; i < ArraySize(ordersHistory); i++) {
-			snapshotData.orders[i] = ordersHistory[i];
-		}
-
-		ArrayResize(snapshotData.nav, ArraySize(nav));
-		ArrayCopy(snapshotData.nav, nav);
-
-		ArrayResize(snapshotData.performance, ArraySize(performance));
-		ArrayCopy(snapshotData.performance, performance);
-
-		snapshotData.navPeak = navPeak;
-		snapshotData.drawdownMaxInDollars = drawdownMaxInDollars;
-		snapshotData.drawdownMaxInPercentage = drawdownMaxInPercentage;
-
-		snapshotData.quality = quality.quality;
-		snapshotData.qualityReason = quality.reason;
-
-		if (ArraySize(nav) > 1 && nav[ArraySize(nav) - 2] != 0.0) {
-			snapshotData.dailyPerformance = dailyPerformance / nav[ArraySize(nav) - 2];
-		} else {
-			snapshotData.dailyPerformance = 0.0;
-		}
-
-		return snapshotData;
-	}
-
-	double calculateFloatingPnL(EOrder &strategyOrders[]) {
-		double floatingPnL = 0.0;
-
-		for (int i = 0; i < ArraySize(strategyOrders); i++) {
-			if (strategyOrders[i].GetStatus() == ORDER_STATUS_OPEN) {
-				floatingPnL += strategyOrders[i].GetFloatingPnL();
-			}
-		}
-
-		return floatingPnL;
-	}
-
-	double calculatePendingClosedProfit() {
-		double pendingProfit = 0.0;
-
-		for (int i = 0; i < ArraySize(lastClosedOrders); i++) {
-			pendingProfit += lastClosedOrders[i].GetProfitInDollars();
-		}
-
-		return pendingProfit;
-	}
-
-	void updateDrawdownWithFloatingPnL(EOrder &strategyOrders[]) {
-		int lastIndex = ArraySize(performance) - 1;
-		double currentPerformance = (lastIndex >= 0) ? performance[lastIndex] : 0;
-		double pendingClosedProfit = calculatePendingClosedProfit();
-		double floatingPnL = calculateFloatingPnL(strategyOrders);
-		double realNav = initialBalance + currentPerformance + pendingClosedProfit + floatingPnL;
-		double drawdownInDollars = navPeak - realNav;
-
-		if (drawdownInDollars > drawdownMaxInDollars) {
-			drawdownMaxInDollars = drawdownInDollars;
-			drawdownMaxInPercentage = (navPeak > 0)
-				? drawdownMaxInDollars / navPeak
-				: 0.0;
-		}
+	void updateDrawdownWithFloatingPnl(EOrder &strategyOrders[]) {
+		double realNav = initialBalance
+				 + performanceTracker.GetLatest()
+				 + orderHistoryTracker.GetPendingClosedProfit()
+				 + CalculateFloatingPnl(strategyOrders);
+		drawdownTracker.Update(navTracker.GetPeak(), realNav);
 	}
 
 public:
@@ -134,19 +56,37 @@ public:
 		id = TimeToString(dtime.Now().timestamp, TIME_DATE | TIME_SECONDS);
 		startTime = dtime.Now().timestamp;
 
-		ArrayResize(nav, 1);
-		nav[0] = allocatedBalance;
-		navPeak = nav[0];
-		navYesterday = allocatedBalance;
-		dailyPerformance = 0.0;
+		navTracker.Initialize(allocatedBalance);
+	}
 
-		ArrayResize(performance, 1);
-		performance[0] = 0.0;
+	double GetClosedNav() {
+		return initialBalance
+		       + performanceTracker.GetLatest()
+		       + orderHistoryTracker.GetPendingClosedProfit();
+	}
 
-		ArrayResize(returns, 0);
+	SSStatisticsSnapshot GetDailySnapshot() {
+		processPendingOrders();
+		SSQualityResult quality = GetQuality();
+		SSStatisticsSnapshot snapshotData = BuildStatisticsSnapshot(
+			id,
+			dtime.Now().timestamp,
+			GetPointer(navTracker),
+			GetPointer(performanceTracker),
+			GetPointer(drawdownTracker),
+			GetPointer(orderHistoryTracker),
+			quality
+		);
+		ArrayResize(snapshotData.orders, 0);
+		return snapshotData;
+	}
 
-		drawdownMaxInDollars = 0.0;
-		drawdownMaxInPercentage = 0.0;
+	double GetDrawdownMaxInDollars() {
+		return drawdownTracker.GetMaxInDollars();
+	}
+
+	double GetDrawdownMaxInPercentage() {
+		return drawdownTracker.GetMaxInPercentage();
 	}
 
 	double GetInitialBalance() {
@@ -154,98 +94,52 @@ public:
 	}
 
 	double GetNav() {
-		if (ArraySize(nav) == 0) {
-			return 0.0;
-		}
-
-		return nav[ArraySize(nav) - 1];
+		return navTracker.GetLatest();
 	}
 
-	double GetClosedNav() {
-		int lastIndex = ArraySize(performance) - 1;
-		double currentPerformance = (lastIndex >= 0) ? performance[lastIndex] : 0;
-		return initialBalance + currentPerformance + calculatePendingClosedProfit();
+	void GetNavArray(double &target[]) {
+		navTracker.CopyNav(target);
 	}
 
 	double GetNavPeak() {
-		return navPeak;
+		return navTracker.GetPeak();
 	}
 
-	double GetDailyPerformance() {
-		return dailyPerformance;
+	double GetNavYesterday() {
+		return navTracker.GetYesterday();
+	}
+
+	void GetOrdersHistory(SSOrderHistory &target[]) {
+		orderHistoryTracker.CopyOrdersHistory(target);
+	}
+
+	void GetPerformanceArray(double &target[]) {
+		performanceTracker.CopyPerformance(target);
+	}
+
+	SSQualityResult GetQuality() {
+		return CalculateQuality(performanceTracker.GetLatest(), drawdownTracker.GetMaxInDollars());
+	}
+
+	void GetReturnsArray(double &target[]) {
+		performanceTracker.CopyReturns(target);
 	}
 
 	datetime GetStartTime() {
 		return startTime;
 	}
 
-	double GetNavYesterday() {
-		return navYesterday;
+	double GetTodayClosedPnl() {
+		return orderHistoryTracker.GetTodayClosedPnl();
 	}
 
-	double GetDrawdownMaxInDollars() {
-		return drawdownMaxInDollars;
-	}
-
-	double GetDrawdownMaxInPercentage() {
-		return drawdownMaxInPercentage;
-	}
-
-	void GetNavArray(double &target[]) {
-		ArrayResize(target, ArraySize(nav));
-		ArrayCopy(target, nav);
-	}
-
-	void GetPerformanceArray(double &target[]) {
-		ArrayResize(target, ArraySize(performance));
-		ArrayCopy(target, performance);
-	}
-
-	void GetReturnsArray(double &target[]) {
-		ArrayResize(target, ArraySize(returns));
-		ArrayCopy(target, returns);
-	}
-
-	void GetOrdersHistory(SSOrderHistory &target[]) {
-		ArrayResize(target, ArraySize(ordersHistory));
-
-		for (int i = 0; i < ArraySize(ordersHistory); i++) {
-			target[i] = ordersHistory[i];
-		}
-	}
-
-	SSQualityResult GetQuality() {
-		SSQualityResult result;
-
-		int lastIndex = ArraySize(performance) - 1;
-		double totalPerformance = (lastIndex >= 0) ? performance[lastIndex] : 0;
-
-		if (totalPerformance <= 0) {
-			result.quality = 0;
-			result.reason = "Total performance is zero or negative";
-			return result;
-		}
-
-		if (drawdownMaxInDollars <= DRAWDOWN_EPSILON) {
-			result.quality = 0;
-			result.reason = "Maximum drawdown is zero";
-			return result;
-		}
-
-		result.quality = totalPerformance / drawdownMaxInDollars;
-		result.reason = NULL;
-
-		return result;
+	double GetTodayTotalPnl(EOrder &strategyOrders[]) {
+		return orderHistoryTracker.GetTodayClosedPnl() + CalculateFloatingPnl(strategyOrders);
 	}
 
 	void OnCloseOrder(EOrder &order, EOrder &strategyOrders[]) {
-		ArrayResize(lastClosedOrders, ArraySize(lastClosedOrders) + 1);
-		lastClosedOrders[ArraySize(lastClosedOrders) - 1] = order;
-
-		ArrayResize(ordersHistory, ArraySize(ordersHistory) + 1);
-		ordersHistory[ArraySize(ordersHistory) - 1] = order.GetSnapshot();
-
-		updateDrawdownWithFloatingPnL(strategyOrders);
+		orderHistoryTracker.RegisterClose(order);
+		updateDrawdownWithFloatingPnl(strategyOrders);
 	}
 
 	void OnForceEnd() {
@@ -257,73 +151,37 @@ public:
 			return;
 		}
 
-		updateDrawdownWithFloatingPnL(strategyOrders);
+		updateDrawdownWithFloatingPnl(strategyOrders);
 	}
 
 	void OnStartDay(EOrder &strategyOrders[]) {
 		processPendingOrders();
+		orderHistoryTracker.ResetTodayClosedPnl();
 
-		ArrayResize(performance, ArraySize(performance) + 1);
-		ArrayResize(nav, ArraySize(nav) + 1);
+		performanceTracker.StartNewDay();
 
-		int lastIndex = ArraySize(performance) - 2;
-		double prevPerformance = (lastIndex >= 0) ? performance[lastIndex] : 0;
-		performance[ArraySize(performance) - 1] = prevPerformance;
-
-		double floatingPnL = calculateFloatingPnL(strategyOrders);
+		double prevPerformance = performanceTracker.GetLatest();
+		double floatingPnl = CalculateFloatingPnl(strategyOrders);
 		double closedNav = initialBalance + prevPerformance;
-		double realNav = closedNav + floatingPnL;
+		double realNav = closedNav + floatingPnl;
 
-		nav[ArraySize(nav) - 1] = realNav;
+		navTracker.AppendDay(realNav);
 
-		if (realNav > navPeak) {
-			navPeak = realNav;
-		}
+		updateDrawdownWithFloatingPnl(strategyOrders);
 
-		updateDrawdownWithFloatingPnL(strategyOrders);
-
-		dailyPerformance = realNav - navYesterday;
-		navYesterday = realNav;
-
-		ArrayResize(returns, ArraySize(returns) + 1);
-		returns[ArraySize(returns) - 1] = dailyPerformance;
+		performanceTracker.AppendReturn(navTracker.GetDailyPerformance());
 	}
 
 	void OnStartHour() {
 	}
 
-	SSStatisticsSnapshot GetDailySnapshot() {
-		processPendingOrders();
-		SSQualityResult quality = GetQuality();
-		SSStatisticsSnapshot snapshotData = buildSnapshotData(quality);
-		ArrayResize(snapshotData.orders, 0);
-		return snapshotData;
-	}
-
 	void RestoreState(SStatisticsState &state) {
 		startTime = state.startTime;
-		navPeak = state.navPeak;
-		navYesterday = state.navYesterday;
-		drawdownMaxInDollars = state.drawdownMaxInDollars;
-		drawdownMaxInPercentage = state.drawdownMaxInPercentage;
 
-		ArrayResize(nav, ArraySize(state.nav));
-		ArrayCopy(nav, state.nav);
-
-		ArrayResize(performance, ArraySize(state.performance));
-		ArrayCopy(performance, state.performance);
-
-		ArrayResize(returns, ArraySize(state.returns));
-		ArrayCopy(returns, state.returns);
-
-		ArrayResize(ordersHistory, ArraySize(state.ordersHistory));
-		for (int i = 0; i < ArraySize(state.ordersHistory); i++) {
-			ordersHistory[i] = state.ordersHistory[i];
-		}
-
-		if (ArraySize(nav) > 0) {
-			dailyPerformance = nav[ArraySize(nav) - 1] - navYesterday;
-		}
+		navTracker.Restore(state.nav, state.navPeak, state.navYesterday);
+		performanceTracker.Restore(state.performance, state.returns);
+		drawdownTracker.Restore(state.drawdownMaxInDollars, state.drawdownMaxInPercentage);
+		orderHistoryTracker.Restore(state.ordersHistory);
 	}
 };
 

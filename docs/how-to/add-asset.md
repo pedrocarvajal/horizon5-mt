@@ -11,7 +11,6 @@ Example: `assets/Forex/EURUSD.mqh`.
 Extend `SEAsset`, set the name and broker symbol, call `Setup()`, and register strategies:
 
 ```mql5
-#include "../../strategies/Generic/Gateway/Gateway.mqh"
 #include "../Asset.mqh"
 
 input group "[EURUSD] Strategies >";
@@ -27,9 +26,6 @@ public:
     }
 
     void Setup() {
-        Gateway *gateway = new Gateway();
-        AddStrategy(gateway);
-
         if (EURUSDExampleEnabled) {
             // instantiate and AddStrategy(...)
         }
@@ -42,7 +38,7 @@ Key points:
 - `SetName()` -- lowercase identifier used in logs and file paths.
 - `SetSymbol()` -- must match the exact broker symbol string in MetaTrader 5.
 - `Setup()` -- must be called at the end of the constructor. It instantiates strategies based on the input toggles.
-- The `Gateway` strategy is always added (it is passive and handles remote order management).
+- Gateway (inbound order commands + outbound notifications) is handled per-asset by `SEGateway`, which is instantiated automatically inside `SEAsset` — no manual registration needed.
 
 ## 3. Register in configs/Assets.mqh
 

@@ -2,6 +2,8 @@
 #define __E_ORDER_MQH__
 
 #include "../enums/EOrderStatuses.mqh"
+
+#include "../structs/SOrderRetryState.mqh"
 #include "../structs/SSOrderHistory.mqh"
 
 #include "../helpers/HGenerateUuid.mqh"
@@ -26,6 +28,11 @@ private:
 	bool pendingToOpen;
 	bool pendingToClose;
 
+	SOrderRetryState openRetry;
+	SOrderRetryState cancelRetry;
+	SOrderRetryState closeRetry;
+	SOrderRetryState modifyRetry;
+
 	string id;
 	string source;
 	string symbol;
@@ -34,8 +41,6 @@ private:
 	ENUM_ORDER_STATUSES status;
 	int side;
 	ENUM_DEAL_REASON orderCloseReason;
-	int retryCount;
-	datetime retryAfter;
 
 	double volume;
 	double signalPrice;
@@ -68,8 +73,12 @@ public:
 		isMarketOrder = false;
 		pendingToOpen = true;
 		pendingToClose = false;
-		retryCount = 0;
-		retryAfter = 0;
+
+		openRetry.retryable = false;
+		cancelRetry.retryable = true;
+		closeRetry.retryable = true;
+		modifyRetry.retryable = true;
+
 		id = "";
 		source = "";
 
@@ -107,8 +116,10 @@ public:
 		isMarketOrder = other.isMarketOrder;
 		pendingToOpen = other.pendingToOpen;
 		pendingToClose = other.pendingToClose;
-		retryCount = other.retryCount;
-		retryAfter = other.retryAfter;
+		openRetry = other.openRetry;
+		cancelRetry = other.cancelRetry;
+		closeRetry = other.closeRetry;
+		modifyRetry = other.modifyRetry;
 
 		id = other.id;
 		source = other.source;
@@ -147,7 +158,7 @@ public:
 
 	void OnInit() {
 		if (isInitialized) {
-			logger.Info(StringFormat("[%s] Order already initialized", GetId()));
+			logger.Info(LOG_CODE_ORDER_OPENED, StringFormat("[%s] Order already initialized", GetId()));
 			return;
 		}
 
@@ -162,8 +173,15 @@ public:
 		isMarketOrder = false;
 		pendingToOpen = false;
 		pendingToClose = false;
-		retryCount = 0;
-		retryAfter = 0;
+
+		openRetry = SOrderRetryState();
+		cancelRetry = SOrderRetryState();
+		closeRetry = SOrderRetryState();
+		modifyRetry = SOrderRetryState();
+		cancelRetry.retryable = true;
+		closeRetry.retryable = true;
+		modifyRetry.retryable = true;
+
 		id = "";
 		source = "";
 
@@ -343,12 +361,20 @@ public:
 		return pendingToClose;
 	}
 
-	int GetRetryCount() const {
-		return retryCount;
+	SOrderRetryState GetOpenRetry() const {
+		return openRetry;
 	}
 
-	datetime GetRetryAfter() const {
-		return retryAfter;
+	SOrderRetryState GetCancelRetry() const {
+		return cancelRetry;
+	}
+
+	SOrderRetryState GetCloseRetry() const {
+		return closeRetry;
+	}
+
+	SOrderRetryState GetModifyRetry() const {
+		return modifyRetry;
 	}
 
 	ulong GetDealId() const {
@@ -459,12 +485,20 @@ public:
 		pendingToClose = value;
 	}
 
-	void SetRetryCount(int value) {
-		retryCount = value;
+	void SetOpenRetry(const SOrderRetryState &value) {
+		openRetry = value;
 	}
 
-	void SetRetryAfter(datetime value) {
-		retryAfter = value;
+	void SetCancelRetry(const SOrderRetryState &value) {
+		cancelRetry = value;
+	}
+
+	void SetCloseRetry(const SOrderRetryState &value) {
+		closeRetry = value;
+	}
+
+	void SetModifyRetry(const SOrderRetryState &value) {
+		modifyRetry = value;
 	}
 
 	void SetCommission(double value) {

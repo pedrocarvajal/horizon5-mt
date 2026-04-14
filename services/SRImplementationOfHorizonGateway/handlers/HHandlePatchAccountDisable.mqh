@@ -9,7 +9,7 @@ void HandlePatchAccountDisable(SGatewayEvent &event, HorizonGateway &gateway, SE
 	ackBody.setProperty("status", "disabled");
 	gateway.AckEvent(event.id, ackBody);
 
-	eventLogger.Warning("Account disabled via Gateway event");
+	eventLogger.Warning(LOG_CODE_REMOTE_HTTP_ERROR, "Account disabled via Gateway event");
 }
 
 #endif

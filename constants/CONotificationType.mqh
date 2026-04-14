@@ -1,0 +1,10 @@
+#ifndef __CONSTANTS_CO_NOTIFICATION_TYPE_MQH__
+#define __CONSTANTS_CO_NOTIFICATION_TYPE_MQH__
+
+#define NOTIFICATION_TYPE_ORDER_PLACED "order.placed"
+#define NOTIFICATION_TYPE_ORDER_OPENED "order.opened"
+#define NOTIFICATION_TYPE_ORDER_CLOSED "order.closed"
+#define NOTIFICATION_TYPE_ORDER_CANCELLED "order.cancelled"
+#define NOTIFICATION_TYPE_ORDER_MODIFIED "order.modified"
+
+#endif

@@ -1,0 +1,7 @@
+#ifndef __CONSTANTS_CO_HORIZON_MQH__
+#define __CONSTANTS_CO_HORIZON_MQH__
+
+#define COMMISSION_ROUND_TRIP_MULTIPLIER 2
+#define LOG_SYSTEM_HORIZON5 "horizon5"
+
+#endif

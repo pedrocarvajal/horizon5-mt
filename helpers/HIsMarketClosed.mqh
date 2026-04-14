@@ -1,7 +1,7 @@
 #ifndef __H_IS_MARKET_CLOSED_MQH__
 #define __H_IS_MARKET_CLOSED_MQH__
 
-#include "../constants/time.mqh"
+#include "../constants/COTime.mqh"
 
 #include "../structs/SMarketStatus.mqh"
 

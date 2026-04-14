@@ -2,6 +2,7 @@
 #define __E_ASSET_MQH__
 
 #include "../libraries/Json/index.mqh"
+
 #include "../helpers/HClampNumeric.mqh"
 
 class EAsset {

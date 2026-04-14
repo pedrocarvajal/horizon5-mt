@@ -1,8 +1,10 @@
 *.log
 *.logs
 .DS_Store
+node_modules/
 .env
 .claude/.env
+.claude/scheduled_tasks.lock
 libraries/HorizonMessageBus/build/
 libraries/HorizonFileDb/build/
 scripts/cli/storage/results/

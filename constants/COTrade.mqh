@@ -1,0 +1,7 @@
+#ifndef __CONSTANTS_CO_TRADE_MQH__
+#define __CONSTANTS_CO_TRADE_MQH__
+
+#define SLIPPAGE_POINTS 5
+#define STOP_DISTANCE_BUFFER_POINTS 5
+
+#endif

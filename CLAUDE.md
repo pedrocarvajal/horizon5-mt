@@ -15,23 +15,9 @@ All projects must stay in sync; when changes in one project affect another, noti
 
 ## Core projects (upstream / source of truth)
 
-| Project              | Path                                      | Description                                                                                                                                 |
-| -------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Horizon EA**       | `/Users/memeonlymellc/horizon5-portfolio` | Main MetaTrader 5 Expert Advisor. This is the current repository.                                                                           |
-| **Horizon API**      | `/Users/memeonlymellc/horizon5-mt-api`    | Django REST API that the EA communicates with via `integrations/HorizonAPI/`. Handles persistence, snapshots, events, and order management. |
-| **Horizon War Room** | `/Users/memeonlymellc/horizon5-warroom`   | Monitoring dashboard that consumes the Horizon API.                                                                                         |
-
-## Client forks (Enaria)
-
-These are client-specific forks that must mirror the core projects, adding only client-specific configuration.
-
-| Project           | Path                                                    | Upstream                                                                                                                    |
-| ----------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Enaria EA**     | `/Users/memeonlymellc/enaria/enaria-horizon5-portfolio` | Fork of Horizon EA                                                                                                          |
-| **Enaria API**    | `/Users/memeonlymellc/enaria/enaria-horizon5-mt-api`    | Fork of Horizon API                                                                                                         |
-| **Enaria Agents** | `/Users/memeonlymellc/enaria/enaria-agents`             | Autonomous agent system that consumes the Enaria API (`tools/trading/`) to read data and push events for the EA to process. |
-
-## Sync workflow
-
-- Use `~/.claude/hooks/cross-check.sh <source> <target>` to diff two projects and identify drift (e.g., `~/.claude/hooks/cross-check.sh /Users/memeonlymellc/horizon5-portfolio /Users/memeonlymellc/enaria/enaria-horizon5-portfolio`).
-- After working on any core project, check whether the Enaria forks or dependent projects need the same changes and notify the user.
+| Project              | Path                                      | Description                                                                                                                                                       |
+| -------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Horizon EA**       | `/Users/memeonlymellc/horizon5-portfolio` | Main MetaTrader 5 Expert Advisor. This is the current repository.                                                                                                 |
+| **Horizon Gateway**  | `/Users/memeonlymellc/horizon5-gateway`   | Backend counterpart of `HorizonGateway.mq5` (via `integrations/HorizonGateway/`). Handles trading and service events (orders, account info, assets, klines, etc). |
+| **Horizon Monitor**  | `/Users/memeonlymellc/horizon5-monitor`   | Backend counterpart of `HorizonMonitor.mq5` (via `integrations/HorizonMonitor/`). Receives monitoring data pushed from the EA.                                    |
+| **Horizon War Room** | `/Users/memeonlymellc/horizon5-warroom`   | Dashboard that consumes Horizon Monitor to visualize the ecosystem state.                                                                                         |

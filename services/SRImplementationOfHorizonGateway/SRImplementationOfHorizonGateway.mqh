@@ -2,12 +2,16 @@
 #define __SR_IMPLEMENTATION_OF_HORIZON_GATEWAY_MQH__
 
 #include "../SELogger/SELogger.mqh"
+
 #include "../SEMessageBus/SEMessageBus.mqh"
-#include "../SEMessageBus/SEMessageBusChannels.mqh"
+
+#include "../../constants/COMessageBus.mqh"
 
 #include "../../integrations/HorizonGateway/HorizonGateway.mqh"
 #include "../../integrations/HorizonGateway/structs/SEventResponse.mqh"
+
 #include "../../structs/STradingStatus.mqh"
+
 #include "../../helpers/HClampNumeric.mqh"
 #include "../../helpers/HMapTimeframe.mqh"
 
@@ -68,7 +72,7 @@ public:
 		return gateway.FetchAccountStatus();
 	}
 
-	int ConsumeEvents(const string keys, const string symbolFilter, SGatewayEvent &eventList[], int limit = 10, int strategyFilter = 0) {
+	int ConsumeEvents(const string keys, const string symbolFilter, SGatewayEvent &eventList[], int limit = 10, const string strategyFilter = "") {
 		return gateway.ConsumeEvents(keys, symbolFilter, eventList, limit, strategyFilter);
 	}
 
@@ -78,6 +82,10 @@ public:
 
 	bool AckEventDirect(const string eventId, JSON::Object &responseBody) {
 		return gateway.AckEventDirect(eventId, responseBody);
+	}
+
+	void PublishNotification(const string notificationType, const string strategyUuid, const string assetUuid, const string symbolName, JSON::Object *payload) {
+		gateway.PublishNotification(notificationType, strategyUuid, assetUuid, symbolName, payload);
 	}
 
 	void ProcessServiceEvents(SEAsset *&registeredAssets[]) {

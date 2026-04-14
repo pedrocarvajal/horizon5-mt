@@ -1,14 +1,15 @@
 #ifndef __SE_STRATEGY_MQH__
 #define __SE_STRATEGY_MQH__
 
-class SEAsset;
-
-#include "../constants/time.mqh"
+#include "../constants/COTime.mqh"
 
 #include "../enums/EOrderStatuses.mqh"
+
 #include "../structs/SSOrderHistory.mqh"
 #include "../structs/SSStatisticsSnapshot.mqh"
 #include "../structs/STradingStatus.mqh"
+
+#include "../helpers/sqx/HNormalizeLotSize.mqh"
 
 #include "../interfaces/IStrategy.mqh"
 
@@ -23,7 +24,6 @@ class SEAsset;
 #include "../services/SRPersistenceOfOrders/SRPersistenceOfOrders.mqh"
 #include "../services/SRPersistenceOfStatistics/SRPersistenceOfStatistics.mqh"
 #include "../services/SRPersistenceOfState/SRPersistenceOfState.mqh"
-
 #include "../services/SRImplementationOfHorizonMonitor/SRImplementationOfHorizonMonitor.mqh"
 #include "../services/SRReportOfMonitorSeed/SRReportOfMonitorSeed.mqh"
 
@@ -34,31 +34,12 @@ extern SRImplementationOfHorizonMonitor horizonMonitor;
 extern STradingStatus tradingStatus;
 extern SRReportOfMonitorSeed *monitorSeedReporter;
 
-void SEOrderBook::NotifyOrderCancelled(EOrder &order) {
-	if (CheckPointer(listener) != POINTER_INVALID) {
-		listener.OnCancelOrder(order);
-	}
-}
-
-void SEOrderBook::NotifyOrderPlaced(EOrder &order) {
-	if (CheckPointer(listener) != POINTER_INVALID) {
-		listener.OnPendingOrderPlaced(order);
-	}
-}
-
-void SEOrderBook::NotifyOrderUpdated(EOrder &order) {
-	if (CheckPointer(listener) != POINTER_INVALID) {
-		listener.OnOrderUpdated(order);
-	}
-}
-
 class SEStrategy:
 public IStrategy {
 private:
 	double weight;
 	double balance;
 
-	SEAsset *asset;
 	SEStatistics *statistics;
 	SELotSize *lotSize;
 	SRReportOfOrderHistory *orderHistoryReporter;
@@ -74,66 +55,67 @@ protected:
 	string name;
 	string symbol;
 	string prefix;
+	string strategyUuid;
 	ulong strategyMagicNumber;
 	double maxLotsByOrder;
 	bool isPassive;
 
 	void SetStateDouble(string key, double value) {
-		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statePersistence) != POINTER_INVALID) {
 			statePersistence.SetDouble(key, value);
 		}
 	}
 
 	void GetStateDouble(string key, double &value, double defaultValue = 0.0) {
-		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statePersistence) != POINTER_INVALID) {
 			statePersistence.GetDouble(key, value, defaultValue);
 		}
 	}
 
 	void SetStateInt(string key, int value) {
-		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statePersistence) != POINTER_INVALID) {
 			statePersistence.SetInt(key, value);
 		}
 	}
 
 	void GetStateInt(string key, int &value, int defaultValue = 0) {
-		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statePersistence) != POINTER_INVALID) {
 			statePersistence.GetInt(key, value, defaultValue);
 		}
 	}
 
 	void SetStateString(string key, string value) {
-		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statePersistence) != POINTER_INVALID) {
 			statePersistence.SetString(key, value);
 		}
 	}
 
 	void GetStateString(string key, string &value, string defaultValue = "") {
-		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statePersistence) != POINTER_INVALID) {
 			statePersistence.GetString(key, value, defaultValue);
 		}
 	}
 
 	void SetStateBool(string key, bool value) {
-		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statePersistence) != POINTER_INVALID) {
 			statePersistence.SetBool(key, value);
 		}
 	}
 
 	void GetStateBool(string key, bool &value, bool defaultValue = false) {
-		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statePersistence) != POINTER_INVALID) {
 			statePersistence.GetBool(key, value, defaultValue);
 		}
 	}
 
 	void SetStateDatetime(string key, datetime value) {
-		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statePersistence) != POINTER_INVALID) {
 			statePersistence.SetDatetime(key, value);
 		}
 	}
 
 	void GetStateDatetime(string key, datetime &value, datetime defaultValue = 0) {
-		if (CheckPointer(statePersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statePersistence) != POINTER_INVALID) {
 			statePersistence.GetDatetime(key, value, defaultValue);
 		}
 	}
@@ -180,8 +162,9 @@ public:
 
 		orderHistoryReporter.Export();
 
-		logger.Info(StringFormat(
-			"Order history exported with %d orders",
+		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
+			"order history exported | strategy=%s count=%d",
+			name,
 			orderHistoryReporter.GetOrderCount()
 		));
 	}
@@ -191,15 +174,16 @@ public:
 			return;
 		}
 
-		if (CheckPointer(statistics) != POINTER_DYNAMIC) {
+		if (CheckPointer(statistics) == POINTER_INVALID) {
 			return;
 		}
 
 		strategySnapshotsReporter.AddSnapshot(statistics.GetDailySnapshot());
 		strategySnapshotsReporter.Export();
 
-		logger.Info(StringFormat(
-			"Snapshot history exported with %d snapshots",
+		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
+			"snapshot history exported | strategy=%s count=%d",
+			name,
 			strategySnapshotsReporter.GetSnapshotCount()
 		));
 	}
@@ -208,9 +192,37 @@ public:
 		return balance;
 	}
 
+	double CalculateLotSize(double stopLossDistance) {
+		double orderLotSize = GetLotSizeByStopLoss(stopLossDistance);
+
+		if (orderLotSize < 0) {
+			return -1;
+		}
+
+		if (orderLotSize == 0) {
+			logger.Warning(LOG_CODE_VALIDATION_VOLUME_INVALID, StringFormat(
+				"lot size invalid | strategy=%s symbol=%s reason='calculation returned zero'",
+				name, symbol
+			));
+			return 0;
+		}
+
+		orderLotSize = NormalizeLotSize(orderLotSize, symbol);
+
+		if (orderLotSize == 0) {
+			logger.Warning(LOG_CODE_VALIDATION_LOT_BELOW_MIN, StringFormat(
+				"lot size below minimum | strategy=%s symbol=%s reason='normalized volume below broker minimum'",
+				name, symbol
+			));
+			return 0;
+		}
+
+		return orderLotSize;
+	}
+
 	double GetLotSizeByStopLoss(double stopLossDistance) {
 		if (balance <= 0) {
-			return -1;
+			return 0;
 		}
 
 		double nav = EquityAtRiskCompounded
@@ -228,6 +240,10 @@ public:
 
 	ulong GetMagicNumber() {
 		return strategyMagicNumber;
+	}
+
+	string GetStrategyUuid() {
+		return strategyUuid;
 	}
 
 	double GetMaxLotsByOrder() {
@@ -254,32 +270,50 @@ public:
 		return symbol;
 	}
 
+	double GetTodayClosedPnl() {
+		return statistics.GetTodayClosedPnl();
+	}
+
+	double GetTodayTotalPnl() {
+		EOrder ordersSnapshot[];
+		orderBook.CopyOrders(ordersSnapshot);
+		return statistics.GetTodayTotalPnl(ordersSnapshot);
+	}
+
 	double GetWeight() {
 		return weight;
 	}
 
+	bool IsPassive() {
+		return isPassive;
+	}
+
+	bool IsTradable() {
+		return CheckPointer(statistics) == POINTER_INVALID || statistics.GetClosedNav() > 0;
+	}
+
+	bool CanTrade() {
+		return !tradingStatus.isPaused && IsTradable();
+	}
+
 	virtual void OnCancelOrder(EOrder& order) {
-		orderBook.OnOrderCancelled();
 		horizonMonitor.UpsertOrder(order);
 
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
 		}
 
-		if (monitorSeedReporter != NULL && !isPassive) {
+		if (CheckPointer(monitorSeedReporter) != POINTER_INVALID && !isPassive) {
 			monitorSeedReporter.AddOrder(order);
 		}
 	}
 
-	virtual void OnOrderUpdated(EOrder& order) {
-		horizonMonitor.UpsertOrder(order);
-	}
-
 	virtual void OnCloseOrder(EOrder& order, ENUM_DEAL_REASON reason) {
-		statistics.OnCloseOrder(order, orderBook.orders);
-		orderBook.OnOrderClosed();
+		EOrder ordersSnapshot[];
+		orderBook.CopyOrders(ordersSnapshot);
+		statistics.OnCloseOrder(order, ordersSnapshot);
 
-		if (CheckPointer(statisticsPersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statisticsPersistence) != POINTER_INVALID) {
 			statisticsPersistence.Save(statistics);
 		}
 
@@ -289,7 +323,7 @@ public:
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
 		}
 
-		if (monitorSeedReporter != NULL && !isPassive) {
+		if (CheckPointer(monitorSeedReporter) != POINTER_INVALID && !isPassive) {
 			monitorSeedReporter.AddOrder(order);
 		}
 
@@ -297,11 +331,11 @@ public:
 	}
 
 	virtual void OnDeinit() {
-		if (CheckPointer(statisticsPersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statisticsPersistence) != POINTER_INVALID) {
 			statisticsPersistence.Save(statistics);
 		}
 
-		if (CheckPointer(orderBook) == POINTER_DYNAMIC) {
+		if (CheckPointer(orderBook) != POINTER_INVALID) {
 			orderBook.OnDeinit();
 		}
 	}
@@ -341,7 +375,13 @@ public:
 	}
 
 	virtual void OnOpenOrder(EOrder& order) {
-		statistics.OnOpenOrder(order, orderBook.orders);
+		EOrder ordersSnapshot[];
+		orderBook.CopyOrders(ordersSnapshot);
+		statistics.OnOpenOrder(order, ordersSnapshot);
+		horizonMonitor.UpsertOrder(order);
+	}
+
+	virtual void OnOrderUpdated(EOrder& order) {
 		horizonMonitor.UpsertOrder(order);
 	}
 
@@ -356,13 +396,13 @@ public:
 			strategySnapshotsReporter.AddSnapshot(statistics.GetDailySnapshot());
 		}
 
-		statistics.OnStartDay(orderBook.orders);
+		EOrder ordersSnapshot[];
+		orderBook.CopyOrders(ordersSnapshot);
+		statistics.OnStartDay(ordersSnapshot);
 
-		if (CheckPointer(statisticsPersistence) == POINTER_DYNAMIC) {
+		if (CheckPointer(statisticsPersistence) != POINTER_INVALID) {
 			statisticsPersistence.Save(statistics);
 		}
-
-		orderBook.ResetTodayOrderCount();
 	}
 
 	virtual void OnStartHour() {
@@ -386,16 +426,16 @@ public:
 		orderBook.ProcessOrders();
 	}
 
-	void SetAsset(SEAsset *assetReference) {
-		asset = assetReference;
-	}
-
 	virtual void SetBalance(double newBalance) {
 		balance = newBalance;
 	}
 
 	void SetMagicNumber(ulong magic) {
 		strategyMagicNumber = magic;
+	}
+
+	void SetStrategyUuid(string uuid) {
+		strategyUuid = uuid;
 	}
 
 	void SetMaxLotsByOrder(double lots) {
@@ -408,10 +448,6 @@ public:
 
 	void SetPassive(bool passive) {
 		isPassive = passive;
-	}
-
-	bool IsPassive() {
-		return isPassive;
 	}
 
 	void SetPrefix(string strategyPrefix) {
@@ -441,7 +477,7 @@ public:
 		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
 			EOrder *order = orderBook.GetOrderAtIndex(i);
 			if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
-				floatingPnl += orderBook.GetFloatingProfitAndLoss(order);
+				floatingPnl += order.GetFloatingPnL();
 			}
 		}
 
@@ -459,40 +495,6 @@ public:
 	}
 
 private:
-	void calculateLiveMetrics(
-		double &floatingPnl,
-		double &exposureLots,
-		double &exposureUsd,
-		double &nav,
-		double &drawdownPct
-	) {
-		floatingPnl = 0;
-		exposureLots = 0;
-		exposureUsd = 0;
-
-		double contractSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
-
-		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
-			EOrder *order = orderBook.GetOrderAtIndex(i);
-			if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
-				floatingPnl += orderBook.GetFloatingProfitAndLoss(order);
-				exposureLots += order.GetVolume();
-				exposureUsd += order.GetVolume() * contractSize * SymbolInfoDouble(symbol, SYMBOL_BID);
-			}
-		}
-
-		nav = statistics.GetClosedNav() + floatingPnl;
-		double peak = statistics.GetNavPeak();
-
-		if (nav > peak) {
-			peak = nav;
-		}
-
-		drawdownPct = (peak > 0 && nav < peak)
-			? (peak - nav) / peak
-			: 0.0;
-	}
-
 	void detectManualClose(ENUM_DEAL_REASON reason) {
 		if (tradingStatus.isPaused) {
 			return;
@@ -506,7 +508,10 @@ private:
 
 		tradingStatus.isPaused = true;
 		tradingStatus.reason = TRADING_PAUSE_REASON_MANUAL_CLOSE;
-		logger.Warning("Manual close detected - trading paused until next day");
+		logger.Warning(LOG_CODE_TRADING_PAUSED, StringFormat(
+			"trading paused | strategy=%s reason='manual close detected' until='next day'",
+			name
+		));
 	}
 
 	void initializeServices() {
@@ -547,14 +552,19 @@ private:
 
 		for (int i = 0; i < ArraySize(reconciledOrders); i++) {
 			horizonMonitor.UpsertOrder(reconciledOrders[i]);
-			logger.Info(StringFormat(
-				"Synced reconciled order to Monitor: %s",
+			logger.Info(LOG_CODE_ORDER_RESTORED, StringFormat(
+				"order reconciled | strategy=%s order_id=%s target=monitor",
+				name,
 				reconciledOrders[i].GetId()
 			));
 		}
 
 		if (totalRestored > 0) {
-			logger.Info(StringFormat("Restored %d active orders from JSON", totalRestored));
+			logger.Info(LOG_CODE_ORDER_RESTORED, StringFormat(
+				"orders restored | strategy=%s count=%d",
+				name,
+				totalRestored
+			));
 		}
 
 		return totalRestored;
@@ -562,14 +572,14 @@ private:
 
 	int validateConfiguration() {
 		if (name == "") {
-			logger.Error("Name not defined for strategy");
+			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, "configuration invalid | field=name reason='strategy name not defined'");
 
 			return INIT_FAILED;
 		}
 
 		if (symbol == "") {
-			logger.Error(StringFormat(
-				"Symbol not defined for strategy: %s",
+			logger.Error(LOG_CODE_CONFIG_INVALID_SYMBOL, StringFormat(
+				"configuration invalid | strategy=%s field=symbol reason='symbol not defined'",
 				name
 			));
 
@@ -577,8 +587,8 @@ private:
 		}
 
 		if (prefix == "") {
-			logger.Error(StringFormat(
-				"Prefix not defined for strategy: %s",
+			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, StringFormat(
+				"configuration invalid | strategy=%s field=prefix reason='prefix not defined'",
 				name
 			));
 
@@ -586,17 +596,21 @@ private:
 		}
 
 		if (strategyMagicNumber == 0) {
-			logger.Error(StringFormat(
-				"Magic number not defined for strategy: %s",
+			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, StringFormat(
+				"configuration invalid | strategy=%s field=magic_number reason='magic number not defined'",
 				name
 			));
 
 			return INIT_FAILED;
 		}
 
+		if (isPassive) {
+			return INIT_SUCCEEDED;
+		}
+
 		if (balance <= 0) {
-			logger.Error(StringFormat(
-				"Balance not defined for strategy: %s",
+			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, StringFormat(
+				"configuration invalid | strategy=%s field=balance reason='balance not defined'",
 				name
 			));
 
@@ -604,9 +618,9 @@ private:
 		}
 
 		if (!SymbolSelect(symbol, true)) {
-			logger.Error(StringFormat(
-				"Symbol '%s' does not exist or cannot be selected",
-				symbol
+			logger.Error(LOG_CODE_CONFIG_INVALID_SYMBOL, StringFormat(
+				"configuration invalid | strategy=%s symbol=%s reason='symbol not available in market watch'",
+				name, symbol
 			));
 
 			return INIT_FAILED;

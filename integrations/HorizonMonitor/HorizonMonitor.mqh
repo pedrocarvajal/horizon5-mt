@@ -9,6 +9,7 @@
 #include "../../entities/EOrder.mqh"
 
 #include "HorizonMonitorContext.mqh"
+
 #include "resources/AccountResource.mqh"
 #include "resources/AccountMetadataResource.mqh"
 #include "resources/AssetResource.mqh"
@@ -74,14 +75,14 @@ private:
 		SRequestResponse response = authRequest.Post("api/v1/auth/login", loginBody);
 
 		if (response.status != 200) {
-			logger.Error(StringFormat("Authentication failed with status %d", response.status));
+			logger.Error(LOG_CODE_REMOTE_AUTH_FAILED, StringFormat("auth failed | status=%d", response.status));
 			return false;
 		}
 
 		JSON::Object root(response.body);
 
 		if (!root.isObject("data")) {
-			logger.Error("Authentication response missing 'data' object");
+			logger.Error(LOG_CODE_REMOTE_RESPONSE_INVALID, "auth response invalid | reason='missing data object'");
 			return false;
 		}
 
@@ -89,7 +90,7 @@ private:
 		string accessToken = dataObject.getString("access");
 
 		if (accessToken == "") {
-			logger.Error("Authentication response missing 'access' token");
+			logger.Error(LOG_CODE_REMOTE_RESPONSE_INVALID, "auth response invalid | reason='missing access token'");
 			return false;
 		}
 
@@ -98,7 +99,7 @@ private:
 		authenticatedRequest.AddHeader("Authorization", "Bearer " + accessToken);
 		context.SetRequest(authenticatedRequest);
 
-		logger.Info("Authentication successful");
+		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, "Authentication successful");
 		return true;
 	}
 
@@ -128,11 +129,15 @@ public:
 
 	bool Initialize(string baseUrl, string email, string password, bool enabled) {
 		if (!enabled) {
+			if (context.IsEnabled()) {
+				resetResources(true);
+				context.Disable();
+			}
 			return true;
 		}
 
 		if (email == "" || password == "") {
-			logger.Error("Email and password are required. HorizonMonitor integration disabled.");
+			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, "configuration invalid | integration=monitor field=credentials reason='email and password required'");
 			return false;
 		}
 
@@ -151,7 +156,7 @@ public:
 		context.Enable();
 		initResources();
 
-		logger.Info("Initialized for account " + IntegerToString(context.GetAccountNumber()));
+		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, "Initialized for account " + IntegerToString(context.GetAccountNumber()));
 		return true;
 	}
 
