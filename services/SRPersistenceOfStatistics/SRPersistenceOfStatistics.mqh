@@ -4,7 +4,9 @@
 #include "../../helpers/HIsLiveTrading.mqh"
 
 #include "../SELogger/SELogger.mqh"
+
 #include "../SEDb/SEDb.mqh"
+
 #include "../SEStatistics/SEStatistics.mqh"
 
 class SRPersistenceOfStatistics {
@@ -193,7 +195,7 @@ public:
 		delete json;
 
 		if (result) {
-			logger.Debug("Statistics saved to database");
+			logger.Debug(LOG_CODE_PERSISTENCE_SAVE_FAILED, "Statistics saved to database");
 		}
 
 		return result;
@@ -218,9 +220,9 @@ public:
 		delete document;
 
 		if (result) {
-			logger.Debug("Statistics restored from database");
+			logger.Debug(LOG_CODE_PERSISTENCE_SAVE_FAILED, "Statistics restored from database");
 		} else {
-			logger.Error("Failed to deserialize statistics");
+			logger.Error(LOG_CODE_PERSISTENCE_LOAD_FAILED, "statistics load failed | reason='deserialize error'");
 		}
 
 		return result;

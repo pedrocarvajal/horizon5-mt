@@ -2,11 +2,15 @@
 #define __SR_ACCOUNT_AUDITOR_MQH__
 
 #include "../SELogger/SELogger.mqh"
+
 #include "../SEDateTime/SEDateTime.mqh"
+
 #include "../SRReportOfMonitorSeed/SRReportOfMonitorSeed.mqh"
 
 #include "../../entities/EAccount.mqh"
+
 #include "../../assets/Asset.mqh"
+
 #include "../../helpers/HIsLiveTrading.mqh"
 #include "../../helpers/HGetSnapshotEvent.mqh"
 
@@ -49,7 +53,7 @@ public:
 
 			for (int j = 0; j < registeredAssets[i].GetStrategyCount(); j++) {
 				SEOrderBook *book = registeredAssets[i].GetStrategyAtIndex(j).GetOrderBook();
-				trackedOrderCount += book.GetOpenOrderCount();
+				trackedOrderCount += book.GetActiveOrderCount();
 			}
 		}
 
@@ -57,7 +61,7 @@ public:
 		int metatraderPendingOrders = OrdersTotal();
 		int metatraderTotal = metatraderPositions + metatraderPendingOrders;
 
-		logger.Info(StringFormat(
+		logger.Info(LOG_CODE_ORDER_NOT_FOUND, StringFormat(
 			"Order summary (enabled assets only) | MT5 positions: %d | MT5 pending: %d | Tracked orders: %d",
 			metatraderPositions,
 			metatraderPendingOrders,
@@ -65,7 +69,7 @@ public:
 		));
 
 		if (metatraderTotal != trackedOrderCount) {
-			logger.Warning(StringFormat(
+			logger.Warning(LOG_CODE_ORDER_NOT_FOUND, StringFormat(
 				"Order discrepancy detected (enabled assets only) | MT5 total: %d | Tracked: %d | Diff: %d",
 				metatraderTotal,
 				trackedOrderCount,

@@ -4,7 +4,7 @@
 #include "../../../entities/EAccount.mqh"
 
 void HandleGetKlines(SGatewayEvent &event, HorizonGateway &gateway, SELogger &eventLogger) {
-	eventLogger.Info(StringFormat("Event received | %s | id=%s", event.key, event.id));
+	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Event received | %s | id=%s", event.key, event.id));
 	if (event.symbol == "" || event.timeframe == "" || event.fromDate == "" || event.toDate == "") {
 		AckServiceEventError(event, gateway, eventLogger, "symbol, timeframe, from_date and to_date are required");
 		return;
@@ -84,7 +84,7 @@ void HandleGetKlines(SGatewayEvent &event, HorizonGateway &gateway, SELogger &ev
 	response.ApplyTo(ackBody);
 	ackBody.setProperty("file_name", uploadedFileName);
 	ackBody.setProperty("rows", copied);
-	eventLogger.Info(StringFormat("Event ack | %s | rows=%d | id=%s", event.key, copied, event.id));
+	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Event ack | %s | rows=%d | id=%s", event.key, copied, event.id));
 	gateway.AckEvent(event.id, ackBody);
 }
 

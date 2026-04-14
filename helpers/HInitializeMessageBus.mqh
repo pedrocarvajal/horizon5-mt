@@ -2,8 +2,9 @@
 #define __H_INITIALIZE_MESSAGE_BUS_MQH__
 
 #include "../services/SEMessageBus/SEMessageBus.mqh"
-#include "../services/SEMessageBus/SEMessageBusChannels.mqh"
 #include "../services/SELogger/SELogger.mqh"
+
+#include "../constants/COMessageBus.mqh"
 
 bool InitializeMessageBus(string &requiredServices[], int serviceCount) {
 	if (SEMessageBus::IsActive()) {
@@ -13,13 +14,13 @@ bool InitializeMessageBus(string &requiredServices[], int serviceCount) {
 	SELogger messageBusLogger("MessageBus");
 
 	if (!SEMessageBus::Initialize()) {
-		messageBusLogger.Error("DLL failed to initialize");
+		messageBusLogger.Error(LOG_CODE_FRAMEWORK_INIT_FAILED, "DLL failed to initialize");
 		return false;
 	}
 
 	for (int i = 0; i < serviceCount; i++) {
 		bool running = SEMessageBus::IsServiceRunning(requiredServices[i]);
-		messageBusLogger.Info(StringFormat(
+		messageBusLogger.Info(LOG_CODE_FRAMEWORK_INIT_FAILED, StringFormat(
 			"Service check | %s | running: %s",
 			requiredServices[i],
 			running ? "yes" : "no"
@@ -27,12 +28,12 @@ bool InitializeMessageBus(string &requiredServices[], int serviceCount) {
 	}
 
 	if (!SEMessageBus::AreServicesReady(requiredServices, serviceCount)) {
-		messageBusLogger.Error("Services not running");
+		messageBusLogger.Error(LOG_CODE_FRAMEWORK_INIT_FAILED, "Services not running");
 		return false;
 	}
 
 	SEMessageBus::Activate();
-	messageBusLogger.Info("Enabled, all services running");
+	messageBusLogger.Info(LOG_CODE_FRAMEWORK_INIT_FAILED, "Enabled, all services running");
 	return true;
 }
 

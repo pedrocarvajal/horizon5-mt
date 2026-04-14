@@ -4,14 +4,10 @@
 #include "../structs/SGatewayEvent.mqh"
 
 #include "../HorizonGatewayContext.mqh"
+
 #include "../../../services/SELogger/SELogger.mqh"
 
-#define EVENT_KEY_POST_ORDER   "post.order"
-#define EVENT_KEY_DELETE_ORDER  "delete.order"
-#define EVENT_KEY_PUT_ORDER    "put.order"
-#define EVENT_KEY_GET_ORDERS   "get.orders"
-#define EVENT_KEY_GET_TICKER   "get.ticker"
-#define EVENT_KEY_GET_KLINES   "get.klines"
+#include "../../../constants/COEventKey.mqh"
 
 class EventResource {
 private:
@@ -76,7 +72,7 @@ private:
 	void parseEvent(JSON::Object *eventObject, SGatewayEvent &event) {
 		event.id = eventObject.getString("id");
 		event.key = eventObject.getString("key");
-		event.strategyId = (int)eventObject.getNumber("strategy");
+		event.strategyId = eventObject.getString("strategy_id");
 
 		JSON::Object *payload = eventObject.getObject("payload");
 
@@ -122,7 +118,7 @@ public:
 		logger.SetPrefix("Gateway::Event");
 	}
 
-	int Consume(const string keys, const string symbolFilter, SGatewayEvent &events[], int limit = 10, int strategyFilter = 0) {
+	int Consume(const string keys, const string symbolFilter, SGatewayEvent &events[], int limit = 10, const string strategyFilter = "") {
 		string path = StringFormat(
 			"api/v1/account/%s/events/consume?key=%s&limit=%d",
 			context.GetAccountUuid(), keys, limit
@@ -132,15 +128,15 @@ public:
 			path += "&asset_id=" + symbolFilter;
 		}
 
-		if (strategyFilter > 0) {
-			path += "&strategy_id=" + IntegerToString(strategyFilter);
+		if (strategyFilter != "") {
+			path += "&strategy_id=" + strategyFilter;
 		}
 
 		JSON::Object emptyBody;
 		SRequestResponse response = context.Post(path, emptyBody);
 
 		if (response.status == 401) {
-			logger.Error("Unauthorized (401) on Consume, check credentials. Disabling Gateway.");
+			logger.Error(LOG_CODE_REMOTE_AUTH_FAILED, "remote auth failed | endpoint=consume reason='unauthorized 401' action='disabling gateway'");
 			context.Disable();
 			return 0;
 		}
@@ -171,7 +167,7 @@ public:
 		SRequestResponse response = context.Patch(path, wrapper);
 
 		if (response.status == 401) {
-			logger.Error("Unauthorized (401) on Ack, check credentials. Disabling Gateway.");
+			logger.Error(LOG_CODE_REMOTE_AUTH_FAILED, "remote auth failed | endpoint=ack reason='unauthorized 401' action='disabling gateway'");
 			context.Disable();
 			return false;
 		}

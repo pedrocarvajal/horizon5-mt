@@ -12,6 +12,7 @@ interface IAsset {
 	void OnStartMinute();
 	void OnStartHour();
 	void OnStartDay();
+	void ProcessBarEvents();
 
 	void OnOpenOrder(EOrder &order);
 	void OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason);

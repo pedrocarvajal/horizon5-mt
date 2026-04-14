@@ -1,0 +1,6 @@
+#ifndef __CONSTANTS_CO_TIME_MQH__
+#define __CONSTANTS_CO_TIME_MQH__
+
+#define SECONDS_IN_24_HOURS 86400
+
+#endif

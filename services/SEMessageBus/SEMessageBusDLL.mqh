@@ -4,9 +4,7 @@
 #import "HorizonMessageBus.dll"
 
 int MbInit();
-void MbShutdown();
 
-int MbChannelCreate(const string channelName, int capacity);
 int MbChannelFind(const string channelName);
 int MbChannelGetOrCreate(const string channelName);
 

@@ -2,6 +2,7 @@
 #define __E_ACCOUNT_MQH__
 
 #include "../libraries/Json/index.mqh"
+
 #include "../helpers/HClampNumeric.mqh"
 
 class EAccount {

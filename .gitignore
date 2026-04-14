@@ -1,7 +1,9 @@
 *.log
 *.logs
 .DS_Store
+node_modules/
 .env
+
 
 libraries/HorizonMessageBus/build/
 libraries/HorizonFileDb/build/

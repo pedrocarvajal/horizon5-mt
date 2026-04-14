@@ -1,7 +1,11 @@
 #property service
 #property copyright "Horizon5"
-#property version   "0.05"
+#property version   "0.11"
 #property strict
+
+#include "constants/COHorizonPersistence.mqh"
+#include "constants/CODiagnostic.mqh"
+#include "constants/COMessageBus.mqh"
 
 #include "enums/EDebugLevel.mqh"
 
@@ -10,13 +14,8 @@
 
 #include "services/SELogger/SELogger.mqh"
 #include "services/SEMessageBus/SEMessageBus.mqh"
-#include "services/SEMessageBus/SEMessageBusChannels.mqh"
 #include "services/SEDateTime/SEDateTime.mqh"
 #include "services/SRReportOfLogs/SRReportOfLogs.mqh"
-
-#define SERVICE_VERSION "1.0.1"
-#define MESSAGE_TYPE_FLUSH "flush"
-#define DIAGNOSTIC_INTERVAL_SECONDS 300
 
 SEDateTime dtime;
 SELogger logger("Persistence");
@@ -61,9 +60,10 @@ void writeFiles(SPendingWrite &pendingWrites[]) {
 		int handle = FileOpen(pendingWrites[i].filePath, FILE_WRITE | pendingWrites[i].fileFlags);
 
 		if (handle == INVALID_HANDLE) {
-			logger.Error(StringFormat(
-				"Cannot write '%s' - Error: %d",
-				pendingWrites[i].filePath, GetLastError()
+			logger.Error(LOG_CODE_PERSISTENCE_SAVE_FAILED, StringFormat(
+				"persistence write failed | path='%s' error=%d",
+				pendingWrites[i].filePath,
+				GetLastError()
 			));
 		} else {
 			FileWriteString(handle, pendingWrites[i].content);
@@ -78,7 +78,7 @@ void processMessages(SMessage &messages[], int count) {
 	SPendingWrite latestPerPath[];
 
 	for (int i = 0; i < count; i++) {
-		if (messages[i].messageType != MESSAGE_TYPE_FLUSH) {
+		if (messages[i].messageType != MB_TYPE_FLUSH) {
 			SEMessageBus::Ack(MB_CHANNEL_PERSISTENCE, messages[i].sequence);
 			continue;
 		}
@@ -131,8 +131,8 @@ void logDiagnostics() {
 
 	int pendingPersistence = SEMessageBus::GetPendingCount(MB_CHANNEL_PERSISTENCE);
 
-	logger.Info(StringFormat(
-		"Queue diagnostics | persistence=%d",
+	logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat(
+		"queue diagnostics | persistence=%d",
 		pendingPersistence
 	));
 }
@@ -145,7 +145,7 @@ int OnStart() {
 	}
 
 	if (!IsLiveTrading()) {
-		logger.Warning("Not in live trading mode, service idle");
+		logger.Warning(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='not in live trading mode'");
 
 		while (!IsStopped()) {
 			Sleep(5000);
@@ -155,12 +155,16 @@ int OnStart() {
 	}
 
 	if (!SEMessageBus::Initialize()) {
-		logger.Error("MessageBus DLL initialization failed");
+		logger.Error(LOG_CODE_FRAMEWORK_INIT_FAILED, "service idle | reason='message bus DLL initialization failed'");
 		return 0;
 	}
 
 	SEMessageBus::RegisterService(MB_SERVICE_PERSISTENCE);
-	logger.Info("Service started | v" + SERVICE_VERSION + " | built " + (string)__DATETIME__);
+	logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat(
+		"service started | system=HorizonPersistence version=%s built='%s'",
+		HORIZON_PERSISTENCE_SERVICE_VERSION,
+		(string)__DATETIME__
+	));
 
 	while (!IsStopped()) {
 		SEMessageBus::WaitForMessage(MB_CHANNEL_PERSISTENCE, PollIntervalMs);
@@ -177,7 +181,7 @@ int OnStart() {
 
 	SEMessageBus::UnregisterService(MB_SERVICE_PERSISTENCE);
 	SEMessageBus::Shutdown();
-	logger.Info("Service stopped");
+	logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, "service stopped | system=HorizonPersistence");
 
 	if (SELogger::GetGlobalEntryCount() > 0) {
 		string logEntries[];

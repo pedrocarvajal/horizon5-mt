@@ -1,8 +1,13 @@
 #ifndef __IN_HIGHEST_MQH__
 #define __IN_HIGHEST_MQH__
 
-double Highest(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType,
-	       int period, int shift) {
+double Highest(
+	string symbolName,
+	ENUM_TIMEFRAMES timeframe,
+	ENUM_APPLIED_PRICE priceType,
+	int period,
+	int shift
+) {
 	double values[];
 
 	int copied = 0;
@@ -21,19 +26,16 @@ double Highest(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType,
 		return 0.0;
 	}
 
-	double maxValue = values[0];
-
-	for (int i = 1; i < period; i++) {
-		if (values[i] > maxValue) {
-			maxValue = values[i];
-		}
-	}
-
-	return maxValue;
+	return values[ArrayMaximum(values, 0, period)];
 }
 
-double Lowest(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType,
-	      int period, int shift) {
+double Lowest(
+	string symbolName,
+	ENUM_TIMEFRAMES timeframe,
+	ENUM_APPLIED_PRICE priceType,
+	int period,
+	int shift
+) {
 	double values[];
 
 	int copied = 0;
@@ -52,15 +54,7 @@ double Lowest(string symbolName, ENUM_TIMEFRAMES timeframe, int priceType,
 		return 0.0;
 	}
 
-	double minValue = values[0];
-
-	for (int i = 1; i < period; i++) {
-		if (values[i] < minValue) {
-			minValue = values[i];
-		}
-	}
-
-	return minValue;
+	return values[ArrayMinimum(values, 0, period)];
 }
 
 #endif

@@ -2,6 +2,7 @@
 #define __MONITOR_ACCOUNT_RESOURCE_MQH__
 
 #include "../../../entities/EAccount.mqh"
+
 #include "../../../helpers/HGetAccountUuid.mqh"
 
 #include "../HorizonMonitorContext.mqh"
@@ -31,7 +32,7 @@ public:
 		context.Post("api/v1/account", body, false);
 
 		context.SetAccountUuid(accountUuid);
-		logger.Info(StringFormat("Account registered | uuid: %s", accountUuid));
+		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Account registered | uuid: %s", accountUuid));
 
 		return true;
 	}

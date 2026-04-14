@@ -39,7 +39,7 @@ The strategy calls `PlaceOrder()` on its `SEOrderBook`, which:
 2. Checks if the market is open. If closed, the order is queued (`pendingToOpen = true`) and will be sent when the market reopens.
 3. When the market is open, sends the order to MT5 via the `ATrade` adapter (a wrapper around the standard `CTrade` class).
 4. Records the MT5 order ID on the `EOrder` for later matching.
-5. Notifies the strategy listener via `NotifyOrderPlaced()`.
+5. Notifies the strategy listener via `notifyOrderPlaced()`.
 
 ## Order fill (PENDING -> OPEN)
 
@@ -70,7 +70,7 @@ For SL/TP hits, the broker closes the position directly. The EA detects this via
 
 ## Order cancellation
 
-If an order is cancelled or expires before filling (detected via `TRADE_TRANSACTION_HISTORY_ADD` with `ORDER_STATE_CANCELED` or `ORDER_STATE_EXPIRED`), the EA calls `HandleOrderCancellation()` on each asset. The matching strategy transitions the order to `ORDER_STATUS_CANCELLED`. Orders have a retry mechanism (up to `MAX_RETRY_COUNT = 3`) -- if a send fails, the order can be retried on the next processing cycle before being cancelled.
+If an order is cancelled or expires before filling (detected via `TRADE_TRANSACTION_HISTORY_ADD` with `ORDER_STATE_CANCELED` or `ORDER_STATE_EXPIRED`), the EA calls `HandleOrderCancellation()` on each asset. The matching strategy transitions the order to `ORDER_STATUS_CANCELLED`. Each lifecycle operation has its own retry budget (`MAX_RETRY_COUNT_OPEN`, `MAX_RETRY_COUNT_CANCEL`, `MAX_RETRY_COUNT_CLOSE`, each defaulting to 3) -- if a send fails, the order can be retried on the next processing cycle before being cancelled.
 
 ## Persistence
 

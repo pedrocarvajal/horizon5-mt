@@ -2,7 +2,7 @@
 #define __H_HANDLE_GATEWAY_GET_TICKER_MQH__
 
 void HandleGetTicker(SGatewayEvent &event, HorizonGateway &gateway, SELogger &eventLogger) {
-	eventLogger.Info(StringFormat("Event received | %s | id=%s", event.key, event.id));
+	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Event received | %s | id=%s", event.key, event.id));
 	if (event.symbol == "") {
 		AckServiceEventError(event, gateway, eventLogger, "No symbols provided");
 		return;
@@ -29,7 +29,7 @@ void HandleGetTicker(SGatewayEvent &event, HorizonGateway &gateway, SELogger &ev
 		ackBody.setProperty(tickerSymbol + "_ask", ClampNumeric(SymbolInfoDouble(tickerSymbol, SYMBOL_ASK), 10, 5));
 	}
 
-	eventLogger.Info(StringFormat("Event ack | %s | id=%s", event.key, event.id));
+	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Event ack | %s | id=%s", event.key, event.id));
 	gateway.AckEvent(event.id, ackBody);
 }
 

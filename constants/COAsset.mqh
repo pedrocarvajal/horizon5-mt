@@ -1,0 +1,6 @@
+#ifndef __CONSTANTS_CO_ASSET_MQH__
+#define __CONSTANTS_CO_ASSET_MQH__
+
+#define ROLLING_PERIOD_DAYS 90
+
+#endif

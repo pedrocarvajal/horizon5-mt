@@ -2,9 +2,11 @@
 #define __MONITOR_STRATEGY_RESOURCE_MQH__
 
 #include "../../../entities/EAccount.mqh"
+
 #include "../../../helpers/HGetStrategyUuid.mqh"
 
 #include "../HorizonMonitorContext.mqh"
+
 #include "../structs/SStrategyMapping.mqh"
 
 class StrategyResource {
@@ -65,7 +67,7 @@ public:
 		context.Post("api/v1/strategy", body, false);
 
 		registerStrategy(magicNumber, strategyUuid);
-		logger.Info(StringFormat("Strategy registered | %s | magic: %llu | uuid: %s", strategyName, magicNumber, strategyUuid));
+		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Strategy registered | %s | magic: %llu | uuid: %s", strategyName, magicNumber, strategyUuid));
 
 		return strategyUuid;
 	}

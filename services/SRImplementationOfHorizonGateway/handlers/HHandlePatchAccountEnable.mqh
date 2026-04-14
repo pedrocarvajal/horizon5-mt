@@ -9,7 +9,7 @@ void HandlePatchAccountEnable(SGatewayEvent &event, HorizonGateway &gateway, SEL
 	ackBody.setProperty("status", "enabled");
 	gateway.AckEvent(event.id, ackBody);
 
-	eventLogger.Info("Account enabled via Gateway event");
+	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, "Account enabled via Gateway event");
 }
 
 #endif

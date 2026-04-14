@@ -39,8 +39,8 @@ All services in the `services/` directory, organized by prefix and responsibilit
 | SRImplementationOfHorizonMonitor | `services/SRImplementationOfHorizonMonitor/` | Communicates with the Horizon Monitor API for remote logging, account sync, and heartbeats. |
 | SRImplementationOfHorizonGateway | `services/SRImplementationOfHorizonGateway/` | Communicates with the Horizon Gateway API for remote order management and account status.   |
 
-## Order Management (SR\*)
+## Gateway (SE\*)
 
-| Service              | Path                             | Purpose                                                                           |
-| -------------------- | -------------------------------- | --------------------------------------------------------------------------------- |
-| SRRemoteOrderManager | `services/SRRemoteOrderManager/` | Processes order commands received from the Horizon Gateway (open, close, modify). |
+| Service   | Path                  | Purpose                                                                                                                        |
+| --------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| SEGateway | `services/SEGateway/` | Per-asset gateway. Consumes inbound order commands from Horizon Gateway and publishes outbound notifications (orders, alerts). |

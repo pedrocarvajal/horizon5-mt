@@ -12,7 +12,7 @@ Each service runs its own polling loop, reads messages from assigned channels, p
 
 ## Message bus channels
 
-The message bus defines five named channels (in `SEMessageBusChannels.mqh`):
+The message bus defines five named channels (in `constants/COMessageBus.mqh`):
 
 | Channel           | Constant                    | Direction                 | Purpose                                                         |
 | ----------------- | --------------------------- | ------------------------- | --------------------------------------------------------------- |
@@ -46,14 +46,14 @@ The service also ensures target directories exist before writing and logs queue 
 
 ## HorizonGateway
 
-Optional. Only starts when Gateway URL and credentials are configured and the EA runs in live mode. Polls the Horizon API every 3 seconds (`EVENT_POLL_INTERVAL`) for pending events.
+Optional. Only starts when Gateway URL and credentials are configured and the EA runs in live mode. Polls the Horizon API every 3 seconds (`EVENT_POLL_INTERVAL_SECONDS`) for pending events.
 
 The service handles two categories of events:
 
 - **Trading events** (`post.order`, `delete.order`, `put.order`, `get.orders`): forwarded to the EA via `MB_CHANNEL_EVENTS_IN` for order management.
 - **Service events** (`get.account.info`, `get.assets`, `get.strategies`, `get.ticker`, `get.klines`, `patch.account.disable`, `patch.account.enable`): forwarded via `MB_CHANNEL_EVENTS_SERVICE` for informational responses.
 
-The EA processes inbound trading events through `SRRemoteOrderManager`, which dispatches to specific handlers (`HHandlePostOrder`, `HHandleDeleteOrder`, etc.). Acknowledgments flow back through `MB_CHANNEL_EVENTS_OUT`.
+The EA processes inbound trading events through `SEGateway` (per asset), which dispatches to specific handlers (`HHandlePostOrder`, `HHandleDeleteOrder`, etc.). Acknowledgments flow back through `MB_CHANNEL_EVENTS_OUT`.
 
 ## HorizonMonitor
 

@@ -4,6 +4,7 @@
 #include "../../helpers/HIsLiveTrading.mqh"
 
 #include "../SELogger/SELogger.mqh"
+
 #include "../SEDb/SEDb.mqh"
 
 class SRPersistenceOfState {

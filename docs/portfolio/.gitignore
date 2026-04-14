@@ -1,0 +1,4 @@
+node_modules/
+storage/
+package-lock.json
+report/template/tailwind.css

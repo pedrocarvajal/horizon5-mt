@@ -2,9 +2,10 @@
 #define __MONITOR_HEARTBEAT_RESOURCE_MQH__
 
 #include "../HorizonMonitorContext.mqh"
+
 #include "StrategyResource.mqh"
 
-#define HEARTBEAT_EVENT_RUNNING "on_running"
+#include "../../../constants/COHeartbeat.mqh"
 
 class HeartbeatResource {
 private:

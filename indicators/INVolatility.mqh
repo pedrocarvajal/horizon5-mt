@@ -2,6 +2,10 @@
 #define __IN_VOLATILITY_MQH__
 
 double Volatility(string symbolName, ENUM_TIMEFRAMES timeframe, int period, int shift) {
+	if (period <= 1) {
+		return 0.0;
+	}
+
 	double closes[];
 	ArraySetAsSeries(closes, true);
 
@@ -31,10 +35,6 @@ double Volatility(string symbolName, ENUM_TIMEFRAMES timeframe, int period, int 
 	for (int i = 0; i < period; i++) {
 		double diff = returns[i] - mean;
 		sumSquaredDiff += diff * diff;
-	}
-
-	if (period <= 1) {
-		return 0.0;
 	}
 
 	return MathSqrt(sumSquaredDiff / (period - 1));

@@ -6,6 +6,7 @@
 #include "../../helpers/HGetReportsPath.mqh"
 
 #include "../SELogger/SELogger.mqh"
+
 #include "../SEDb/SEDb.mqh"
 
 class SRReportOfOrderHistory {
@@ -67,7 +68,7 @@ public:
 	void Export() {
 		ordersCollection.Flush();
 
-		logger.Info(StringFormat(
+		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
 			"Order history saved - %s.json with %d orders",
 			reportName,
 			ordersCollection.Count()
@@ -76,18 +77,6 @@ public:
 
 	int GetOrderCount() {
 		return ordersCollection.Count();
-	}
-
-	string GetCurrentReportsPath() {
-		string pathSeparator = "\\";
-		string convertedDir = reportsDir;
-		StringReplace(convertedDir, "/", pathSeparator);
-
-		return StringFormat("%s%sFiles%s",
-			TerminalInfoString(TERMINAL_COMMONDATA_PATH),
-			pathSeparator,
-			convertedDir
-		);
 	}
 };
 
