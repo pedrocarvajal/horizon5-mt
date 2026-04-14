@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "0.12"
+#property version   "0.14"
 #property strict
 
 #include "constants/COHorizonMonitor.mqh"
@@ -166,10 +166,8 @@ int OnStart() {
 	}
 
 	SEMessageBus::RegisterService(MB_SERVICE_MONITOR);
-	monitorLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, StringFormat(
-		"service started | system=HorizonMonitor version=1.00 built='%s'",
-		(string)__DATETIME__
-	));
+	monitorLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+		"service started | system=HorizonMonitor version=0.14 built='2026-04-14 19:59:38'");
 
 	while (!IsStopped()) {
 		SEMessageBus::WaitForMessage(MB_CHANNEL_CONNECTOR, HORIZON_MONITOR_POLL_INTERVAL_MILLISECONDS);

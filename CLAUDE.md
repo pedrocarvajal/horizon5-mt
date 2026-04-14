@@ -2,11 +2,7 @@
 
 # Rules
 
-- On every `.mq5` file modification, bump `#property version`. The project is currently in unstable pre-release (`0.x`). Versioning scheme:
-  - `Horizon.mq5`: `0.{total project commit count}` (e.g. `0.340` means 340 commits across the project)
-  - Service files (`HorizonGateway.mq5`, `HorizonMonitor.mq5`, `HorizonPersistence.mq5`): `0.{commit count for that specific file}` (e.g. `0.05` means 5 commits touching that file)
-  - When the project reaches stable release, MAJOR will move to `1` and versioning will switch to `MAJOR.MINORPATCH` format (e.g. `1.00`, `1.01`, `1.10`): MAJOR for breaking changes, MINOR (tens digit) for new functionality, PATCH (ones digit) for fixes or non-functional changes.
-  - This does not apply to `.mqh` files. Update the version before committing/pushing changes.
+- On every commit / unit of work touching a `.mq5` file, bump its version via `make version-upgrade-<target>` (targets: `expert`, `gateway`, `monitor`, `persistence`, `all`; optional `KIND=counter|minor|patch`, default `counter`). Never hand-edit `#property version` or the `service started` log line. Example: `make version-upgrade-expert` after working on `Horizon.mq5`, or `make version-upgrade-all` if several `.mq5` files changed.
 
 # Projects correlation
 
