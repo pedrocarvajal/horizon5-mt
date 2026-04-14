@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "0.11"
+#property version   "0.13"
 #property strict
 
 #include "constants/COHorizonGateway.mqh"
@@ -181,10 +181,8 @@ int OnStart() {
 	}
 
 	SEMessageBus::RegisterService(MB_SERVICE_GATEWAY);
-	gatewayLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, StringFormat(
-		"service started | system=HorizonGateway version=1.00 built='%s'",
-		(string)__DATETIME__
-	));
+	gatewayLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+		"service started | system=HorizonGateway version=0.13 built='2026-04-14 19:59:38'");
 
 	gatewayLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "main loop entered | system=HorizonGateway");
 
