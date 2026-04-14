@@ -34,7 +34,6 @@ Horizon5/
 |-- enums/
 |   |-- EDebugLevel.mqh          Debug log levels
 |   |-- EHeartbeatEvent.mqh      Heartbeat event types
-|   |-- ELogSystem.mqh           Log system identifiers
 |   |-- EOrderStatuses.mqh       Order status enum
 |   |-- ETradingPauseReason.mqh  Trading pause reasons
 |
@@ -119,7 +118,7 @@ Horizon5/
 |       |-- SRPersistenceOfOrders/              Order state persistence via MessageBus
 |       |-- SRPersistenceOfState/               Strategy state persistence (key-value store)
 |       |-- SRPersistenceOfStatistics/          Statistics persistence via MessageBus
-|       |-- SRRemoteOrderManager/               Remote order execution from Gateway events
+|       |-- SEGateway/                          Per-asset gateway for inbound order events and outbound notifications
 |       |-- SRReportOfLogs/                     Log export to CSV
 |       |-- SRReportOfMarketSnapshots/          Market snapshot export to CSV
 |       |-- SRReportOfOrderHistory/             Order history export to CSV

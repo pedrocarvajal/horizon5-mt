@@ -6,6 +6,7 @@
 #include "../../helpers/HGetReportsPath.mqh"
 
 #include "../SELogger/SELogger.mqh"
+
 #include "../SEDb/SEDb.mqh"
 
 class SRReportOfMarketSnapshots {
@@ -34,7 +35,7 @@ public:
 	void Export() {
 		marketCollection.Flush();
 
-		logger.Info(StringFormat(
+		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
 			"Market history saved - %s.json with %d snapshots",
 			reportName,
 			marketCollection.Count()
@@ -43,18 +44,6 @@ public:
 
 	int GetSnapshotCount() {
 		return marketCollection.Count();
-	}
-
-	string GetCurrentReportsPath() {
-		string pathSeparator = "\\";
-		string convertedDir = reportsDir;
-		StringReplace(convertedDir, "/", pathSeparator);
-
-		return StringFormat("%s%sFiles%s",
-			TerminalInfoString(TERMINAL_COMMONDATA_PATH),
-			pathSeparator,
-			convertedDir
-		);
 	}
 
 private:

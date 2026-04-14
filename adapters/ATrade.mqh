@@ -3,9 +3,13 @@
 
 #include <Trade/Trade.mqh>
 
+#include "../structs/STradeResult.mqh"
+
+#include "../helpers/HTradeRetcodeSeverity.mqh"
+
 #include "../services/SELogger/SELogger.mqh"
 
-#define SLIPPAGE_POINTS 5
+#include "../constants/COTrade.mqh"
 
 class ATrade {
 private:
@@ -23,28 +27,22 @@ public:
 		positionId = 0;
 	}
 
-	bool Cancel(ulong orderTicket) {
+	STradeResult Cancel(ulong orderTicket) {
 		CTrade trade;
-		return trade.OrderDelete(orderTicket);
+		trade.OrderDelete(orderTicket);
+
+		STradeResult result;
+		populateResult(result, trade);
+		return result;
 	}
 
-	bool Close(ulong positionTicket) {
+	STradeResult Close(ulong positionTicket) {
 		CTrade trade;
-		return trade.PositionClose(positionTicket);
-	}
+		trade.PositionClose(positionTicket);
 
-	bool CloseOrCancel(ulong ticket) {
-		if (IsPendingOrder(ticket)) {
-			logger.Info(StringFormat("Canceling pending order: %llu", ticket));
-			return Cancel(ticket);
-		}
-
-		if (IsOpenPosition(ticket)) {
-			logger.Info(StringFormat("Closing open position: %llu", ticket));
-			return Close(ticket);
-		}
-
-		return false;
+		STradeResult result;
+		populateResult(result, trade);
+		return result;
 	}
 
 	static string DescribeRetcode(uint retcode) {
@@ -97,26 +95,20 @@ public:
 		return positionId;
 	}
 
-	bool IsOpenPosition(ulong ticket) {
-		return PositionSelectByTicket(ticket);
-	}
-
-	bool IsPendingOrder(ulong ticket) {
-		return OrderSelect(ticket);
-	}
-
-	bool Modify(double stopLoss = 0, double takeProfit = 0,
-		    ulong magicNumber = 0) {
-		logger.Info(StringFormat("Modifying order, position_id=%llu, order_id=%llu",
-			GetPositionId(), GetOrderId()));
+	STradeResult Modify(double stopLoss = 0, double takeProfit = 0, ulong magicNumber = 0) {
+		STradeResult result;
+		ZeroMemory(result);
 
 		if (stopLoss == 0 && takeProfit == 0) {
-			return false;
+			result.retcode = TRADE_RETCODE_NO_CHANGES;
+			result.severity = TRADE_SEVERITY_TERMINAL;
+			return result;
 		}
 
 		if (!PositionSelectByTicket(GetPositionId())) {
-			logger.Error(StringFormat("Error selecting position: %llu", GetPositionId()));
-			return false;
+			result.retcode = TRADE_RETCODE_INVALID;
+			result.severity = TRADE_SEVERITY_TERMINAL;
+			return result;
 		}
 
 		string positionSymbol = PositionGetString(POSITION_SYMBOL);
@@ -124,39 +116,34 @@ public:
 		double currentTp = PositionGetDouble(POSITION_TP);
 
 		MqlTradeRequest request;
-		MqlTradeResult result;
+		MqlTradeResult mqlResult;
 		ZeroMemory(request);
-		ZeroMemory(result);
+		ZeroMemory(mqlResult);
 
 		buildModifyRequest(request, positionSymbol, stopLoss, currentSl,
 			takeProfit, currentTp, magicNumber);
 
-		if (!OrderSend(request, result)) {
-			logger.Error(StringFormat("Error sending order modification: %d", GetLastError()));
-			return false;
+		if (!OrderSend(request, mqlResult) && mqlResult.retcode == 0) {
+			mqlResult.retcode = TRADE_RETCODE_REJECT;
 		}
 
-		if (result.retcode != TRADE_RETCODE_DONE) {
-			logger.Error(StringFormat("Error modifying order: %d", result.retcode));
-			return false;
-		}
-
-		return true;
+		populateResultFromMql(result, mqlResult);
+		return result;
 	}
 
-	bool ModifyStopLoss(double stopLoss, ulong magicNumber = 0) {
+	STradeResult ModifyStopLoss(double stopLoss, ulong magicNumber = 0) {
 		return Modify(stopLoss, 0, magicNumber);
 	}
 
-	bool ModifyStopLossAndTakeProfit(double stopLoss, double takeProfit, ulong magicNumber = 0) {
+	STradeResult ModifyStopLossAndTakeProfit(double stopLoss, double takeProfit, ulong magicNumber = 0) {
 		return Modify(stopLoss, takeProfit, magicNumber);
 	}
 
-	bool ModifyTakeProfit(double takeProfit, ulong magicNumber = 0) {
+	STradeResult ModifyTakeProfit(double takeProfit, ulong magicNumber = 0) {
 		return Modify(0, takeProfit, magicNumber);
 	}
 
-	MqlTradeResult Open(
+	STradeResult Open(
 		string symbol,
 		string id,
 		ENUM_ORDER_TYPE orderType,
@@ -166,26 +153,28 @@ public:
 		double stopLoss,
 		ulong magicNumber) {
 		MqlTradeRequest request;
-		MqlTradeResult result;
+		MqlTradeResult mqlResult;
 		ZeroMemory(request);
-		ZeroMemory(result);
+		ZeroMemory(mqlResult);
 
 		buildOpenRequest(request, symbol, id, orderType, price, volume,
 			takeProfit, stopLoss, magicNumber);
 
-		logger.Separator("Trade request");
-
-		if (!OrderSend(request, result)) {
-			logger.Error(StringFormat("Error opening order: %s (%d)",
-				DescribeRetcode(result.retcode), GetLastError()));
-			return result;
+		if (!OrderSend(request, mqlResult) && mqlResult.retcode == 0) {
+			mqlResult.retcode = TRADE_RETCODE_REJECT;
 		}
 
-		trackOrderIds(result);
+		STradeResult result;
+		ZeroMemory(result);
+		populateResultFromMql(result, mqlResult);
 
-		logger.Info(StringFormat(
-			"Order opened, deal_id=%llu, order_id=%llu, position_id=%llu",
-			GetDealId(), GetOrderId(), GetPositionId()));
+		if (result.severity == TRADE_SEVERITY_SUCCESS) {
+			trackOrderIds(mqlResult);
+			result.dealId = GetDealId();
+			result.orderId = GetOrderId();
+			result.positionId = GetPositionId();
+		}
+
 		return result;
 	}
 
@@ -202,6 +191,26 @@ public:
 	}
 
 private:
+	void populateResult(STradeResult &result, CTrade &trade) {
+		result.retcode = trade.ResultRetcode();
+		result.severity = GetTradeRetcodeSeverity(result.retcode);
+		result.dealId = trade.ResultDeal();
+		result.orderId = trade.ResultOrder();
+		result.positionId = 0;
+		result.price = trade.ResultPrice();
+		result.volume = trade.ResultVolume();
+	}
+
+	void populateResultFromMql(STradeResult &result, MqlTradeResult &mqlResult) {
+		result.retcode = mqlResult.retcode;
+		result.severity = GetTradeRetcodeSeverity(result.retcode);
+		result.dealId = mqlResult.deal;
+		result.orderId = mqlResult.order;
+		result.positionId = 0;
+		result.price = mqlResult.price;
+		result.volume = mqlResult.volume;
+	}
+
 	void buildModifyRequest(MqlTradeRequest &request, string positionSymbol,
 				double stopLoss, double currentSl,
 				double takeProfit, double currentTp,
@@ -265,14 +274,13 @@ private:
 		return ORDER_FILLING_RETURN;
 	}
 
-	void trackOrderIds(MqlTradeResult &result) {
+	void trackOrderIds(const MqlTradeResult &result) {
 		SetDealId(result.deal);
 		SetOrderId(result.order);
 
 		if (GetDealId() > 0) {
 			HistoryDealSelect(GetDealId());
 			SetPositionId(HistoryDealGetInteger(GetDealId(), DEAL_POSITION_ID));
-			logger.Info(StringFormat("Position ID found: %llu", GetPositionId()));
 		}
 	}
 };

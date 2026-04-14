@@ -4,13 +4,12 @@
 #include "../../libraries/Json/index.mqh"
 
 #include "structs/SMessage.mqh"
-#include "SEMessageBusChannels.mqh"
+
 #include "SEMessageBusDLL.mqh"
 
 #include "../SELogger/SELogger.mqh"
 
-#define MB_PAYLOAD_BUFFER_SIZE 65536
-#define MB_TYPE_BUFFER_SIZE 256
+#include "../../constants/COMessageBus.mqh"
 
 class SEMessageBus {
 private:
@@ -23,7 +22,7 @@ public:
 		int result = MbInit();
 
 		if (result != 1) {
-			logger.Error("Failed to initialize HorizonMessageBus DLL");
+			logger.Error(LOG_CODE_FRAMEWORK_INIT_FAILED, "message bus init failed | reason='dll initialization failed'");
 			return false;
 		}
 
@@ -47,7 +46,7 @@ public:
 		int channelId = MbChannelGetOrCreate(channel);
 
 		if (channelId < 0) {
-			logger.Error(StringFormat("Cannot get/create channel: %s", channel));
+			logger.Error(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat("message bus channel failed | channel=%s reason='get or create failed'", channel));
 			return false;
 		}
 
@@ -55,7 +54,7 @@ public:
 		long sequence = MbPublish(channelId, messageType, payloadStr);
 
 		if (sequence < 0) {
-			logger.Error(StringFormat("Publish failed on channel: %s", channel));
+			logger.Error(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat("message bus publish failed | channel=%s", channel));
 			return false;
 		}
 
@@ -105,10 +104,6 @@ public:
 		}
 
 		return MbAck(channelId, sequence) == 1;
-	}
-
-	static int Cleanup(string channel, int maxAgeSeconds) {
-		return 0;
 	}
 
 	static void RegisterService(string serviceName) {

@@ -2,7 +2,9 @@
 #define __SE_DB_MQH__
 
 #include "SEFileDbDLL.mqh"
+
 #include "SEDbCollection.mqh"
+
 #include "../../entities/EAccount.mqh"
 
 class SEDb {
@@ -78,36 +80,6 @@ public:
 		collections[size] = collection;
 
 		return collection;
-	}
-
-	bool Drop(string collectionName) {
-		if (!isInitialized) {
-			Print("[ERROR] SEDb: Database not initialized");
-			return false;
-		}
-
-		int index = FindCollectionIndex(collectionName);
-		if (index == -1) {
-			return false;
-		}
-
-		collections[index].DeleteFile();
-
-		if (CheckPointer(collections[index]) == POINTER_DYNAMIC) {
-			delete collections[index];
-		}
-
-		int size = ArraySize(collections);
-		for (int i = index; i < size - 1; i++) {
-			collections[i] = collections[i + 1];
-		}
-		ArrayResize(collections, size - 1);
-
-		return true;
-	}
-
-	int GetCollectionCount() {
-		return ArraySize(collections);
 	}
 
 private:

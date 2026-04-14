@@ -1,0 +1,6 @@
+#ifndef __CONSTANTS_CO_SE_DB_MQH__
+#define __CONSTANTS_CO_SE_DB_MQH__
+
+#define SEDB_RESULT_BUFFER_SIZE 65536
+
+#endif

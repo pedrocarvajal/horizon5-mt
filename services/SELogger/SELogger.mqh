@@ -2,51 +2,52 @@
 #define __SE_LOGGER_MQH__
 
 #include "../../enums/EDebugLevel.mqh"
+#include "enums/ELogLevel.mqh"
+#include "enums/ELogCode.mqh"
 
 #include "../../interfaces/IRemoteLogger.mqh"
 
-#include "../../helpers/HIsLiveTrading.mqh"
+#include "components/LogLevelFilter.mqh"
+#include "components/LogPersister.mqh"
+#include "components/LogRemoteDispatcher.mqh"
+#include "components/LogFormatter.mqh"
 
 class SELogger {
 private:
 	string prefix;
 	static ENUM_DEBUG_LEVEL globalDebugLevel;
-	static string globalEntries[];
-	static IRemoteLogger *remoteLogger;
-	static string logSystem;
-	static bool isSendingToRemote;
 
 public:
 	SELogger(string newPrefix = "") {
 		prefix = newPrefix;
 	}
 
-	void Debug(string message) {
-		log("DEBUG", message);
+	void Debug(ENUM_LOG_CODE code, string message) {
+		log(LOG_LEVEL_DEBUG, code, message);
 	}
 
-	void Error(string message) {
-		log("ERROR", message);
+	void Error(ENUM_LOG_CODE code, string message) {
+		log(LOG_LEVEL_ERROR, code, message);
 	}
 
-	void Info(string message) {
-		log("INFO", message);
+	void Info(ENUM_LOG_CODE code, string message) {
+		log(LOG_LEVEL_INFO, code, message);
 	}
 
-	void Success(string message) {
-		log("SUCCESS", message);
+	void Success(ENUM_LOG_CODE code, string message) {
+		log(LOG_LEVEL_SUCCESS, code, message);
+	}
+
+	void Warning(ENUM_LOG_CODE code, string message) {
+		log(LOG_LEVEL_WARNING, code, message);
 	}
 
 	void Separator(string title) {
-		log("INFO", title + " -------------------------------- ");
+		log(LOG_LEVEL_INFO, LOG_CODE_NONE, title + " -------------------------------- ");
 	}
 
 	void SetPrefix(string newPrefix) {
 		prefix = newPrefix;
-	}
-
-	void Warning(string message) {
-		log("WARNING", message);
 	}
 
 	static void SetGlobalDebugLevel(ENUM_DEBUG_LEVEL level) {
@@ -54,84 +55,48 @@ public:
 	}
 
 	static void SetRemoteLogger(IRemoteLogger *remoteLoggerInstance) {
-		remoteLogger = remoteLoggerInstance;
+		LogRemoteDispatcher::SetRemoteLogger(remoteLoggerInstance);
 	}
 
 	static void SetLogSystem(string system) {
-		logSystem = system;
+		LogRemoteDispatcher::SetLogSystem(system);
 	}
 
 	static void GetGlobalEntries(string &result[]) {
-		int size = ArraySize(globalEntries);
-		ArrayResize(result, size);
-
-		for (int i = 0; i < size; i++) {
-			result[i] = globalEntries[i];
-		}
+		LogPersister::GetAll(result);
 	}
 
 	static int GetGlobalEntryCount() {
-		return ArraySize(globalEntries);
+		return LogPersister::GetCount();
 	}
 
 	static void ClearGlobalEntries() {
-		ArrayResize(globalEntries, 0);
+		LogPersister::Clear();
 	}
 
 private:
-	void log(string level, string message) {
-		if (globalDebugLevel == DEBUG_LEVEL_NONE) {
+	void log(ENUM_LOG_LEVEL level, ENUM_LOG_CODE code, string message) {
+		if (!LogLevelFilter::IsEnabled(globalDebugLevel)) {
 			return;
 		}
 
-		sendToRemote(level, message);
+		string levelLabel = LogLevelToString(level);
+		LogRemoteDispatcher::Dispatch(levelLabel, prefix, message);
 
-		if (!shouldPrint(level)) {
+		if (!LogLevelFilter::ShouldPrint(level, globalDebugLevel)) {
 			return;
 		}
 
-		Print("[", level, "] ", prefix, ": ", message);
+		Print(LogFormatter::FormatPrintLine(level, code, prefix, message));
 
-		if (!shouldPersist()) {
+		if (!LogLevelFilter::ShouldPersist(globalDebugLevel)) {
 			return;
 		}
 
-		int size = ArraySize(globalEntries);
-		ArrayResize(globalEntries, size + 1, size + 64);
-		globalEntries[size] = StringFormat("[%s] %s: %s", level, prefix, message);
-	}
-
-	void sendToRemote(string level, string message) {
-		if (isSendingToRemote || remoteLogger == NULL || !IsLiveEnvironment()) {
-			return;
-		}
-
-		isSendingToRemote = true;
-		remoteLogger.StoreLog(logSystem, level, prefix + ": " + message);
-		isSendingToRemote = false;
-	}
-
-	static bool shouldPersist() {
-		return globalDebugLevel == DEBUG_LEVEL_ERRORS_PERSIST || globalDebugLevel == DEBUG_LEVEL_ALL_PERSIST;
-	}
-
-	static bool shouldPrint(string level) {
-		if (globalDebugLevel == DEBUG_LEVEL_NONE) {
-			return false;
-		}
-
-		if (globalDebugLevel == DEBUG_LEVEL_ERRORS || globalDebugLevel == DEBUG_LEVEL_ERRORS_PERSIST) {
-			return level == "ERROR" || level == "WARNING";
-		}
-
-		return true;
+		LogPersister::Append(LogFormatter::FormatPersistedEntry(level, code, prefix, message));
 	}
 };
 
 ENUM_DEBUG_LEVEL SELogger::globalDebugLevel = DEBUG_LEVEL_ALL;
-string SELogger::globalEntries[];
-IRemoteLogger *SELogger::remoteLogger = NULL;
-string SELogger::logSystem = "";
-bool SELogger::isSendingToRemote = false;
 
 #endif

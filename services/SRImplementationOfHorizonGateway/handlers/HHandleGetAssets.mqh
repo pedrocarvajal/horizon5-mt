@@ -4,7 +4,7 @@
 class SEAsset;
 
 void HandleGetAssets(SGatewayEvent &event, HorizonGateway &gateway, SEAsset *&registeredAssets[], SELogger &eventLogger) {
-	eventLogger.Info(StringFormat("Event received | %s | id=%s", event.key, event.id));
+	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Event received | %s | id=%s", event.key, event.id));
 
 	JSON::Object ackBody;
 	SEventResponse response;
@@ -29,7 +29,7 @@ void HandleGetAssets(SGatewayEvent &event, HorizonGateway &gateway, SEAsset *&re
 
 	ackBody.setProperty("assets", assetsArray);
 
-	eventLogger.Info(StringFormat("Event ack | %s | id=%s", event.key, event.id));
+	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Event ack | %s | id=%s", event.key, event.id));
 	gateway.AckEvent(event.id, ackBody);
 }
 

@@ -2,6 +2,7 @@
 #define __SR_REPORT_OF_LOGS_MQH__
 
 #include "../SELogger/SELogger.mqh"
+
 #include "../SEDb/SEDb.mqh"
 
 class SRReportOfLogs {
@@ -41,7 +42,7 @@ public:
 
 		collection.Flush();
 
-		logger.Info(StringFormat(
+		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
 			"Exported %d log entries to %s",
 			entryCount,
 			collectionName

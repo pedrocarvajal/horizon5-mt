@@ -2,6 +2,7 @@
 #define __MONITOR_LOG_RESOURCE_MQH__
 
 #include "../HorizonMonitorContext.mqh"
+
 #include "StrategyResource.mqh"
 
 class LogResource {

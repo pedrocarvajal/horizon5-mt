@@ -4,12 +4,13 @@
 #include "../../libraries/Json/index.mqh"
 
 #include "../SEMessageBus/SEMessageBus.mqh"
-#include "../SEMessageBus/SEMessageBusChannels.mqh"
 
 #include "SEFileDbDLL.mqh"
+
 #include "SEDbQuery.mqh"
 
-#define SEDB_RESULT_BUFFER_SIZE 65536
+#include "../../constants/COMessageBus.mqh"
+#include "../../constants/COSEDb.mqh"
 
 class SEDbCollection {
 private:

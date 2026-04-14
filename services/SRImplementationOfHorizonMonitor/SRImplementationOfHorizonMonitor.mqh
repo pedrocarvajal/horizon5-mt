@@ -4,6 +4,7 @@
 #include "../SELogger/SELogger.mqh"
 
 #include "../../interfaces/IRemoteLogger.mqh"
+
 #include "../../integrations/HorizonMonitor/HorizonMonitor.mqh"
 
 class SEAsset;
@@ -89,10 +90,6 @@ public:
 
 	void PostDirect(string path, JSON::Object &body) {
 		monitor.PostDirect(path, body);
-	}
-
-	HorizonMonitor *GetMonitor() {
-		return GetPointer(monitor);
 	}
 
 	void SyncAccount(SEAsset *&registeredAssets[], int assetCount, string event) {

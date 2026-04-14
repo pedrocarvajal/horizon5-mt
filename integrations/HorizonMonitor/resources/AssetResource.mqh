@@ -5,6 +5,7 @@
 #include "../../../helpers/HGetAssetUuid.mqh"
 
 #include "../HorizonMonitorContext.mqh"
+
 #include "../structs/SAssetMapping.mqh"
 
 class AssetResource {
@@ -57,7 +58,7 @@ public:
 		context.Post("api/v1/asset", body, false);
 
 		registerAsset(symbolName, assetUuid);
-		logger.Info(StringFormat("Asset registered | %s | uuid: %s", symbolName, assetUuid));
+		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Asset registered | %s | uuid: %s", symbolName, assetUuid));
 
 		return assetUuid;
 	}

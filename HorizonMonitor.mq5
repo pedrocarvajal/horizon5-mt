@@ -1,10 +1,13 @@
 #property service
 #property copyright "Horizon5"
-#property version   "0.05"
+#property version   "0.12"
 #property strict
 
+#include "constants/COHorizonMonitor.mqh"
+#include "constants/CODiagnostic.mqh"
+#include "constants/COMessageBus.mqh"
+
 #include "enums/EDebugLevel.mqh"
-#include "enums/ELogSystem.mqh"
 
 #include "helpers/HIsLiveTrading.mqh"
 #include "helpers/HGetLogsPath.mqh"
@@ -12,16 +15,10 @@
 
 #include "services/SELogger/SELogger.mqh"
 #include "services/SEMessageBus/SEMessageBus.mqh"
-#include "services/SEMessageBus/SEMessageBusChannels.mqh"
 #include "services/SEDateTime/SEDateTime.mqh"
 #include "services/SRReportOfLogs/SRReportOfLogs.mqh"
 
 #include "integrations/HorizonMonitor/HorizonMonitor.mqh"
-
-#define MESSAGE_TYPE_HTTP_POST "http_post"
-#define API_ORDER_PATH_PREFIX  "api/v1/order"
-
-#define DIAGNOSTIC_INTERVAL_SECONDS 300
 
 SEDateTime dtime;
 SELogger monitorLogger("HorizonMonitor");
@@ -35,12 +32,8 @@ input string HorizonMonitorUrl = ""; // [1] > HorizonMonitor base URL
 input string HorizonMonitorEmail = ""; // [1] > HorizonMonitor email (required)
 input string HorizonMonitorPassword = ""; // [1] > HorizonMonitor password (required)
 
-#define POLL_INTERVAL_MS 100
-
 datetime lastDiagnosticTime = 0;
 datetime lastHeartbeatTime = 0;
-
-#define HEARTBEAT_INTERVAL_SECONDS 3600
 
 bool isOrderEndpoint(string path) {
 	return StringFind(path, API_ORDER_PATH_PREFIX) >= 0;
@@ -65,7 +58,7 @@ void processConnectorMessages() {
 	string normalPaths[];
 
 	for (int i = 0; i < count; i++) {
-		if (messages[i].messageType != MESSAGE_TYPE_HTTP_POST) {
+		if (messages[i].messageType != MB_TYPE_HTTP_POST) {
 			SEMessageBus::Ack(MB_CHANNEL_CONNECTOR, messages[i].sequence);
 			continue;
 		}
@@ -138,8 +131,8 @@ void logDiagnostics() {
 
 	int pendingConnector = SEMessageBus::GetPendingCount(MB_CHANNEL_CONNECTOR);
 
-	monitorLogger.Info(StringFormat(
-		"Queue diagnostics | connector=%d",
+	monitorLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, StringFormat(
+		"queue diagnostics | connector=%d",
 		pendingConnector
 	));
 }
@@ -153,13 +146,13 @@ int OnStart() {
 	}
 
 	if (!horizonMonitor.Initialize(HorizonMonitorUrl, HorizonMonitorEmail, HorizonMonitorPassword, IsLiveTrading())) {
-		monitorLogger.Warning("HorizonMonitor initialization failed, service idle");
+		monitorLogger.Warning(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='monitor initialization failed'");
 		return 0;
 	}
 
 	if (horizonMonitor.IsEnabled()) {
 		if (!horizonMonitor.UpsertAccount()) {
-			monitorLogger.Error("Failed to register account, service idle");
+			monitorLogger.Error(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='account registration failed'");
 			return 0;
 		}
 
@@ -168,15 +161,18 @@ int OnStart() {
 	}
 
 	if (!SEMessageBus::Initialize()) {
-		monitorLogger.Error("MessageBus DLL initialization failed");
+		monitorLogger.Error(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='message bus DLL initialization failed'");
 		return 0;
 	}
 
 	SEMessageBus::RegisterService(MB_SERVICE_MONITOR);
-	monitorLogger.Info("Service started | v" + "1.00" + " | built " + (string)__DATETIME__);
+	monitorLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, StringFormat(
+		"service started | system=HorizonMonitor version=1.00 built='%s'",
+		(string)__DATETIME__
+	));
 
 	while (!IsStopped()) {
-		SEMessageBus::WaitForMessage(MB_CHANNEL_CONNECTOR, POLL_INTERVAL_MS);
+		SEMessageBus::WaitForMessage(MB_CHANNEL_CONNECTOR, HORIZON_MONITOR_POLL_INTERVAL_MILLISECONDS);
 
 		processConnectorMessages();
 		sendHeartbeat();
@@ -186,7 +182,7 @@ int OnStart() {
 	SELogger::SetRemoteLogger(NULL);
 	SEMessageBus::UnregisterService(MB_SERVICE_MONITOR);
 	SEMessageBus::Shutdown();
-	monitorLogger.Info("Service stopped");
+	monitorLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service stopped | system=HorizonMonitor");
 
 	if (SELogger::GetGlobalEntryCount() > 0) {
 		string logEntries[];

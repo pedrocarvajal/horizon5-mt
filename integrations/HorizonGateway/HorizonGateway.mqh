@@ -4,17 +4,20 @@
 #include "../../services/SERequest/SERequest.mqh"
 #include "../../services/SELogger/SELogger.mqh"
 #include "../../services/SEMessageBus/SEMessageBus.mqh"
-#include "../../services/SEMessageBus/SEMessageBusChannels.mqh"
+#include "../../constants/COMessageBus.mqh"
 
 #include "../../entities/EAccount.mqh"
+
 #include "../../helpers/HGetAccountUuid.mqh"
 #include "../../helpers/HGetAssetUuid.mqh"
 #include "../../helpers/HGetStrategyUuid.mqh"
 
 #include "HorizonGatewayContext.mqh"
+
 #include "structs/SGatewayEvent.mqh"
 #include "structs/SGatewayAssetMapping.mqh"
 #include "structs/SGatewayStrategyMapping.mqh"
+
 #include "resources/EventResource.mqh"
 
 #define SAFE_DELETE(ptr) do { if (ptr != NULL && CheckPointer(ptr) == POINTER_DYNAMIC) { delete ptr; } ptr = NULL; } while (0)
@@ -58,21 +61,6 @@ private:
 		registeredStrategies[size].SetUuid(uuid);
 	}
 
-	string parseUuidFromResponse(SRequestResponse &response) {
-		if (response.status != 200 && response.status != 201) {
-			return "";
-		}
-
-		JSON::Object root(response.body);
-
-		if (!root.isObject("data")) {
-			return "";
-		}
-
-		JSON::Object *dataObject = root.getObject("data");
-		return dataObject.getString("id");
-	}
-
 	void trimKeyArray(string &keyArray[]) {
 		for (int i = 0; i < ArraySize(keyArray); i++) {
 			StringTrimLeft(keyArray[i]);
@@ -90,10 +78,10 @@ private:
 		return false;
 	}
 
-	bool matchesFilters(JSON::Object *payload, const string symbolFilter, int strategyFilter) {
-		if (strategyFilter > 0) {
-			int eventStrategy = (int)payload.getNumber("strategy_id");
-			if (eventStrategy != 0 && eventStrategy != strategyFilter) {
+	bool matchesFilters(JSON::Object *payload, const string symbolFilter, const string strategyFilter) {
+		if (strategyFilter != "") {
+			string eventStrategy = payload.getString("strategy_id");
+			if (eventStrategy != "" && eventStrategy != strategyFilter) {
 				return false;
 			}
 		}
@@ -108,7 +96,7 @@ private:
 		return true;
 	}
 
-	int consumeEventsFromBus(const string keys, const string symbolFilter, SGatewayEvent &eventList[], int limit, int strategyFilter) {
+	int consumeEventsFromBus(const string keys, const string symbolFilter, SGatewayEvent &eventList[], int limit, const string strategyFilter) {
 		SMessage messages[];
 		int count = SEMessageBus::Poll(MB_CHANNEL_EVENTS_IN, messages);
 
@@ -171,14 +159,14 @@ private:
 		SRequestResponse response = authRequest.Post("api/v1/auth/login", loginBody);
 
 		if (response.status != 200) {
-			logger.Error(StringFormat("Authentication failed with status %d", response.status));
+			logger.Error(LOG_CODE_REMOTE_AUTH_FAILED, StringFormat("auth failed | status=%d", response.status));
 			return false;
 		}
 
 		JSON::Object root(response.body);
 
 		if (!root.isObject("data")) {
-			logger.Error("Authentication response missing 'data' object");
+			logger.Error(LOG_CODE_REMOTE_RESPONSE_INVALID, "auth response invalid | reason='missing data object'");
 			return false;
 		}
 
@@ -186,7 +174,7 @@ private:
 		string accessToken = dataObject.getString("access");
 
 		if (accessToken == "") {
-			logger.Error("Authentication response missing 'access' token");
+			logger.Error(LOG_CODE_REMOTE_RESPONSE_INVALID, "auth response invalid | reason='missing access token'");
 			return false;
 		}
 
@@ -195,7 +183,7 @@ private:
 		authenticatedRequest.AddHeader("Authorization", "Bearer " + accessToken);
 		context.SetRequest(authenticatedRequest);
 
-		logger.Info("Authentication successful");
+		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, "Authentication successful");
 		return true;
 	}
 
@@ -212,12 +200,21 @@ public:
 
 	bool Initialize(string baseUrl, string email, string password, bool enabled) {
 		if (!enabled) {
+			if (context.IsEnabled()) {
+				SAFE_DELETE(events);
+				context.Disable();
+			}
 			return true;
 		}
 
 		if (email == "" || password == "") {
-			logger.Error("Email and password are required. HorizonGateway integration disabled.");
+			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, "configuration invalid | integration=gateway field=credentials reason='email and password required'");
 			return false;
+		}
+
+		if (context.IsEnabled()) {
+			SAFE_DELETE(events);
+			context.Disable();
 		}
 
 		if (!authenticate(baseUrl, email, password)) {
@@ -227,7 +224,7 @@ public:
 		context.Enable();
 		events = new EventResource(GetPointer(context));
 
-		logger.Info("Initialized");
+		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, "Initialized");
 		return true;
 	}
 
@@ -260,12 +257,12 @@ public:
 		SRequestResponse response = context.Post("api/v1/account", body);
 
 		if (response.status != 200 && response.status != 201) {
-			logger.Error(StringFormat("Account upsert failed with status %d", response.status));
+			logger.Error(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("account upsert failed | status=%d", response.status));
 			return false;
 		}
 
 		context.SetAccountUuid(accountUuid);
-		logger.Info(StringFormat("Account registered | uuid: %s", accountUuid));
+		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Account registered | uuid: %s", accountUuid));
 
 		return true;
 	}
@@ -287,7 +284,7 @@ public:
 		context.Post("api/v1/asset", body);
 
 		registerAsset(symbolName, assetUuid);
-		logger.Info(StringFormat("Asset registered | %s | uuid: %s", symbolName, assetUuid));
+		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Asset registered | %s | uuid: %s", symbolName, assetUuid));
 
 		return assetUuid;
 	}
@@ -311,9 +308,57 @@ public:
 		context.Post("api/v1/strategy", body);
 
 		registerStrategy(magicNumber, strategyUuid);
-		logger.Info(StringFormat("Strategy registered | %s | magic: %llu | uuid: %s", strategyName, magicNumber, strategyUuid));
+		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Strategy registered | %s | magic: %llu | uuid: %s", strategyName, magicNumber, strategyUuid));
 
 		return strategyUuid;
+	}
+
+	void PublishNotification(const string notificationType, const string strategyUuid, const string assetUuid, const string symbolName, JSON::Object *payload) {
+		if (payload == NULL) {
+			return;
+		}
+
+		if (!context.IsEnabled()) {
+			delete payload;
+			return;
+		}
+
+		string accountUuid = context.GetAccountUuid();
+
+		if (accountUuid == "") {
+			logger.Warning(LOG_CODE_CONFIG_MISSING_DEPENDENCY, "publish notification skipped | reason='no account uuid'");
+			delete payload;
+			return;
+		}
+
+		JSON::Object body;
+		body.setProperty("type", notificationType);
+
+		if (strategyUuid != "") {
+			body.setProperty("strategy_id", strategyUuid);
+		}
+
+		if (assetUuid != "") {
+			body.setProperty("asset_id", assetUuid);
+		}
+
+		if (symbolName != "") {
+			body.setProperty("symbol", symbolName);
+		}
+
+		body.setProperty("payload", payload);
+
+		string path = StringFormat("api/v1/account/%s/notification", accountUuid);
+		SRequestResponse response = context.Post(path, body);
+
+		if (response.status != 200 && response.status != 201) {
+			logger.Warning(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat(
+				"publish notification failed | type=%s status=%d symbol=%s",
+				notificationType,
+				response.status,
+				symbolName
+			));
+		}
 	}
 
 	string GetAssetUuid(string symbolName) {
@@ -344,7 +389,7 @@ public:
 		string accountUuid = context.GetAccountUuid();
 
 		if (accountUuid == "") {
-			logger.Warning("No account UUID set, assuming active");
+			logger.Warning(LOG_CODE_REMOTE_RESPONSE_INVALID, "account status unknown | reason='no account uuid' assumed=active");
 			return "active";
 		}
 
@@ -352,21 +397,21 @@ public:
 		SRequestResponse response = context.Get(path);
 
 		if (response.status != 200 || response.body == "") {
-			logger.Warning("Fetch account failed, assuming active");
+			logger.Warning(LOG_CODE_REMOTE_HTTP_ERROR, "account status unknown | reason='fetch failed' assumed=active");
 			return "active";
 		}
 
 		JSON::Object root(response.body);
 
 		if (!root.isObject("data")) {
-			logger.Warning("Fetch response missing 'data', assuming active");
+			logger.Warning(LOG_CODE_REMOTE_RESPONSE_INVALID, "account status unknown | reason='missing data' assumed=active");
 			return "active";
 		}
 
 		JSON::Object *dataObject = root.getObject("data");
 		string status = dataObject.getString("status");
 
-		logger.Info(StringFormat("Account status: %s", status));
+		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Account status: %s", status));
 		return status;
 	}
 
@@ -378,7 +423,7 @@ public:
 		string accountUuid = context.GetAccountUuid();
 
 		if (accountUuid == "") {
-			logger.Error("Cannot upload file: account UUID is not set");
+			logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, "file upload failed | reason='account uuid not set'");
 			return "";
 		}
 
@@ -386,7 +431,7 @@ public:
 		SRequestResponse response = context.PostMultipart(path, "file", fileName, fileData, contentType);
 
 		if (response.status != 201) {
-			logger.Error(StringFormat("Upload failed with status %d for file %s", response.status, fileName));
+			logger.Error(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("file upload failed | status=%d file=%s", response.status, fileName));
 			return "";
 		}
 
@@ -396,7 +441,7 @@ public:
 		JSON::Object root(body);
 
 		if (!root.isObject("data")) {
-			logger.Error(StringFormat("Upload response missing 'data' | body=%s", body));
+			logger.Error(LOG_CODE_REMOTE_RESPONSE_INVALID, StringFormat("upload response invalid | reason='missing data' body=%s", body));
 			return "";
 		}
 
@@ -404,7 +449,7 @@ public:
 		return dataObject.getString("file_name");
 	}
 
-	int ConsumeEvents(const string keys, const string symbolFilter, SGatewayEvent &eventList[], int limit = 10, int strategyFilter = 0, bool async = true) {
+	int ConsumeEvents(const string keys, const string symbolFilter, SGatewayEvent &eventList[], int limit = 10, const string strategyFilter = "", bool async = true) {
 		if (!context.IsEnabled()) {
 			return 0;
 		}

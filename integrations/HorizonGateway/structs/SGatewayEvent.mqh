@@ -7,7 +7,7 @@ struct SGatewayEvent {
 	string id;
 	string key;
 	string payloadRaw;
-	int strategyId;
+	string strategyId;
 
 	string symbol;
 	string type;
@@ -31,7 +31,7 @@ struct SGatewayEvent {
 		id = "";
 		key = "";
 		payloadRaw = "";
-		strategyId = 0;
+		strategyId = "";
 		symbol = "";
 		type = "";
 		volume = 0;
@@ -77,7 +77,7 @@ struct SGatewayEvent {
 		id = json.getString("id");
 		key = json.getString("key");
 		payloadRaw = json.getString("payload_raw");
-		strategyId = (int)json.getNumber("strategy_id");
+		strategyId = json.getString("strategy_id");
 		symbol = json.getString("symbol");
 		type = json.getString("type");
 		volume = json.getNumber("volume");

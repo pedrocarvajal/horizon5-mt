@@ -4,7 +4,8 @@
 #include "../../services/SERequest/SERequest.mqh"
 #include "../../services/SELogger/SELogger.mqh"
 #include "../../services/SEMessageBus/SEMessageBus.mqh"
-#include "../../services/SEMessageBus/SEMessageBusChannels.mqh"
+
+#include "../../constants/COMessageBus.mqh"
 
 class HorizonMonitorContext {
 private:
@@ -94,18 +95,6 @@ public:
 		}
 
 		return request.Post(path, body);
-	}
-
-	SRequestResponse Get(string path) {
-		return request.Get(path);
-	}
-
-	SRequestResponse Patch(string path, JSON::Object &body) {
-		return request.Patch(path, body);
-	}
-
-	SRequestResponse PostMultipart(string path, string fieldName, string fileName, char &fileData[], string contentType = "text/csv") {
-		return request.PostMultipart(path, fieldName, fileName, fileData, contentType);
 	}
 };
 

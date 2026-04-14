@@ -4,19 +4,20 @@
 #include "../../../services/SEDateTime/structs/SDateTime.mqh"
 
 #include "../../../helpers/HClampNumeric.mqh"
-
-#include "../../../entities/EOrder.mqh"
-
-#include "../HorizonMonitorContext.mqh"
 #include "../../../helpers/HGetOrderStatus.mqh"
 #include "../../../helpers/HGetOrderSide.mqh"
 #include "../../../helpers/HGetCloseReason.mqh"
 #include "../../../helpers/HGetOrderUuid.mqh"
+
+#include "../../../entities/EOrder.mqh"
+
+#include "../HorizonMonitorContext.mqh"
+
 #include "StrategyResource.mqh"
+
 #include "AssetResource.mqh"
 
-#define VALID_TIMESTAMP_MIN 1577836800
-#define VALID_TIMESTAMP_MAX 4102444800
+#include "../../../constants/COTimestamp.mqh"
 
 class OrderResource {
 private:

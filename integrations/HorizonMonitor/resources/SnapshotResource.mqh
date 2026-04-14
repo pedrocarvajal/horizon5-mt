@@ -2,9 +2,11 @@
 #define __MONITOR_SNAPSHOT_RESOURCE_MQH__
 
 #include "../../../entities/EAccount.mqh"
+
 #include "../../../helpers/HClampNumeric.mqh"
 
 #include "../HorizonMonitorContext.mqh"
+
 #include "StrategyResource.mqh"
 
 class SnapshotResource {
