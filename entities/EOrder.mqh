@@ -158,7 +158,12 @@ public:
 
 	void OnInit() {
 		if (isInitialized) {
-			logger.Info(LOG_CODE_ORDER_OPENED, StringFormat("[%s] Order already initialized", GetId()));
+			logger.Info(
+				LOG_CODE_ORDER_OPENED,
+				StringFormat(
+					"[%s] Order already initialized",
+					GetId()
+			));
 			return;
 		}
 

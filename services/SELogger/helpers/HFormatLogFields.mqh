@@ -2,13 +2,7 @@
 #define __H_FORMAT_LOG_FIELDS_MQH__
 
 string HFormatLogFields(const string &keys[], const string &values[]) {
-	int count = ArraySize(keys);
-	int valueCount = ArraySize(values);
-
-	if (count > valueCount) {
-		count = valueCount;
-	}
-
+	int count = MathMin(ArraySize(keys), ArraySize(values));
 	string result = "";
 
 	for (int i = 0; i < count; i++) {

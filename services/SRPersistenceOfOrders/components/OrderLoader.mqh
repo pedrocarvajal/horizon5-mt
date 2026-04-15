@@ -47,7 +47,12 @@ public:
 
 	int Load(EOrder &restoredOrders[]) {
 		int documentCount = collection.Count();
-		logger.Debug(LOG_CODE_PERSISTENCE_SAVE_FAILED, StringFormat("Starting order restoration, found %d documents", documentCount));
+		logger.Debug(
+			LOG_CODE_PERSISTENCE_SAVE_FAILED,
+			StringFormat(
+				"Starting order restoration, found %d documents",
+				documentCount
+		));
 
 		if (documentCount == 0) {
 			return 0;
@@ -78,9 +83,22 @@ public:
 
 		cleanupOrphanedOrders(idsToDelete);
 
-		logger.Debug(LOG_CODE_PERSISTENCE_SAVE_FAILED, "Order restoration completed");
-		logger.Debug(LOG_CODE_PERSISTENCE_SAVE_FAILED, StringFormat("Documents found: %d", foundCount));
-		logger.Debug(LOG_CODE_PERSISTENCE_SAVE_FAILED, StringFormat("Orders loaded: %d", loadedCount));
+		logger.Debug(
+			LOG_CODE_PERSISTENCE_SAVE_FAILED,
+			"Order restoration completed"
+		);
+		logger.Debug(
+			LOG_CODE_PERSISTENCE_SAVE_FAILED,
+			StringFormat(
+				"Documents found: %d",
+				foundCount
+		));
+		logger.Debug(
+			LOG_CODE_PERSISTENCE_SAVE_FAILED,
+			StringFormat(
+				"Orders loaded: %d",
+				loadedCount
+		));
 		return loadedCount;
 	}
 
@@ -104,9 +122,11 @@ private:
 		EOrder order;
 
 		if (!DeserializeOrder(document, order)) {
-			logger.Error(LOG_CODE_PERSISTENCE_LOAD_FAILED, StringFormat(
-				"CRITICAL ERROR: Failed to deserialize order document at index %d",
-				index
+			logger.Error(
+				LOG_CODE_PERSISTENCE_LOAD_FAILED,
+				StringFormat(
+					"CRITICAL ERROR: Failed to deserialize order document at index %d",
+					index
 			));
 			return -1;
 		}
@@ -120,18 +140,22 @@ private:
 
 		if (!validator.Validate(order)) {
 			if (reconciler.Reconcile(order)) {
-				logger.Info(LOG_CODE_PERSISTENCE_SAVE_FAILED, StringFormat(
-					"Order reconciled from MT5 history: %s (closed while EA was offline)",
-					order.GetId()
+				logger.Info(
+					LOG_CODE_PERSISTENCE_SAVE_FAILED,
+					StringFormat(
+						"Order reconciled from MT5 history: %s (closed while EA was offline)",
+						order.GetId()
 				));
 
 				appendOrder(restoredOrders, order);
 				return 1;
 			}
 
-			logger.Warning(LOG_CODE_PERSISTENCE_LOAD_FAILED, StringFormat(
-				"Order no longer exists in MetaTrader and not found in history, marking as cancelled: %s",
-				order.GetId()
+			logger.Warning(
+				LOG_CODE_PERSISTENCE_LOAD_FAILED,
+				StringFormat(
+					"Order no longer exists in MetaTrader and not found in history, marking as cancelled: %s",
+					order.GetId()
 			));
 
 			order.SetStatus(ORDER_STATUS_CANCELLED);
@@ -145,10 +169,12 @@ private:
 
 		appendOrder(restoredOrders, order);
 
-		logger.Info(LOG_CODE_PERSISTENCE_SAVE_FAILED, StringFormat(
-			"Order loaded successfully: %s (Status: %s)",
-			order.GetId(),
-			EnumToString(order.GetStatus())
+		logger.Info(
+			LOG_CODE_PERSISTENCE_SAVE_FAILED,
+			StringFormat(
+				"Order loaded successfully: %s (Status: %s)",
+				order.GetId(),
+				EnumToString(order.GetStatus())
 		));
 
 		return 1;

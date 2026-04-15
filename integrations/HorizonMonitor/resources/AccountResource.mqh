@@ -6,13 +6,31 @@
 #include "../../../helpers/HGetAccountUuid.mqh"
 
 #include "../HorizonMonitorContext.mqh"
-#include "../helpers/HHasMonitorHttpFailed.mqh"
+
+#include "../../../services/SERequest/structs/SRequestResponse.mqh"
 
 class AccountResource {
 private:
 	HorizonMonitorContext * context;
 	SELogger logger;
 	EAccount account;
+
+	bool hasHttpFailed(SRequestResponse &response, const string failurePrefix) {
+		if (response.status >= 200 && response.status < 300) {
+			return false;
+		}
+
+		logger.Error(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			StringFormat(
+				"%s status=%d body='%s'",
+				failurePrefix,
+				response.status,
+				response.body
+		));
+
+		return true;
+	}
 
 public:
 	AccountResource(HorizonMonitorContext * ctx) {
@@ -32,12 +50,17 @@ public:
 
 		SRequestResponse response = context.Post("api/v1/account", body, false);
 
-		if (HasMonitorHttpFailed(response, logger, "account upsert failed |")) {
+		if (hasHttpFailed(response, "account upsert failed |")) {
 			return false;
 		}
 
 		context.SetAccountUuid(accountUuid);
-		logger.Info(LOG_CODE_REMOTE_HTTP_OK, StringFormat("account registered | uuid=%s", accountUuid));
+		logger.Info(
+			LOG_CODE_REMOTE_HTTP_OK,
+			StringFormat(
+				"account registered | uuid=%s",
+				accountUuid
+		));
 
 		return true;
 	}

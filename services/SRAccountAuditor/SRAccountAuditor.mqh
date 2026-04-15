@@ -61,19 +61,23 @@ public:
 		int metatraderPendingOrders = OrdersTotal();
 		int metatraderTotal = metatraderPositions + metatraderPendingOrders;
 
-		logger.Info(LOG_CODE_ORDER_NOT_FOUND, StringFormat(
-			"Order summary (enabled assets only) | MT5 positions: %d | MT5 pending: %d | Tracked orders: %d",
-			metatraderPositions,
-			metatraderPendingOrders,
-			trackedOrderCount
+		logger.Info(
+			LOG_CODE_ORDER_NOT_FOUND,
+			StringFormat(
+				"Order summary (enabled assets only) | MT5 positions: %d | MT5 pending: %d | Tracked orders: %d",
+				metatraderPositions,
+				metatraderPendingOrders,
+				trackedOrderCount
 		));
 
 		if (metatraderTotal != trackedOrderCount) {
-			logger.Warning(LOG_CODE_ORDER_NOT_FOUND, StringFormat(
-				"Order discrepancy detected (enabled assets only) | MT5 total: %d | Tracked: %d | Diff: %d",
-				metatraderTotal,
-				trackedOrderCount,
-				metatraderTotal - trackedOrderCount
+			logger.Warning(
+				LOG_CODE_ORDER_NOT_FOUND,
+				StringFormat(
+					"Order discrepancy detected (enabled assets only) | MT5 total: %d | Tracked: %d | Diff: %d",
+					metatraderTotal,
+					trackedOrderCount,
+					metatraderTotal - trackedOrderCount
 			));
 		}
 	}

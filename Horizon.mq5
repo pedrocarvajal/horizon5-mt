@@ -1,5 +1,5 @@
 #property copyright "Horizon5, by Pedro Carvajal"
-#property version "0.412"
+#property version "0.416"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 #include <Trade/Trade.mqh>
@@ -12,6 +12,7 @@
 #include "entities/EAccount.mqh"
 
 #include "enums/EDebugLevel.mqh"
+#include "enums/ESnapshotEvent.mqh"
 
 #include "structs/STradingStatus.mqh"
 
@@ -19,7 +20,6 @@
 #include "helpers/HGetPipValue.mqh"
 #include "helpers/HIsLiveTrading.mqh"
 #include "helpers/HGetLogsPath.mqh"
-#include "helpers/HGetSnapshotEvent.mqh"
 #include "helpers/HGetSystemName.mqh"
 #include "helpers/HInitializeMessageBus.mqh"
 
@@ -95,15 +95,19 @@ bool ValidateMagicNumbers() {
 
 			for (int k = 0; k < ArraySize(magicNumbers); k++) {
 				if (magicNumbers[k] == currentMagic) {
-					logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, StringFormat(
-						"duplicate magic detected | magic=%llu",
-						currentMagic
+					logger.Error(
+						LOG_CODE_CONFIG_INVALID_PARAMETER,
+						StringFormat(
+							"duplicate magic detected | magic=%llu",
+							currentMagic
 					));
 
-					logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, StringFormat(
-						"magic conflict | existing=%s new=%s",
-						magicSources[k],
-						currentSource
+					logger.Error(
+						LOG_CODE_CONFIG_INVALID_PARAMETER,
+						StringFormat(
+							"magic conflict | existing=%s new=%s",
+							magicSources[k],
+							currentSource
 					));
 
 					return false;
@@ -119,7 +123,10 @@ bool ValidateMagicNumbers() {
 	}
 
 	if (ArraySize(magicNumbers) == 0) {
-		logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, "configuration invalid | field=strategies reason='no strategies enabled'");
+		logger.Error(
+			LOG_CODE_CONFIG_MISSING_DEPENDENCY,
+			"configuration invalid | field=strategies reason='no strategies enabled'"
+		);
 
 		return false;
 	}
@@ -163,13 +170,19 @@ void CheckServiceHealth() {
 
 	if (servicesRunning && tradingStatus.reason == TRADING_PAUSE_REASON_SERVICES_DOWN) {
 		SEMessageBus::Activate();
-		logger.Info(LOG_CODE_TRADING_PAUSED, "trading resumed | reason='services recovered'");
+		logger.Info(
+			LOG_CODE_TRADING_PAUSED,
+			"trading resumed | reason='services recovered'"
+		);
 		tradingStatus.isPaused = false;
 		tradingStatus.reason = TRADING_PAUSE_REASON_NONE;
 	}
 
 	if (!servicesRunning && tradingStatus.reason != TRADING_PAUSE_REASON_SERVICES_DOWN) {
-		logger.Error(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "trading paused | reason='required services down'");
+		logger.Error(
+			LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+			"trading paused | reason='required services down'"
+		);
 		SEMessageBus::Shutdown();
 		tradingStatus.isPaused = true;
 		tradingStatus.reason = TRADING_PAUSE_REASON_SERVICES_DOWN;
@@ -218,21 +231,30 @@ int OnInit() {
 		SELogger::SetRemoteLogger(GetPointer(horizonMonitor));
 
 		if (!horizonMonitor.UpsertAccount()) {
-			logger.Error(LOG_CODE_REMOTE_AUTH_FAILED, "service idle | reason='monitor account registration failed'");
+			logger.Error(
+				LOG_CODE_REMOTE_AUTH_FAILED,
+				"service idle | reason='monitor account registration failed'"
+			);
 			return INIT_FAILED;
 		}
 	}
 
 	if (horizonGateway.IsEnabled()) {
 		if (!horizonGateway.UpsertAccount()) {
-			logger.Error(LOG_CODE_REMOTE_AUTH_FAILED, "service idle | reason='gateway account registration failed'");
+			logger.Error(
+				LOG_CODE_REMOTE_AUTH_FAILED,
+				"service idle | reason='gateway account registration failed'"
+			);
 			return INIT_FAILED;
 		}
 
 		string accountStatus = horizonGateway.FetchAccountStatus();
 
 		if (accountStatus != "active") {
-			logger.Warning(LOG_CODE_TRADING_PAUSED, "trading paused | reason='account inactive'");
+			logger.Warning(
+				LOG_CODE_TRADING_PAUSED,
+				"trading paused | reason='account inactive'"
+			);
 			tradingStatus.isPaused = true;
 			tradingStatus.reason = TRADING_PAUSE_REASON_ACCOUNT_INACTIVE;
 		}
@@ -245,7 +267,10 @@ int OnInit() {
 	int enabledAssetCount = 0;
 
 	if (assetCount == 0) {
-		logger.Warning(LOG_CODE_CONFIG_MISSING_DEPENDENCY, "configuration invalid | field=assets reason='no assets defined'");
+		logger.Warning(
+			LOG_CODE_CONFIG_MISSING_DEPENDENCY,
+			"configuration invalid | field=assets reason='no assets defined'"
+		);
 		return INIT_FAILED;
 	}
 
@@ -256,7 +281,10 @@ int OnInit() {
 	}
 
 	if (enabledAssetCount == 0) {
-		logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, "configuration invalid | field=assets reason='no assets enabled'");
+		logger.Error(
+			LOG_CODE_CONFIG_MISSING_DEPENDENCY,
+			"configuration invalid | field=assets reason='no assets enabled'"
+		);
 		return INIT_FAILED;
 	}
 
@@ -294,7 +322,10 @@ int OnInit() {
 		int serviceCount = BuildRequiredServices(requiredServices);
 
 		if (!InitializeMessageBus(requiredServices, serviceCount)) {
-			logger.Error(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='required services not running'");
+			logger.Error(
+				LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+				"service idle | reason='required services not running'"
+			);
 			return INIT_FAILED;
 		}
 	}
@@ -303,9 +334,11 @@ int OnInit() {
 		logger.Separator("UUID Mapping Report");
 
 		if (horizonMonitor.IsEnabled()) {
-			logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat(
-				"uuid mapped | system=monitor target=account uuid=%s",
-				horizonMonitor.GetAccountUuid()
+			logger.Info(
+				LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+				StringFormat(
+					"uuid mapped | system=monitor target=account uuid=%s",
+					horizonMonitor.GetAccountUuid()
 			));
 
 			for (int i = 0; i < ArraySize(assets); i++) {
@@ -314,29 +347,35 @@ int OnInit() {
 				}
 
 				string symbolName = assets[i].GetSymbol();
-				logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat(
-					"uuid mapped | system=monitor target=asset symbol=%s uuid=%s",
-					symbolName,
-					horizonMonitor.GetAssetUuid(symbolName)
+				logger.Info(
+					LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+					StringFormat(
+						"uuid mapped | system=monitor target=asset symbol=%s uuid=%s",
+						symbolName,
+						horizonMonitor.GetAssetUuid(symbolName)
 				));
 
 				for (int j = 0; j < assets[i].GetStrategyCount(); j++) {
 					ulong magic = assets[i].GetStrategyAtIndex(j).GetMagicNumber();
 					string stratName = assets[i].GetStrategyAtIndex(j).GetName();
-					logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat(
-						"uuid mapped | system=monitor target=strategy strategy=%s magic=%llu uuid=%s",
-						stratName,
-						magic,
-						horizonMonitor.GetStrategyUuid(magic)
+					logger.Info(
+						LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+						StringFormat(
+							"uuid mapped | system=monitor target=strategy strategy=%s magic=%llu uuid=%s",
+							stratName,
+							magic,
+							horizonMonitor.GetStrategyUuid(magic)
 					));
 				}
 			}
 		}
 
 		if (horizonGateway.IsEnabled()) {
-			logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat(
-				"uuid mapped | system=gateway target=account uuid=%s",
-				horizonGateway.GetAccountUuid()
+			logger.Info(
+				LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+				StringFormat(
+					"uuid mapped | system=gateway target=account uuid=%s",
+					horizonGateway.GetAccountUuid()
 			));
 
 			for (int i = 0; i < ArraySize(assets); i++) {
@@ -345,20 +384,24 @@ int OnInit() {
 				}
 
 				string symbolName = assets[i].GetSymbol();
-				logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat(
-					"uuid mapped | system=gateway target=asset symbol=%s uuid=%s",
-					symbolName,
-					horizonGateway.GetAssetUuid(symbolName)
+				logger.Info(
+					LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+					StringFormat(
+						"uuid mapped | system=gateway target=asset symbol=%s uuid=%s",
+						symbolName,
+						horizonGateway.GetAssetUuid(symbolName)
 				));
 
 				for (int j = 0; j < assets[i].GetStrategyCount(); j++) {
 					ulong magic = assets[i].GetStrategyAtIndex(j).GetMagicNumber();
 					string stratName = assets[i].GetStrategyAtIndex(j).GetName();
-					logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat(
-						"uuid mapped | system=gateway target=strategy strategy=%s magic=%llu uuid=%s",
-						stratName,
-						magic,
-						horizonGateway.GetStrategyUuid(magic)
+					logger.Info(
+						LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+						StringFormat(
+							"uuid mapped | system=gateway target=strategy strategy=%s magic=%llu uuid=%s",
+							stratName,
+							magic,
+							horizonGateway.GetStrategyUuid(magic)
 					));
 				}
 			}
@@ -371,8 +414,10 @@ int OnInit() {
 		SendServiceHeartbeats();
 	}
 
-	logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
-		"service started | system=Horizon version=0.412 built='2026-04-15 11:15:54'");
+	logger.Info(
+		LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+		"service started | system=Horizon version=0.416 built='2026-04-15 14:14:55'"
+	);
 
 	return INIT_SUCCEEDED;
 }
@@ -434,13 +479,16 @@ void OnTimer() {
 		    && tradingStatus.reason != TRADING_PAUSE_REASON_HORIZON_API_REQUEST
 		    && tradingStatus.reason != TRADING_PAUSE_REASON_ACCOUNT_INACTIVE
 		    && tradingStatus.reason != TRADING_PAUSE_REASON_SERVICES_DOWN) {
-			logger.Info(LOG_CODE_TRADING_PAUSED, "trading resumed | reason='new day started'");
+			logger.Info(
+				LOG_CODE_TRADING_PAUSED,
+				"trading resumed | reason='new day started'"
+			);
 			tradingStatus.isPaused = false;
 			tradingStatus.reason = TRADING_PAUSE_REASON_NONE;
 		}
 
 		if (horizonMonitor.IsEnabled()) {
-			horizonMonitor.SyncAccount(assets, ArraySize(assets), GetSnapshotEvent(SNAPSHOT_ON_END_DAY));
+			horizonMonitor.SyncAccount(assets, ArraySize(assets), SNAPSHOT_ON_END_DAY);
 		}
 
 		if (monitorSeedReporter != NULL) {
@@ -457,10 +505,6 @@ void OnTimer() {
 
 		if (SEMessageBus::IsActive()) {
 			CheckServiceHealth();
-		}
-
-		for (int i = 0; i < ArraySize(assets); i++) {
-			assets[i].OnStartMinute();
 		}
 	}
 
@@ -482,7 +526,7 @@ void OnTimer() {
 
 	if (isStartHour && horizonMonitor.IsEnabled()) {
 		if (!isStartDay) {
-			horizonMonitor.SyncAccount(assets, ArraySize(assets), GetSnapshotEvent(SNAPSHOT_ON_HOUR));
+			horizonMonitor.SyncAccount(assets, ArraySize(assets), SNAPSHOT_ON_HOUR);
 		}
 
 		SendServiceHeartbeats();
@@ -565,9 +609,11 @@ void HandleDealCloseTransaction(ulong positionId, ulong dealId) {
 	}
 
 	if (!isFound) {
-		logger.Warning(LOG_CODE_ORDER_NOT_FOUND, StringFormat(
-			"order not found | position_id=%llu reason='trade transaction handler'",
-			positionId
+		logger.Warning(
+			LOG_CODE_ORDER_NOT_FOUND,
+			StringFormat(
+				"order not found | position_id=%llu reason='trade transaction handler'",
+				positionId
 		));
 	}
 }
@@ -584,9 +630,11 @@ void HandleDealOpenTransaction(ulong orderId, ulong dealId) {
 	}
 
 	if (!isFound) {
-		logger.Warning(LOG_CODE_ORDER_NOT_FOUND, StringFormat(
-			"order not found | order_ticket=%llu reason='trade transaction handler'",
-			orderId
+		logger.Warning(
+			LOG_CODE_ORDER_NOT_FOUND,
+			StringFormat(
+				"order not found | order_ticket=%llu reason='trade transaction handler'",
+				orderId
 		));
 	}
 }

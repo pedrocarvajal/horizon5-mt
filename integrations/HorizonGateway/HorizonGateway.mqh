@@ -159,14 +159,22 @@ private:
 		SRequestResponse response = authRequest.Post("api/v1/auth/login", loginBody);
 
 		if (response.status != 200) {
-			logger.Error(LOG_CODE_REMOTE_AUTH_FAILED, StringFormat("auth failed | status=%d", response.status));
+			logger.Error(
+				LOG_CODE_REMOTE_AUTH_FAILED,
+				StringFormat(
+					"auth failed | status=%d",
+					response.status
+			));
 			return false;
 		}
 
 		JSON::Object root(response.body);
 
 		if (!root.isObject("data")) {
-			logger.Error(LOG_CODE_REMOTE_RESPONSE_INVALID, "auth response invalid | reason='missing data object'");
+			logger.Error(
+				LOG_CODE_REMOTE_RESPONSE_INVALID,
+				"auth response invalid | reason='missing data object'"
+			);
 			return false;
 		}
 
@@ -174,7 +182,10 @@ private:
 		string accessToken = dataObject.getString("access");
 
 		if (accessToken == "") {
-			logger.Error(LOG_CODE_REMOTE_RESPONSE_INVALID, "auth response invalid | reason='missing access token'");
+			logger.Error(
+				LOG_CODE_REMOTE_RESPONSE_INVALID,
+				"auth response invalid | reason='missing access token'"
+			);
 			return false;
 		}
 
@@ -183,7 +194,10 @@ private:
 		authenticatedRequest.AddHeader("Authorization", "Bearer " + accessToken);
 		context.SetRequest(authenticatedRequest);
 
-		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, "Authentication successful");
+		logger.Info(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			"Authentication successful"
+		);
 		return true;
 	}
 
@@ -208,7 +222,10 @@ public:
 		}
 
 		if (email == "" || password == "") {
-			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, "configuration invalid | integration=gateway field=credentials reason='email and password required'");
+			logger.Error(
+				LOG_CODE_CONFIG_INVALID_PARAMETER,
+				"configuration invalid | integration=gateway field=credentials reason='email and password required'"
+			);
 			return false;
 		}
 
@@ -224,7 +241,10 @@ public:
 		context.Enable();
 		events = new EventResource(GetPointer(context));
 
-		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, "Initialized");
+		logger.Info(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			"Initialized"
+		);
 		return true;
 	}
 
@@ -257,12 +277,22 @@ public:
 		SRequestResponse response = context.Post("api/v1/account", body);
 
 		if (response.status != 200 && response.status != 201) {
-			logger.Error(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("account upsert failed | status=%d", response.status));
+			logger.Error(
+				LOG_CODE_REMOTE_HTTP_ERROR,
+				StringFormat(
+					"account upsert failed | status=%d",
+					response.status
+			));
 			return false;
 		}
 
 		context.SetAccountUuid(accountUuid);
-		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Account registered | uuid: %s", accountUuid));
+		logger.Info(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			StringFormat(
+				"Account registered | uuid: %s",
+				accountUuid
+		));
 
 		return true;
 	}
@@ -284,7 +314,13 @@ public:
 		context.Post("api/v1/asset", body);
 
 		registerAsset(symbolName, assetUuid);
-		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Asset registered | %s | uuid: %s", symbolName, assetUuid));
+		logger.Info(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			StringFormat(
+				"Asset registered | %s | uuid: %s",
+				symbolName,
+				assetUuid
+		));
 
 		return assetUuid;
 	}
@@ -308,7 +344,14 @@ public:
 		context.Post("api/v1/strategy", body);
 
 		registerStrategy(magicNumber, strategyUuid);
-		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Strategy registered | %s | magic: %llu | uuid: %s", strategyName, magicNumber, strategyUuid));
+		logger.Info(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			StringFormat(
+				"Strategy registered | %s | magic: %llu | uuid: %s",
+				strategyName,
+				magicNumber,
+				strategyUuid
+		));
 
 		return strategyUuid;
 	}
@@ -326,7 +369,10 @@ public:
 		string accountUuid = context.GetAccountUuid();
 
 		if (accountUuid == "") {
-			logger.Warning(LOG_CODE_CONFIG_MISSING_DEPENDENCY, "publish notification skipped | reason='no account uuid'");
+			logger.Warning(
+				LOG_CODE_CONFIG_MISSING_DEPENDENCY,
+				"publish notification skipped | reason='no account uuid'"
+			);
 			delete payload;
 			return;
 		}
@@ -352,11 +398,13 @@ public:
 		SRequestResponse response = context.Post(path, body);
 
 		if (response.status != 200 && response.status != 201) {
-			logger.Warning(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat(
-				"publish notification failed | type=%s status=%d symbol=%s",
-				notificationType,
-				response.status,
-				symbolName
+			logger.Warning(
+				LOG_CODE_REMOTE_HTTP_ERROR,
+				StringFormat(
+					"publish notification failed | type=%s status=%d symbol=%s",
+					notificationType,
+					response.status,
+					symbolName
 			));
 		}
 	}
@@ -389,7 +437,10 @@ public:
 		string accountUuid = context.GetAccountUuid();
 
 		if (accountUuid == "") {
-			logger.Warning(LOG_CODE_REMOTE_RESPONSE_INVALID, "account status unknown | reason='no account uuid' assumed=active");
+			logger.Warning(
+				LOG_CODE_REMOTE_RESPONSE_INVALID,
+				"account status unknown | reason='no account uuid' assumed=active"
+			);
 			return "active";
 		}
 
@@ -397,21 +448,32 @@ public:
 		SRequestResponse response = context.Get(path);
 
 		if (response.status != 200 || response.body == "") {
-			logger.Warning(LOG_CODE_REMOTE_HTTP_ERROR, "account status unknown | reason='fetch failed' assumed=active");
+			logger.Warning(
+				LOG_CODE_REMOTE_HTTP_ERROR,
+				"account status unknown | reason='fetch failed' assumed=active"
+			);
 			return "active";
 		}
 
 		JSON::Object root(response.body);
 
 		if (!root.isObject("data")) {
-			logger.Warning(LOG_CODE_REMOTE_RESPONSE_INVALID, "account status unknown | reason='missing data' assumed=active");
+			logger.Warning(
+				LOG_CODE_REMOTE_RESPONSE_INVALID,
+				"account status unknown | reason='missing data' assumed=active"
+			);
 			return "active";
 		}
 
 		JSON::Object *dataObject = root.getObject("data");
 		string status = dataObject.getString("status");
 
-		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Account status: %s", status));
+		logger.Info(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			StringFormat(
+				"Account status: %s",
+				status
+		));
 		return status;
 	}
 
@@ -423,7 +485,10 @@ public:
 		string accountUuid = context.GetAccountUuid();
 
 		if (accountUuid == "") {
-			logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, "file upload failed | reason='account uuid not set'");
+			logger.Error(
+				LOG_CODE_CONFIG_MISSING_DEPENDENCY,
+				"file upload failed | reason='account uuid not set'"
+			);
 			return "";
 		}
 
@@ -431,7 +496,13 @@ public:
 		SRequestResponse response = context.PostMultipart(path, "file", fileName, fileData, contentType);
 
 		if (response.status != 201) {
-			logger.Error(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("file upload failed | status=%d file=%s", response.status, fileName));
+			logger.Error(
+				LOG_CODE_REMOTE_HTTP_ERROR,
+				StringFormat(
+					"file upload failed | status=%d file=%s",
+					response.status,
+					fileName
+			));
 			return "";
 		}
 
@@ -441,7 +512,12 @@ public:
 		JSON::Object root(body);
 
 		if (!root.isObject("data")) {
-			logger.Error(LOG_CODE_REMOTE_RESPONSE_INVALID, StringFormat("upload response invalid | reason='missing data' body=%s", body));
+			logger.Error(
+				LOG_CODE_REMOTE_RESPONSE_INVALID,
+				StringFormat(
+					"upload response invalid | reason='missing data' body=%s",
+					body
+			));
 			return "";
 		}
 

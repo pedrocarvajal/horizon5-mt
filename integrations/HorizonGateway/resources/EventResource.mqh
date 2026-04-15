@@ -136,7 +136,10 @@ public:
 		SRequestResponse response = context.Post(path, emptyBody);
 
 		if (response.status == 401) {
-			logger.Error(LOG_CODE_REMOTE_AUTH_FAILED, "remote auth failed | endpoint=consume reason='unauthorized 401' action='disabling gateway'");
+			logger.Error(
+				LOG_CODE_REMOTE_AUTH_FAILED,
+				"remote auth failed | endpoint=consume reason='unauthorized 401' action='disabling gateway'"
+			);
 			context.Disable();
 			return 0;
 		}
@@ -167,7 +170,10 @@ public:
 		SRequestResponse response = context.Patch(path, wrapper);
 
 		if (response.status == 401) {
-			logger.Error(LOG_CODE_REMOTE_AUTH_FAILED, "remote auth failed | endpoint=ack reason='unauthorized 401' action='disabling gateway'");
+			logger.Error(
+				LOG_CODE_REMOTE_AUTH_FAILED,
+				"remote auth failed | endpoint=ack reason='unauthorized 401' action='disabling gateway'"
+			);
 			context.Disable();
 			return false;
 		}

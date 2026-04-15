@@ -40,10 +40,12 @@ public:
 	void Export() {
 		snapshotsCollection.Flush();
 
-		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
-			"Snapshot history saved - %s.json with %d snapshots",
-			reportName,
-			snapshotsCollection.Count()
+		logger.Info(
+			LOG_CODE_STATS_EXPORT_FAILED,
+			StringFormat(
+				"Snapshot history saved - %s.json with %d snapshots",
+				reportName,
+				snapshotsCollection.Count()
 		));
 	}
 

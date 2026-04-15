@@ -3,6 +3,8 @@
 
 #include "../SELogger/SELogger.mqh"
 
+#include "../../enums/ESnapshotEvent.mqh"
+
 #include "../../interfaces/IRemoteLogger.mqh"
 
 #include "../../integrations/HorizonMonitor/HorizonMonitor.mqh"
@@ -76,15 +78,15 @@ public:
 		monitor.StoreLog(system, level, message, magicNumber);
 	}
 
-	void StoreAccountSnapshot(double floatingPnl, double realizedPnl, string event) {
+	void StoreAccountSnapshot(double floatingPnl, double realizedPnl, ENUM_SNAPSHOT_EVENT event) {
 		monitor.StoreAccountSnapshot(floatingPnl, realizedPnl, event);
 	}
 
-	void StoreStrategySnapshot(ulong magicNumber, double balance, double equity, double floatingPnl, double realizedPnl, string event) {
+	void StoreStrategySnapshot(ulong magicNumber, double balance, double equity, double floatingPnl, double realizedPnl, ENUM_SNAPSHOT_EVENT event) {
 		monitor.StoreStrategySnapshot(magicNumber, balance, equity, floatingPnl, realizedPnl, event);
 	}
 
-	void StoreAssetSnapshot(string assetUuid, double balance, double equity, double floatingPnl, double realizedPnl, double bid, double ask, double usdRate, string event) {
+	void StoreAssetSnapshot(string assetUuid, double balance, double equity, double floatingPnl, double realizedPnl, double bid, double ask, double usdRate, ENUM_SNAPSHOT_EVENT event) {
 		monitor.StoreAssetSnapshot(assetUuid, balance, equity, floatingPnl, realizedPnl, bid, ask, usdRate, event);
 	}
 
@@ -92,7 +94,7 @@ public:
 		monitor.PostDirect(path, body);
 	}
 
-	void SyncAccount(SEAsset *&registeredAssets[], int assetCount, string event) {
+	void SyncAccount(SEAsset *&registeredAssets[], int assetCount, ENUM_SNAPSHOT_EVENT event) {
 		monitor.UpsertAccount();
 		monitor.UpsertAccountMetadata();
 
@@ -101,9 +103,11 @@ public:
 
 		for (int i = 0; i < assetCount; i++) {
 			if (!registeredAssets[i].RegisterEntities()) {
-				logger.Warning(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat(
-					"register entities failed during resync | symbol=%s action='continuing best-effort'",
-					registeredAssets[i].GetSymbol()
+				logger.Warning(
+					LOG_CODE_REMOTE_HTTP_ERROR,
+					StringFormat(
+						"register entities failed during resync | symbol=%s action='continuing best-effort'",
+						registeredAssets[i].GetSymbol()
 				));
 			}
 

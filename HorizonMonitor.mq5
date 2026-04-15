@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "0.15"
+#property version   "0.16"
 #property strict
 
 #include "constants/COHorizonMonitor.mqh"
@@ -131,9 +131,11 @@ void logDiagnostics() {
 
 	int pendingConnector = SEMessageBus::GetPendingCount(MB_CHANNEL_CONNECTOR);
 
-	monitorLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, StringFormat(
-		"queue diagnostics | connector=%d",
-		pendingConnector
+	monitorLogger.Info(
+		LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+		StringFormat(
+			"queue diagnostics | connector=%d",
+			pendingConnector
 	));
 }
 
@@ -146,13 +148,19 @@ int OnStart() {
 	}
 
 	if (!horizonMonitor.Initialize(HorizonMonitorUrl, HorizonMonitorEmail, HorizonMonitorPassword, IsLiveTrading())) {
-		monitorLogger.Warning(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='monitor initialization failed'");
+		monitorLogger.Warning(
+			LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+			"service idle | reason='monitor initialization failed'"
+		);
 		return 0;
 	}
 
 	if (horizonMonitor.IsEnabled()) {
 		if (!horizonMonitor.UpsertAccount()) {
-			monitorLogger.Error(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='account registration failed'");
+			monitorLogger.Error(
+				LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+				"service idle | reason='account registration failed'"
+			);
 			return 0;
 		}
 
@@ -161,13 +169,18 @@ int OnStart() {
 	}
 
 	if (!SEMessageBus::Initialize()) {
-		monitorLogger.Error(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='message bus DLL initialization failed'");
+		monitorLogger.Error(
+			LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+			"service idle | reason='message bus DLL initialization failed'"
+		);
 		return 0;
 	}
 
 	SEMessageBus::RegisterService(MB_SERVICE_MONITOR);
-	monitorLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
-		"service started | system=HorizonMonitor version=0.15 built='2026-04-15 11:15:54'");
+	monitorLogger.Info(
+		LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+		"service started | system=HorizonMonitor version=0.16 built='2026-04-15 14:14:55'"
+	);
 
 	while (!IsStopped()) {
 		SEMessageBus::WaitForMessage(MB_CHANNEL_CONNECTOR, HORIZON_MONITOR_POLL_INTERVAL_MILLISECONDS);
@@ -180,7 +193,10 @@ int OnStart() {
 	SELogger::SetRemoteLogger(NULL);
 	SEMessageBus::UnregisterService(MB_SERVICE_MONITOR);
 	SEMessageBus::Shutdown();
-	monitorLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service stopped | system=HorizonMonitor");
+	monitorLogger.Info(
+		LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+		"service stopped | system=HorizonMonitor"
+	);
 
 	if (SELogger::GetGlobalEntryCount() > 0) {
 		string logEntries[];

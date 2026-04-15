@@ -9,8 +9,8 @@
 
 #include "../../../enums/EOrderStatuses.mqh"
 
-#include "../../../helpers/HIsMarketClosed.mqh"
-#include "../../../helpers/HResolveTransientDefer.mqh"
+#include "../../../helpers/HGetMarketStatus.mqh"
+#include "../../../helpers/HResolveTransientDeferSeconds.mqh"
 #include "../../../helpers/HTradeRetcodeToLogCode.mqh"
 #include "../helpers/HBuildOrderComment.mqh"
 #include "../helpers/HResolveOrderTypeAndPrice.mqh"
@@ -81,20 +81,24 @@ public:
 		}
 
 		if (retry.count >= MAX_RETRY_COUNT_OPEN) {
-			logger.Error(LOG_CODE_ORDER_RETRY_EXHAUSTED, StringFormat(
-				"order retry exhausted | symbol=%s order_id=%s retry=%d reason='max open retries reached'",
-				symbol,
-				order.GetId(),
-				retry.count
+			logger.Error(
+				LOG_CODE_ORDER_RETRY_EXHAUSTED,
+				StringFormat(
+					"order retry exhausted | symbol=%s order_id=%s retry=%d reason='max open retries reached'",
+					symbol,
+					order.GetId(),
+					retry.count
 			));
 			finalizer.FinalizeCancelled(order);
 			return;
 		}
 
-		logger.Info(LOG_CODE_ORDER_OPEN_QUEUED, StringFormat(
-			"order opening | symbol=%s order_id=%s",
-			symbol,
-			order.GetId()
+		logger.Info(
+			LOG_CODE_ORDER_OPEN_QUEUED,
+			StringFormat(
+				"order opening | symbol=%s order_id=%s",
+				symbol,
+				order.GetId()
 		));
 		Open(order);
 	}
@@ -107,19 +111,23 @@ public:
 			if (retry.retryable) {
 				retry.after = dtime.Timestamp() + marketStatus.opensInSeconds;
 				order.SetOpenRetry(retry);
-				logger.Warning(LOG_CODE_ORDER_RETRY_SCHEDULED, StringFormat(
-					"open retry scheduled | symbol=%s order_id=%s reason='market closed' retry_in_s=%d",
-					symbol,
-					order.GetId(),
-					marketStatus.opensInSeconds
+				logger.Warning(
+					LOG_CODE_ORDER_RETRY_SCHEDULED,
+					StringFormat(
+						"open retry scheduled | symbol=%s order_id=%s reason='market closed' retry_in_s=%d",
+						symbol,
+						order.GetId(),
+						marketStatus.opensInSeconds
 				));
 				return;
 			}
 
-			logger.Warning(LOG_CODE_ORDER_OPEN_FAILED, StringFormat(
-				"order open dropped | symbol=%s order_id=%s reason='market closed'",
-				symbol,
-				order.GetId()
+			logger.Warning(
+				LOG_CODE_ORDER_OPEN_FAILED,
+				StringFormat(
+					"order open dropped | symbol=%s order_id=%s reason='market closed'",
+					symbol,
+					order.GetId()
 			));
 			finalizer.FinalizeCancelled(order);
 			return;
@@ -165,11 +173,13 @@ public:
 		if (result.severity == TRADE_SEVERITY_TRANSIENT) {
 			SOrderRetryState retry = order.GetOpenRetry();
 			if (!retry.retryable) {
-				logger.Warning(GetTradeRetcodeLogCode(result.retcode), StringFormat(
-					"order open dropped | symbol=%s order_id=%s reason='%s'",
-					symbol,
-					order.GetId(),
-					ATrade::DescribeRetcode(result.retcode)
+				logger.Warning(
+					GetTradeRetcodeLogCode(result.retcode),
+					StringFormat(
+						"order open dropped | symbol=%s order_id=%s reason='%s'",
+						symbol,
+						order.GetId(),
+						ATrade::DescribeRetcode(result.retcode)
 				));
 				finalizer.FinalizeCancelled(order);
 				return;
@@ -178,12 +188,14 @@ public:
 			int deferSeconds = ResolveTransientDeferSeconds(result.retcode, symbol);
 			retry.after = dtime.Timestamp() + deferSeconds;
 			order.SetOpenRetry(retry);
-			logger.Warning(GetTradeRetcodeLogCode(result.retcode), StringFormat(
-				"open retry scheduled | symbol=%s order_id=%s reason='%s' retry_in_s=%d",
-				symbol,
-				order.GetId(),
-				ATrade::DescribeRetcode(result.retcode),
-				deferSeconds
+			logger.Warning(
+				GetTradeRetcodeLogCode(result.retcode),
+				StringFormat(
+					"open retry scheduled | symbol=%s order_id=%s reason='%s' retry_in_s=%d",
+					symbol,
+					order.GetId(),
+					ATrade::DescribeRetcode(result.retcode),
+					deferSeconds
 			));
 			return;
 		}
@@ -196,13 +208,15 @@ private:
 		SOrderRetryState retry = order.GetOpenRetry();
 		retry.count += 1;
 		order.SetOpenRetry(retry);
-		logger.Error(GetTradeRetcodeLogCode(result.retcode), StringFormat(
-			"order open failed | symbol=%s order_id=%s retry=%d error=%d reason='%s'",
-			symbol,
-			order.GetId(),
-			retry.count,
-			result.retcode,
-			ATrade::DescribeRetcode(result.retcode)
+		logger.Error(
+			GetTradeRetcodeLogCode(result.retcode),
+			StringFormat(
+				"order open failed | symbol=%s order_id=%s retry=%d error=%d reason='%s'",
+				symbol,
+				order.GetId(),
+				retry.count,
+				result.retcode,
+				ATrade::DescribeRetcode(result.retcode)
 		));
 
 		if (retry.count >= MAX_RETRY_COUNT_OPEN) {
@@ -230,11 +244,13 @@ private:
 
 	void finalizeAsPending(EOrder &order) {
 		order.SetStatus(ORDER_STATUS_PENDING);
-		logger.Info(LOG_CODE_ORDER_OPEN_PENDING, StringFormat(
-			"order opened as pending | symbol=%s order_id=%s order_ticket=%llu",
-			symbol,
-			order.GetId(),
-			order.GetOrderId()
+		logger.Info(
+			LOG_CODE_ORDER_OPEN_PENDING,
+			StringFormat(
+				"order opened as pending | symbol=%s order_id=%s order_ticket=%llu",
+				symbol,
+				order.GetId(),
+				order.GetOrderId()
 		));
 
 		if (CheckPointer(listener) != POINTER_INVALID) {
@@ -243,13 +259,15 @@ private:
 	}
 
 	void finalizeAsOpen(EOrder &order, bool wasPending) {
-		logger.Success(LOG_CODE_ORDER_OPENED, StringFormat(
-			"order opened | symbol=%s order_id=%s position_id=%llu deal_id=%llu transition=%s",
-			symbol,
-			order.GetId(),
-			order.GetPositionId(),
-			order.GetDealId(),
-			wasPending ? "from_pending" : "immediate"
+		logger.Success(
+			LOG_CODE_ORDER_OPENED,
+			StringFormat(
+				"order opened | symbol=%s order_id=%s position_id=%llu deal_id=%llu transition=%s",
+				symbol,
+				order.GetId(),
+				order.GetPositionId(),
+				order.GetDealId(),
+				wasPending ? "from_pending" : "immediate"
 		));
 
 		order.SetStatus(ORDER_STATUS_OPEN);

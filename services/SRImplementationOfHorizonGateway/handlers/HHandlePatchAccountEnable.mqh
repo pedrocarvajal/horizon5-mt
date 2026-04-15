@@ -1,15 +1,18 @@
 #ifndef __H_HANDLE_GATEWAY_PATCH_ACCOUNT_ENABLE_MQH__
 #define __H_HANDLE_GATEWAY_PATCH_ACCOUNT_ENABLE_MQH__
 
-void HandlePatchAccountEnable(SGatewayEvent &event, HorizonGateway &gateway, SELogger &eventLogger, STradingStatus &status) {
-	status.isPaused = false;
-	status.reason = TRADING_PAUSE_REASON_NONE;
+void SRImplementationOfHorizonGateway::handlePatchAccountEnable(SGatewayEvent &event) {
+	tradingStatus.isPaused = false;
+	tradingStatus.reason = TRADING_PAUSE_REASON_NONE;
 
 	JSON::Object ackBody;
 	ackBody.setProperty("status", "enabled");
 	gateway.AckEvent(event.id, ackBody);
 
-	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, "Account enabled via Gateway event");
+	logger.Info(
+		LOG_CODE_REMOTE_HTTP_ERROR,
+		"Account enabled via Gateway event"
+	);
 }
 
 #endif

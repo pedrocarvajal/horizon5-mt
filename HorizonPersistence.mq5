@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "0.15"
+#property version   "0.16"
 #property strict
 
 #include "constants/COHorizonPersistence.mqh"
@@ -60,10 +60,12 @@ void writeFiles(SPendingWrite &pendingWrites[]) {
 		int handle = FileOpen(pendingWrites[i].filePath, FILE_WRITE | pendingWrites[i].fileFlags);
 
 		if (handle == INVALID_HANDLE) {
-			logger.Error(LOG_CODE_PERSISTENCE_SAVE_FAILED, StringFormat(
-				"persistence write failed | path='%s' error=%d",
-				pendingWrites[i].filePath,
-				GetLastError()
+			logger.Error(
+				LOG_CODE_PERSISTENCE_SAVE_FAILED,
+				StringFormat(
+					"persistence write failed | path='%s' error=%d",
+					pendingWrites[i].filePath,
+					GetLastError()
 			));
 		} else {
 			FileWriteString(handle, pendingWrites[i].content);
@@ -131,9 +133,11 @@ void logDiagnostics() {
 
 	int pendingPersistence = SEMessageBus::GetPendingCount(MB_CHANNEL_PERSISTENCE);
 
-	logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat(
-		"queue diagnostics | persistence=%d",
-		pendingPersistence
+	logger.Info(
+		LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+		StringFormat(
+			"queue diagnostics | persistence=%d",
+			pendingPersistence
 	));
 }
 
@@ -145,7 +149,10 @@ int OnStart() {
 	}
 
 	if (!IsLiveTrading()) {
-		logger.Warning(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='not in live trading mode'");
+		logger.Warning(
+			LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+			"service idle | reason='not in live trading mode'"
+		);
 
 		while (!IsStopped()) {
 			Sleep(5000);
@@ -155,13 +162,18 @@ int OnStart() {
 	}
 
 	if (!SEMessageBus::Initialize()) {
-		logger.Error(LOG_CODE_FRAMEWORK_INIT_FAILED, "service idle | reason='message bus DLL initialization failed'");
+		logger.Error(
+			LOG_CODE_FRAMEWORK_INIT_FAILED,
+			"service idle | reason='message bus DLL initialization failed'"
+		);
 		return 0;
 	}
 
 	SEMessageBus::RegisterService(MB_SERVICE_PERSISTENCE);
-	logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
-		"service started | system=HorizonPersistence version=0.15 built='2026-04-15 11:15:54'");
+	logger.Info(
+		LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+		"service started | system=HorizonPersistence version=0.16 built='2026-04-15 14:14:55'"
+	);
 
 	while (!IsStopped()) {
 		SEMessageBus::WaitForMessage(MB_CHANNEL_PERSISTENCE, PollIntervalMs);
@@ -178,7 +190,10 @@ int OnStart() {
 
 	SEMessageBus::UnregisterService(MB_SERVICE_PERSISTENCE);
 	SEMessageBus::Shutdown();
-	logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, "service stopped | system=HorizonPersistence");
+	logger.Info(
+		LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+		"service stopped | system=HorizonPersistence"
+	);
 
 	if (SELogger::GetGlobalEntryCount() > 0) {
 		string logEntries[];

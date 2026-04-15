@@ -15,8 +15,8 @@ public:
 		);
 	}
 
-	static string FormatPersistedEntry(ENUM_LOG_LEVEL level, ENUM_LOG_CODE code, string prefix, string message) {
-		return FormatPrintLine(level, code, prefix, message);
+	static string FormatRemoteLine(string prefix, string message) {
+		return prefix + ": " + message;
 	}
 
 	static string FormatLogCode(ENUM_LOG_CODE code) {

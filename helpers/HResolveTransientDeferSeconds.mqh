@@ -1,12 +1,12 @@
-#ifndef __H_RESOLVE_TRANSIENT_DEFER_MQH__
-#define __H_RESOLVE_TRANSIENT_DEFER_MQH__
+#ifndef __H_RESOLVE_TRANSIENT_DEFER_SECONDS_MQH__
+#define __H_RESOLVE_TRANSIENT_DEFER_SECONDS_MQH__
 
 #include "../constants/COTime.mqh"
 #include "../constants/COTransientDefer.mqh"
 
 #include "../services/SEDateTime/SEDateTime.mqh"
 
-#include "./HIsMarketClosed.mqh"
+#include "./HGetMarketStatus.mqh"
 
 extern SEDateTime dtime;
 

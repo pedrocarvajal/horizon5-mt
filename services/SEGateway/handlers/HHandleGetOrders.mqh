@@ -1,61 +1,7 @@
 #ifndef __H_HANDLE_GET_ORDERS_MQH__
 #define __H_HANDLE_GET_ORDERS_MQH__
 
-#include "../helpers/HSanitizePrice.mqh"
-#include "../../../helpers/HGetOrderSide.mqh"
-#include "../../../helpers/HGetOrderStatus.mqh"
-
-#include "../../../integrations/HorizonGateway/structs/SGatewayEvent.mqh"
-
-extern SRImplementationOfHorizonGateway horizonGateway;
-
-JSON::Object *SerializeActiveOrder(EOrder *order, SEOrderBook *orderBook) {
-	JSON::Object *orderObject = new JSON::Object();
-	orderObject.setProperty("id", order.GetId());
-	orderObject.setProperty("ticket", (long)order.GetOrderId());
-	orderObject.setProperty("position_id", (long)order.GetPositionId());
-	orderObject.setProperty("symbol", order.GetSymbol());
-	orderObject.setProperty("side", GetOrderSide(order.GetSide()));
-	orderObject.setProperty("status", GetOrderStatus(order.GetStatus()));
-	orderObject.setProperty("volume", order.GetVolume());
-	orderObject.setProperty("open_price", order.GetOpenPrice());
-	orderObject.setProperty("stop_loss", SanitizePrice(order.GetStopLossPrice()));
-	orderObject.setProperty("take_profit", SanitizePrice(order.GetTakeProfitPrice()));
-	orderObject.setProperty("floating_pnl", order.GetFloatingPnL());
-	return orderObject;
-}
-
-bool MatchesOrderFilters(EOrder *order, SGatewayEvent &event) {
-	if (event.symbol != "" && order.GetSymbol() != event.symbol) {
-		return false;
-	}
-
-	if (event.side != "" && GetOrderSide(order.GetSide()) != event.side) {
-		return false;
-	}
-
-	if (event.status != "" && GetOrderStatus(order.GetStatus()) != event.status) {
-		return false;
-	}
-
-	return true;
-}
-
-bool IsDuplicateId(const string &addedIds[], const string orderId) {
-	for (int i = 0; i < ArraySize(addedIds); i++) {
-		if (addedIds[i] == orderId) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-void HandleGetOrders(
-	SGatewayEvent &event,
-	SEStrategy *&strategies[],
-	SELogger &eventLogger
-) {
+void SEGateway::handleGetOrders(SGatewayEvent &event) {
 	JSON::Array *ordersArray = new JSON::Array();
 	int matchCount = 0;
 	string addedIds[];
@@ -66,11 +12,11 @@ void HandleGetOrders(
 		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
 			EOrder *order = orderBook.GetOrderAtIndex(i);
 
-			if (order == NULL || !MatchesOrderFilters(order, event)) {
+			if (order == NULL || !matchesOrderFilters(order, event)) {
 				continue;
 			}
 
-			ordersArray.add(SerializeActiveOrder(order, orderBook));
+			ordersArray.add(serializeActiveOrder(order, orderBook));
 
 			int addedSize = ArraySize(addedIds);
 			ArrayResize(addedIds, addedSize + 1);
@@ -106,7 +52,7 @@ void HandleGetOrders(
 
 				string orderId = results[i].getString("_id");
 
-				if (IsDuplicateId(addedIds, orderId)) {
+				if (isDuplicateId(addedIds, orderId)) {
 					continue;
 				}
 
@@ -150,10 +96,12 @@ void HandleGetOrders(
 	ackBody.setProperty("orders", ordersArray);
 	horizonGateway.AckEvent(event.id, ackBody);
 
-	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat(
-		"event acked | event_type=get.orders event_id=%s count=%d",
-		event.id,
-		matchCount
+	logger.Info(
+		LOG_CODE_REMOTE_HTTP_ERROR,
+		StringFormat(
+			"event acked | event_type=get.orders event_id=%s count=%d",
+			event.id,
+			matchCount
 	));
 }
 

@@ -47,13 +47,28 @@ private:
 		response.status = status;
 
 		if (slowThreshold > 0 && response.delay > (ulong)slowThreshold) {
-			logger.Warning(LOG_CODE_REMOTE_TIMEOUT, StringFormat("remote request slow | delay_ms=%d method=%s url=%s", response.delay, method, url));
+			logger.Warning(
+				LOG_CODE_REMOTE_TIMEOUT,
+				StringFormat(
+					"remote request slow | delay_ms=%d method=%s url=%s",
+					response.delay,
+					method,
+					url
+			));
 		}
 
 		if (status == -1) {
 			int errorCode = GetLastError();
 			string reason = errorCode == 4014 ? "URL not in allowed list" : "Connection failed";
-			logger.Error(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("remote request failed | reason=\"%s\" error=%d method=%s url=%s", reason, errorCode, method, url));
+			logger.Error(
+				LOG_CODE_REMOTE_HTTP_ERROR,
+				StringFormat(
+					"remote request failed | reason=\"%s\" error=%d method=%s url=%s",
+					reason,
+					errorCode,
+					method,
+					url
+			));
 			logRequestBody(data);
 			response.body = "";
 			return response;
@@ -62,9 +77,21 @@ private:
 		response.body = CharArrayToString(result);
 
 		if (status >= 400) {
-			logger.Error(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("remote request failed | status=%d method=%s url=%s", status, method, url));
+			logger.Error(
+				LOG_CODE_REMOTE_HTTP_ERROR,
+				StringFormat(
+					"remote request failed | status=%d method=%s url=%s",
+					status,
+					method,
+					url
+			));
 			logRequestBody(data);
-			logger.Error(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("remote response body | body=%s", response.body));
+			logger.Error(
+				LOG_CODE_REMOTE_HTTP_ERROR,
+				StringFormat(
+					"remote response body | body=%s",
+					response.body
+			));
 		}
 
 		return response;
@@ -78,7 +105,12 @@ private:
 		}
 
 		string requestBody = CharArrayToString(data, 0, MathMin(dataSize, 500));
-		logger.Error(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("remote request body | body=%s", requestBody));
+		logger.Error(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			StringFormat(
+				"remote request body | body=%s",
+				requestBody
+		));
 	}
 
 public:
