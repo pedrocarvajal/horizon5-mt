@@ -541,7 +541,7 @@ Move all outbound HTTP calls from the EA to this service.
 
 - `Horizon.mq5` — Replace direct `horizonAPI.*` calls with `MessageBus.Send("connector", ...)`
 - `assets/Asset.mqh` — Replace `SyncToHorizonAPI()` internals
-- `strategies/Strategy.mqh` — Replace `UpsertOrder()` calls in `OnOpenOrder`, `OnCloseOrder`, `OnCancelOrder`, `SyncOrders`, `SyncSnapshot`
+- `strategies/Strategy.mqh` — Replace `UpsertOrder()` calls in `OnOpenOrder`, `OnCloseOrder`, `OnCancelOrder`, `SyncSnapshot`
 - `services/SELogger/SELogger.mqh` — Replace `sendToRemote()` with `MessageBus.Send`
 
 **HorizonAPI integration reuse:** This service includes `integrations/HorizonAPI/HorizonAPI.mqh` directly (same as EA does today). No changes needed to the integration layer itself.

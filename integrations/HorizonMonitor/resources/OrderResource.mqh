@@ -73,8 +73,7 @@ public:
 			context.GetBrokerServer(),
 			order.GetSymbol(),
 			order.GetMagicNumber(),
-			order.GetOrderId(),
-			order.GetPositionId()
+			order.GetOrderId()
 		);
 
 		JSON::Object body;

@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "0.14"
+#property version   "0.15"
 #property strict
 
 #include "constants/COHorizonPersistence.mqh"
@@ -161,7 +161,7 @@ int OnStart() {
 
 	SEMessageBus::RegisterService(MB_SERVICE_PERSISTENCE);
 	logger.Info(LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
-		"service started | system=HorizonPersistence version=0.14 built='2026-04-14 19:59:38'");
+		"service started | system=HorizonPersistence version=0.15 built='2026-04-15 11:15:54'");
 
 	while (!IsStopped()) {
 		SEMessageBus::WaitForMessage(MB_CHANNEL_PERSISTENCE, PollIntervalMs);
