@@ -6,6 +6,7 @@
 #include "../../../helpers/HGetStrategyUuid.mqh"
 
 #include "../HorizonMonitorContext.mqh"
+#include "../helpers/HHasMonitorHttpFailed.mqh"
 
 #include "../structs/SStrategyMapping.mqh"
 
@@ -64,10 +65,15 @@ public:
 		body.setProperty("name", strategyName);
 		body.setProperty("magic_number", (long)magicNumber);
 
-		context.Post("api/v1/strategy", body, false);
+		SRequestResponse response = context.Post("api/v1/strategy", body, false);
+
+		string failurePrefix = StringFormat("strategy upsert failed | name=%s magic=%llu", strategyName, magicNumber);
+		if (HasMonitorHttpFailed(response, logger, failurePrefix)) {
+			return "";
+		}
 
 		registerStrategy(magicNumber, strategyUuid);
-		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Strategy registered | %s | magic: %llu | uuid: %s", strategyName, magicNumber, strategyUuid));
+		logger.Info(LOG_CODE_REMOTE_HTTP_OK, StringFormat("strategy registered | name=%s magic=%llu uuid=%s", strategyName, magicNumber, strategyUuid));
 
 		return strategyUuid;
 	}

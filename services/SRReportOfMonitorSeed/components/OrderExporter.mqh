@@ -38,7 +38,7 @@ public:
 
 		string orderUuid = GetDeterministicOrderUuid(
 			tradingAccount.GetNumber(), tradingAccount.GetBrokerServer(), order.GetSymbol(),
-			order.GetMagicNumber(), order.GetOrderId(), order.GetPositionId()
+			order.GetMagicNumber(), order.GetOrderId()
 		);
 		string strategyUuid = registry.GetStrategyUuid(order.GetMagicNumber());
 		string assetUuid = registry.GetAssetUuid(order.GetSymbol());

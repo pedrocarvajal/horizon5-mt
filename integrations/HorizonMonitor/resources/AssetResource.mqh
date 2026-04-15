@@ -5,6 +5,7 @@
 #include "../../../helpers/HGetAssetUuid.mqh"
 
 #include "../HorizonMonitorContext.mqh"
+#include "../helpers/HHasMonitorHttpFailed.mqh"
 
 #include "../structs/SAssetMapping.mqh"
 
@@ -55,10 +56,15 @@ public:
 		body.setProperty("name", symbolName);
 		body.setProperty("symbol", symbolName);
 
-		context.Post("api/v1/asset", body, false);
+		SRequestResponse response = context.Post("api/v1/asset", body, false);
+
+		string failurePrefix = StringFormat("asset upsert failed | symbol=%s", symbolName);
+		if (HasMonitorHttpFailed(response, logger, failurePrefix)) {
+			return "";
+		}
 
 		registerAsset(symbolName, assetUuid);
-		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Asset registered | %s | uuid: %s", symbolName, assetUuid));
+		logger.Info(LOG_CODE_REMOTE_HTTP_OK, StringFormat("asset registered | symbol=%s uuid=%s", symbolName, assetUuid));
 
 		return assetUuid;
 	}

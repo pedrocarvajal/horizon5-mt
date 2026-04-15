@@ -6,6 +6,7 @@
 #include "../../../helpers/HGetAccountUuid.mqh"
 
 #include "../HorizonMonitorContext.mqh"
+#include "../helpers/HHasMonitorHttpFailed.mqh"
 
 class AccountResource {
 private:
@@ -29,10 +30,14 @@ public:
 		body.setProperty("broker_name", account.GetBrokerName());
 		body.setProperty("currency", account.GetCurrency());
 
-		context.Post("api/v1/account", body, false);
+		SRequestResponse response = context.Post("api/v1/account", body, false);
+
+		if (HasMonitorHttpFailed(response, logger, "account upsert failed |")) {
+			return false;
+		}
 
 		context.SetAccountUuid(accountUuid);
-		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Account registered | uuid: %s", accountUuid));
+		logger.Info(LOG_CODE_REMOTE_HTTP_OK, StringFormat("account registered | uuid=%s", accountUuid));
 
 		return true;
 	}

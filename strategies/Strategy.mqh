@@ -462,15 +462,6 @@ public:
 		weight = newWeight;
 	}
 
-	void SyncOrders() {
-		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
-			EOrder *order = orderBook.GetOrderAtIndex(i);
-			if (order != NULL && order.GetStatus() != ORDER_STATUS_CLOSED) {
-				horizonMonitor.UpsertOrder(order);
-			}
-		}
-	}
-
 	void SyncSnapshot(string event) {
 		double floatingPnl = 0;
 

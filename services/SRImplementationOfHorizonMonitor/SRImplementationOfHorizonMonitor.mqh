@@ -100,7 +100,13 @@ public:
 		double totalRealizedPnl = 0;
 
 		for (int i = 0; i < assetCount; i++) {
-			registeredAssets[i].RegisterEntities();
+			if (!registeredAssets[i].RegisterEntities()) {
+				logger.Warning(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat(
+					"register entities failed during resync | symbol=%s action='continuing best-effort'",
+					registeredAssets[i].GetSymbol()
+				));
+			}
+
 			registeredAssets[i].SyncToMonitor(event);
 			registeredAssets[i].AggregateSnapshotData(
 				totalFloatingPnl,

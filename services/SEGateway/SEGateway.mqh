@@ -177,22 +177,19 @@ public:
 	void OnCancelOrder(EOrder &order, const string strategyUuid) {
 		publishOrderNotification(NOTIFICATION_TYPE_ORDER_CANCELLED, order, strategyUuid);
 
+		int pendingIndex = tracker.FindOpenIndex(order.GetId());
+
+		if (pendingIndex != -1) {
+			string eventId = tracker.ConsumeOpen(pendingIndex);
+			ackCancelEvent(eventId, "post.order", "rejected", order);
+			return;
+		}
+
 		int closeIndex = tracker.FindCloseIndex(order.GetId());
 
 		if (closeIndex != -1) {
 			string eventId = tracker.ConsumeClose(closeIndex);
-
-			JSON::Object ackBody;
-			ackBody.setProperty("status", "cancelled");
-			ackBody.setProperty("ticket", (long)order.GetOrderId());
-			horizonGateway.AckEvent(eventId, ackBody);
-
-			logger.Info(LOG_CODE_ORDER_CANCELLED, StringFormat(
-				"event acked | event_type=delete.order event_id=%s symbol=%s order_id=%s reason=cancelled",
-				eventId,
-				order.GetSymbol(),
-				order.GetId()
-			));
+			ackCancelEvent(eventId, "delete.order", "cancelled", order);
 		}
 	}
 
@@ -201,6 +198,22 @@ public:
 	}
 
 private:
+	void ackCancelEvent(const string eventId, const string eventType, const string statusValue, EOrder &order) {
+		JSON::Object ackBody;
+		ackBody.setProperty("status", statusValue);
+		ackBody.setProperty("ticket", (long)order.GetOrderId());
+		horizonGateway.AckEvent(eventId, ackBody);
+
+		logger.Info(LOG_CODE_ORDER_CANCELLED, StringFormat(
+			"event acked | event_type=%s event_id=%s symbol=%s order_id=%s reason=%s",
+			eventType,
+			eventId,
+			order.GetSymbol(),
+			order.GetId(),
+			statusValue
+		));
+	}
+
 	void publishOrderNotification(const string notificationType, EOrder &order, const string strategyUuid) {
 		if (!horizonGateway.IsEnabled()) {
 			return;

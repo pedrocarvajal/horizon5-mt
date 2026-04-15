@@ -129,6 +129,10 @@ public:
 			return INIT_SUCCEEDED;
 		}
 
+		if (isEnabled && !RegisterEntities()) {
+			return INIT_FAILED;
+		}
+
 		int initResult = initializeStrategies(strategyCount);
 
 		if (initResult != INIT_SUCCEEDED) {
@@ -138,8 +142,6 @@ public:
 		if (!isEnabled) {
 			return INIT_SUCCEEDED;
 		}
-
-		RegisterEntities();
 
 		if (monitorSeedReporter != NULL) {
 			monitorSeedReporter.RegisterAsset(symbol);
@@ -595,39 +597,102 @@ public:
 		weight = newWeight;
 	}
 
-	void RegisterEntities() {
-		if (!horizonMonitor.IsEnabled() && !horizonGateway.IsEnabled()) {
-			return;
+	bool RegisterEntities() {
+		bool monitorEnabled = horizonMonitor.IsEnabled();
+		bool gatewayEnabled = horizonGateway.IsEnabled();
+
+		if (!monitorEnabled && !gatewayEnabled) {
+			return true;
 		}
 
-		horizonMonitor.UpsertAsset(symbol);
-		horizonGateway.UpsertAsset(symbol);
+		if (monitorEnabled && !registerAssetOnMonitor()) {
+			return false;
+		}
+
+		if (gatewayEnabled && !registerAssetOnGateway()) {
+			return false;
+		}
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			horizonMonitor.UpsertStrategy(
-				strategies[i].GetName(),
-				strategies[i].GetSymbol(),
-				strategies[i].GetPrefix(),
-				strategies[i].GetMagicNumber()
-			);
-
-			string gatewayStrategyUuid = horizonGateway.UpsertStrategy(
-				strategies[i].GetName(),
-				strategies[i].GetSymbol(),
-				strategies[i].GetPrefix(),
-				strategies[i].GetMagicNumber()
-			);
-
-			if (horizonGateway.IsEnabled() && gatewayStrategyUuid == "") {
-				logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, StringFormat(
-					"strategy uuid missing | strategy=%s magic=%llu reason='horizonGateway.UpsertStrategy returned empty uuid'",
-					strategies[i].GetName(),
-					strategies[i].GetMagicNumber()
-				));
+			if (monitorEnabled && !registerStrategyOnMonitor(strategies[i])) {
+				return false;
 			}
 
-			strategies[i].SetStrategyUuid(gatewayStrategyUuid);
+			if (gatewayEnabled && !registerStrategyOnGateway(strategies[i])) {
+				return false;
+			}
 		}
+
+		return true;
+	}
+
+	bool registerAssetOnMonitor() {
+		string monitorAssetUuid = horizonMonitor.UpsertAsset(symbol);
+
+		if (monitorAssetUuid == "") {
+			logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, StringFormat(
+				"asset uuid missing | symbol=%s reason='horizonMonitor.UpsertAsset returned empty uuid'",
+				symbol
+			));
+			return false;
+		}
+
+		return true;
+	}
+
+	bool registerAssetOnGateway() {
+		string gatewayAssetUuid = horizonGateway.UpsertAsset(symbol);
+
+		if (gatewayAssetUuid == "") {
+			logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, StringFormat(
+				"asset uuid missing | symbol=%s reason='horizonGateway.UpsertAsset returned empty uuid'",
+				symbol
+			));
+			return false;
+		}
+
+		return true;
+	}
+
+	bool registerStrategyOnMonitor(SEStrategy *strategy) {
+		string monitorStrategyUuid = horizonMonitor.UpsertStrategy(
+			strategy.GetName(),
+			strategy.GetSymbol(),
+			strategy.GetPrefix(),
+			strategy.GetMagicNumber()
+		);
+
+		if (monitorStrategyUuid == "") {
+			logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, StringFormat(
+				"strategy uuid missing | strategy=%s magic=%llu reason='horizonMonitor.UpsertStrategy returned empty uuid'",
+				strategy.GetName(),
+				strategy.GetMagicNumber()
+			));
+			return false;
+		}
+
+		return true;
+	}
+
+	bool registerStrategyOnGateway(SEStrategy *strategy) {
+		string gatewayStrategyUuid = horizonGateway.UpsertStrategy(
+			strategy.GetName(),
+			strategy.GetSymbol(),
+			strategy.GetPrefix(),
+			strategy.GetMagicNumber()
+		);
+
+		if (gatewayStrategyUuid == "") {
+			logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, StringFormat(
+				"strategy uuid missing | strategy=%s magic=%llu reason='horizonGateway.UpsertStrategy returned empty uuid'",
+				strategy.GetName(),
+				strategy.GetMagicNumber()
+			));
+			return false;
+		}
+
+		strategy.SetStrategyUuid(gatewayStrategyUuid);
+		return true;
 	}
 
 	void SyncToMonitor(string event) {
@@ -639,7 +704,6 @@ public:
 		horizonMonitor.UpsertAssetMetadata(assetUuid, symbol);
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].SyncOrders();
 			strategies[i].SyncSnapshot(event);
 		}
 
