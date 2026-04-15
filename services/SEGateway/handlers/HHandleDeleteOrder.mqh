@@ -1,18 +1,9 @@
 #ifndef __H_HANDLE_DELETE_ORDER_MQH__
 #define __H_HANDLE_DELETE_ORDER_MQH__
 
-#include "../PendingEntryTracker.mqh"
-
-#include "../../../integrations/HorizonGateway/structs/SGatewayEvent.mqh"
-
-void HandleDeleteOrder(
-	SGatewayEvent &event,
-	SEStrategy *&strategies[],
-	PendingEntryTracker &tracker,
-	SELogger &eventLogger
-) {
+void SEGateway::handleDeleteOrder(SGatewayEvent &event) {
 	if (event.orderId == "") {
-		AckWithError(event.id, "Order ID is required", eventLogger);
+		ackWithError(event.id, "Order ID is required");
 		return;
 	}
 
@@ -31,7 +22,7 @@ void HandleDeleteOrder(
 	}
 
 	if (order == NULL) {
-		AckWithError(event.id, StringFormat("Order %s not found", event.orderId), eventLogger);
+		ackWithError(event.id, StringFormat("Order %s not found", event.orderId));
 		return;
 	}
 
@@ -39,10 +30,10 @@ void HandleDeleteOrder(
 		       || order.GetStatus() == ORDER_STATUS_PENDING;
 
 	if (!isValid) {
-		AckWithError(event.id, StringFormat(
+		ackWithError(event.id, StringFormat(
 			"Order status is %s, expected open or pending",
 			GetOrderStatus(order.GetStatus())
-			), eventLogger);
+		));
 		return;
 	}
 
@@ -57,11 +48,13 @@ void HandleDeleteOrder(
 	tracker.TrackClose(order.GetId(), event.id);
 	orderBook.CloseOrder(order);
 
-	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat(
-		"delete order queued | event_id=%s symbol=%s order_id=%s",
-		event.id,
-		order.GetSymbol(),
-		event.orderId
+	logger.Info(
+		LOG_CODE_REMOTE_HTTP_ERROR,
+		StringFormat(
+			"delete order queued | event_id=%s symbol=%s order_id=%s",
+			event.id,
+			order.GetSymbol(),
+			event.orderId
 	));
 }
 

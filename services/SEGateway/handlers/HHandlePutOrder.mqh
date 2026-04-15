@@ -1,27 +1,14 @@
 #ifndef __H_HANDLE_PUT_ORDER_MQH__
 #define __H_HANDLE_PUT_ORDER_MQH__
 
-#include "../helpers/HSanitizePrice.mqh"
-#include "../helpers/HBuildNotificationPayload.mqh"
-
-#include "../../../constants/CONotificationType.mqh"
-
-#include "../../../integrations/HorizonGateway/structs/SGatewayEvent.mqh"
-
-extern SRImplementationOfHorizonGateway horizonGateway;
-
-void HandlePutOrder(
-	SGatewayEvent &event,
-	SEStrategy *&strategies[],
-	SELogger &eventLogger
-) {
+void SEGateway::handlePutOrder(SGatewayEvent &event) {
 	if (event.stopLoss <= 0 && event.takeProfit <= 0) {
-		AckWithError(event.id, "At least one of stop_loss or take_profit must be provided", eventLogger);
+		ackWithError(event.id, "At least one of stop_loss or take_profit must be provided");
 		return;
 	}
 
 	if (event.orderId == "") {
-		AckWithError(event.id, "Order ID is required", eventLogger);
+		ackWithError(event.id, "Order ID is required");
 		return;
 	}
 
@@ -42,15 +29,15 @@ void HandlePutOrder(
 	}
 
 	if (order == NULL) {
-		AckWithError(event.id, StringFormat("Order %s not found", event.orderId), eventLogger);
+		ackWithError(event.id, StringFormat("Order %s not found", event.orderId));
 		return;
 	}
 
 	if (order.GetStatus() != ORDER_STATUS_OPEN && order.GetStatus() != ORDER_STATUS_PENDING) {
-		AckWithError(event.id, StringFormat(
+		ackWithError(event.id, StringFormat(
 			"Order status is %s, expected open or pending",
 			GetOrderStatus(order.GetStatus())
-			), eventLogger);
+		));
 		return;
 	}
 
@@ -65,9 +52,9 @@ void HandlePutOrder(
 	}
 
 	if (!modified) {
-		AckWithError(event.id, StringFormat(
+		ackWithError(event.id, StringFormat(
 			"Failed to modify SL to %.5f / TP to %.5f", event.stopLoss, event.takeProfit
-			), eventLogger);
+		));
 		return;
 	}
 
@@ -78,13 +65,15 @@ void HandlePutOrder(
 	ackBody.setProperty("take_profit", SanitizePrice(order.GetTakeProfitPrice()));
 	horizonGateway.AckEvent(event.id, ackBody);
 
-	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat(
-		"event acked | event_type=put.order event_id=%s symbol=%s order_id=%s sl=%.5f tp=%.5f",
-		event.id,
-		order.GetSymbol(),
-		event.orderId,
-		order.GetStopLossPrice(),
-		order.GetTakeProfitPrice()
+	logger.Info(
+		LOG_CODE_REMOTE_HTTP_ERROR,
+		StringFormat(
+			"event acked | event_type=put.order event_id=%s symbol=%s order_id=%s sl=%.5f tp=%.5f",
+			event.id,
+			order.GetSymbol(),
+			event.orderId,
+			order.GetStopLossPrice(),
+			order.GetTakeProfitPrice()
 	));
 
 	if (horizonGateway.IsEnabled()) {

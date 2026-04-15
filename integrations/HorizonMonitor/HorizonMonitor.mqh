@@ -75,14 +75,22 @@ private:
 		SRequestResponse response = authRequest.Post("api/v1/auth/login", loginBody);
 
 		if (response.status != 200) {
-			logger.Error(LOG_CODE_REMOTE_AUTH_FAILED, StringFormat("auth failed | status=%d", response.status));
+			logger.Error(
+				LOG_CODE_REMOTE_AUTH_FAILED,
+				StringFormat(
+					"auth failed | status=%d",
+					response.status
+			));
 			return false;
 		}
 
 		JSON::Object root(response.body);
 
 		if (!root.isObject("data")) {
-			logger.Error(LOG_CODE_REMOTE_RESPONSE_INVALID, "auth response invalid | reason='missing data object'");
+			logger.Error(
+				LOG_CODE_REMOTE_RESPONSE_INVALID,
+				"auth response invalid | reason='missing data object'"
+			);
 			return false;
 		}
 
@@ -90,7 +98,10 @@ private:
 		string accessToken = dataObject.getString("access");
 
 		if (accessToken == "") {
-			logger.Error(LOG_CODE_REMOTE_RESPONSE_INVALID, "auth response invalid | reason='missing access token'");
+			logger.Error(
+				LOG_CODE_REMOTE_RESPONSE_INVALID,
+				"auth response invalid | reason='missing access token'"
+			);
 			return false;
 		}
 
@@ -99,7 +110,10 @@ private:
 		authenticatedRequest.AddHeader("Authorization", "Bearer " + accessToken);
 		context.SetRequest(authenticatedRequest);
 
-		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, "Authentication successful");
+		logger.Info(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			"Authentication successful"
+		);
 		return true;
 	}
 
@@ -137,7 +151,10 @@ public:
 		}
 
 		if (email == "" || password == "") {
-			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, "configuration invalid | integration=monitor field=credentials reason='email and password required'");
+			logger.Error(
+				LOG_CODE_CONFIG_INVALID_PARAMETER,
+				"configuration invalid | integration=monitor field=credentials reason='email and password required'"
+			);
 			return false;
 		}
 
@@ -156,7 +173,10 @@ public:
 		context.Enable();
 		initResources();
 
-		logger.Info(LOG_CODE_REMOTE_HTTP_ERROR, "Initialized for account " + IntegerToString(context.GetAccountNumber()));
+		logger.Info(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			"Initialized for account " + IntegerToString(context.GetAccountNumber())
+		);
 		return true;
 	}
 
@@ -261,7 +281,7 @@ public:
 		logs.Store(system, level, message, magicNumber);
 	}
 
-	void StoreAccountSnapshot(double floatingPnl, double realizedPnl, string event) {
+	void StoreAccountSnapshot(double floatingPnl, double realizedPnl, ENUM_SNAPSHOT_EVENT event) {
 		if (!context.IsEnabled()) {
 			return;
 		}
@@ -275,7 +295,7 @@ public:
 		double equity,
 		double floatingPnl,
 		double realizedPnl,
-		string event
+		ENUM_SNAPSHOT_EVENT event
 	) {
 		if (!context.IsEnabled()) {
 			return;
@@ -293,7 +313,7 @@ public:
 		double bid,
 		double ask,
 		double usdRate,
-		string event
+		ENUM_SNAPSHOT_EVENT event
 	) {
 		if (!context.IsEnabled()) {
 			return;

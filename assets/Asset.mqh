@@ -5,7 +5,8 @@
 
 #include "../helpers/HStringToNumber.mqh"
 #include "../helpers/HGetAssetRate.mqh"
-#include "../helpers/HGetSnapshotEvent.mqh"
+
+#include "../enums/ESnapshotEvent.mqh"
 
 #include "../services/SELogger/SELogger.mqh"
 #include "../services/SRReportOfMarketSnapshots/SRReportOfMarketSnapshots.mqh"
@@ -43,64 +44,28 @@ private:
 
 	SEStrategy *strategies[];
 
-	SSMarketSnapshot BuildMarketSnapshot() {
-		SSMarketSnapshot snapshot;
-		snapshot.timestamp = dtime.Timestamp();
-		snapshot.bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-		snapshot.ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-		snapshot.spread = snapshot.ask - snapshot.bid;
-		snapshot.rollingPerformance = RollingReturn(symbol, PERIOD_D1, ROLLING_PERIOD_DAYS, 0);
-		snapshot.rollingDrawdown = DrawdownFromPeak(symbol, PERIOD_D1, ROLLING_PERIOD_DAYS, 0);
-		snapshot.rollingVolatility = Volatility(symbol, PERIOD_D1, ROLLING_PERIOD_DAYS, 0);
-		return snapshot;
-	}
-
-	int initializeStrategies(int strategyCount) {
-		int activeCount = 0;
-
-		for (int i = 0; i < strategyCount; i++) {
-			if (!strategies[i].IsPassive()) {
-				activeCount++;
-			}
-		}
-
-		double weightPerStrategy = activeCount > 0 ? weight / activeCount : 0;
-		double balancePerStrategy = activeCount > 0 ? balance / activeCount : 0;
-
-		for (int i = 0; i < strategyCount; i++) {
-			if (strategies[i].IsPassive()) {
-				strategies[i].SetWeight(weight);
-				strategies[i].SetBalance(balance);
-			} else {
-				strategies[i].SetWeight(weightPerStrategy);
-				strategies[i].SetBalance(balancePerStrategy);
-			}
-
-			int result = strategies[i].OnInit();
-
-			if (result != INIT_SUCCEEDED) {
-				logger.Error(LOG_CODE_FRAMEWORK_INIT_FAILED, StringFormat(
-					"strategy init failed | strategy=%s",
-					strategies[i].GetName()));
-				return INIT_FAILED;
-			}
-		}
-
-		return INIT_SUCCEEDED;
-	}
-
 protected:
 	string symbol;
+	datetime lastM1BarOpen;
 	datetime lastH1BarOpen;
 	datetime lastD1BarOpen;
+	bool m1Primed;
+	bool h1Primed;
+	bool d1Primed;
 
 public:
 	SEAsset() {
 		logger.SetPrefix("SEAsset");
+		marketSnapshotsReporter = NULL;
 		weight = 0;
 		isEnabled = false;
+		balance = 0;
+		lastM1BarOpen = 0;
 		lastH1BarOpen = 0;
 		lastD1BarOpen = 0;
+		m1Primed = false;
+		h1Primed = false;
+		d1Primed = false;
 	}
 
 	~SEAsset() {
@@ -115,302 +80,6 @@ public:
 
 			delete strategies[i];
 		}
-	}
-
-	virtual int OnInit() {
-		int strategyCount = ArraySize(strategies);
-
-		if (strategyCount == 0) {
-			logger.Info(LOG_CODE_FRAMEWORK_INIT_FAILED, StringFormat(
-				"Asset skipped (no strategies): %s",
-				name
-			));
-
-			return INIT_SUCCEEDED;
-		}
-
-		if (isEnabled && !RegisterEntities()) {
-			return INIT_FAILED;
-		}
-
-		int initResult = initializeStrategies(strategyCount);
-
-		if (initResult != INIT_SUCCEEDED) {
-			return initResult;
-		}
-
-		if (!isEnabled) {
-			return INIT_SUCCEEDED;
-		}
-
-		if (monitorSeedReporter != NULL) {
-			monitorSeedReporter.RegisterAsset(symbol);
-
-			for (int i = 0; i < strategyCount; i++) {
-				if (strategies[i].IsPassive()) {
-					continue;
-				}
-
-				monitorSeedReporter.RegisterStrategy(
-					strategies[i].GetName(),
-					symbol,
-					strategies[i].GetPrefix(),
-					strategies[i].GetMagicNumber()
-				);
-			}
-		}
-
-		if (EnableMarketHistoryReport) {
-			string marketReportName = StringFormat("%s_MARKET_Snapshots", symbol);
-			marketSnapshotsReporter = new SRReportOfMarketSnapshots(symbol, marketReportName);
-		}
-
-		logger.Info(LOG_CODE_FRAMEWORK_INIT_FAILED, StringFormat(
-			"%s initialized | symbol: %s | strategies: %d | weight: %.4f | balance: %.2f",
-			name,
-			symbol,
-			strategyCount,
-			weight,
-			balance
-		));
-
-		gateway.Initialize(symbol, strategies);
-
-		SyncToMonitor(GetSnapshotEvent(SNAPSHOT_ON_INIT));
-		SendHeartbeats();
-
-		return INIT_SUCCEEDED;
-	}
-
-	virtual int OnTesterInit() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnTesterInit();
-		}
-
-		return INIT_SUCCEEDED;
-	}
-
-	virtual void OnTimer() {
-		if (ArraySize(strategies) == 0 || !isEnabled) {
-			return;
-		}
-
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnTimer();
-		}
-
-		gateway.ProcessEvents();
-	}
-
-	virtual void ProcessBarEvents() {
-		datetime h1BarOpen = iTime(symbol, PERIOD_H1, 0);
-
-		if (h1BarOpen > 0 && lastH1BarOpen == 0) {
-			lastH1BarOpen = h1BarOpen;
-		} else if (h1BarOpen > 0 && h1BarOpen != lastH1BarOpen) {
-			lastH1BarOpen = h1BarOpen;
-			OnStartHour();
-		}
-
-		datetime d1BarOpen = iTime(symbol, PERIOD_D1, 0);
-
-		if (d1BarOpen > 0 && lastD1BarOpen == 0) {
-			lastD1BarOpen = d1BarOpen;
-		} else if (d1BarOpen > 0 && d1BarOpen != lastD1BarOpen) {
-			lastD1BarOpen = d1BarOpen;
-			OnStartDay();
-		}
-	}
-
-	virtual void OnTick() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnTick();
-		}
-	}
-
-	virtual void OnStartMinute() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnStartMinute();
-		}
-	}
-
-	virtual void OnStartHour() {
-		SendHeartbeats();
-
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnStartHour();
-		}
-	}
-
-	virtual void OnStartDay() {
-		if (CheckPointer(marketSnapshotsReporter) != POINTER_INVALID) {
-			marketSnapshotsReporter.AddSnapshot(BuildMarketSnapshot());
-		}
-
-		if (monitorSeedReporter != NULL) {
-			CollectMonitorSeedSnapshots(SNAPSHOT_ON_END_DAY);
-		}
-
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnStartDay();
-		}
-	}
-
-	virtual void OnOpenOrder(EOrder &order) {
-		SEStrategy *strategy = GetStrategyByPrefix(order.GetSource());
-		string targetStrategyUuid = "";
-
-		if (strategy != NULL) {
-			strategy.OnOpenOrder(order);
-			targetStrategyUuid = strategy.GetStrategyUuid();
-		}
-
-		gateway.OnOpenOrder(order, targetStrategyUuid);
-	}
-
-	virtual void OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason) {
-		SEStrategy *strategy = GetStrategyByPrefix(order.GetSource());
-		string targetStrategyUuid = "";
-
-		if (strategy != NULL) {
-			strategy.OnCloseOrder(order, reason);
-			targetStrategyUuid = strategy.GetStrategyUuid();
-		}
-
-		gateway.OnCloseOrder(order, reason, targetStrategyUuid);
-	}
-
-	virtual void OnEnd() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnEnd();
-		}
-	}
-
-	virtual void OnDeinit() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].OnDeinit();
-		}
-	}
-
-	bool HandleOrderCancellation(ulong orderId) {
-		int strategyIndex = -1;
-		int orderIndex = -1;
-
-		if (!FindOrderByOrderId(orderId, strategyIndex, orderIndex)) {
-			return false;
-		}
-
-		SEOrderBook *book = strategies[strategyIndex].GetOrderBook();
-		EOrder *order = book.GetOrderAtIndex(orderIndex);
-
-		if (order == NULL) {
-			return false;
-		}
-
-		if (order.GetStatus() != ORDER_STATUS_CLOSING &&
-		    order.GetStatus() != ORDER_STATUS_PENDING) {
-			return false;
-		}
-
-		book.CancelOrder(order);
-		gateway.OnCancelOrder(order, strategies[strategyIndex].GetStrategyUuid());
-
-		return true;
-	}
-
-	bool HandleDealOpen(ulong orderId, ulong dealId, double dealPrice) {
-		int strategyIndex = -1;
-		int orderIndex = -1;
-
-		if (!FindOrderByOrderId(orderId, strategyIndex, orderIndex)) {
-			return false;
-		}
-
-		SEOrderBook *book = strategies[strategyIndex].GetOrderBook();
-		EOrder *order = book.GetOrderAtIndex(orderIndex);
-
-		if (order == NULL) {
-			return false;
-		}
-
-		if (order.GetStatus() == ORDER_STATUS_CANCELLED) {
-			ulong positionId = HistoryDealGetInteger(dealId, DEAL_POSITION_ID);
-
-			logger.Warning(LOG_CODE_ORDER_ORPHAN_CLOSED, StringFormat(
-				"orphan fill detected | order_ticket=%llu position_id=%llu reason='fill arrived for cancelled order' action='closing orphan'",
-				orderId,
-				positionId
-			));
-
-			if (positionId > 0) {
-				book.CloseOrphanPosition(positionId);
-			}
-
-			return true;
-		}
-
-		if (order.GetStatus() != ORDER_STATUS_OPEN) {
-			STradeResult openResult;
-			ZeroMemory(openResult);
-			openResult.dealId = dealId;
-			openResult.orderId = orderId;
-			openResult.price = dealPrice;
-			openResult.retcode = TRADE_RETCODE_DONE;
-			openResult.severity = TRADE_SEVERITY_SUCCESS;
-			book.OnOpenOrder(order, openResult);
-		}
-
-		strategies[strategyIndex].OnOpenOrder(order);
-		gateway.OnOpenOrder(order, strategies[strategyIndex].GetStrategyUuid());
-
-		return true;
-	}
-
-	bool HandleDealClose(
-		ulong positionId,
-		SDateTime &dealTime,
-		double dealPrice,
-		double netProfit,
-		double dealProfit,
-		double dealCommission,
-		double dealSwap,
-		ENUM_DEAL_REASON reason
-	) {
-		int strategyIndex = -1;
-		int orderIndex = -1;
-
-		if (!FindOrderByPositionId(positionId, strategyIndex, orderIndex)) {
-			return false;
-		}
-
-		SEOrderBook *book = strategies[strategyIndex].GetOrderBook();
-		EOrder *order = book.GetOrderAtIndex(orderIndex);
-
-		if (order == NULL) {
-			return false;
-		}
-
-		book.OnCloseOrder(order, dealTime, dealPrice, netProfit, dealProfit, dealCommission, dealSwap, reason);
-		strategies[strategyIndex].OnCloseOrder(order, reason);
-		gateway.OnCloseOrder(order, reason, strategies[strategyIndex].GetStrategyUuid());
-
-		logger.Info(LOG_CODE_FRAMEWORK_INIT_FAILED, StringFormat(
-			"Order closed with positionId=%llu, profit=%.2f",
-			positionId,
-			netProfit
-		));
-
-		return true;
-	}
-
-	bool HasMagicNumber(ulong magic) {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			if (strategies[i].GetMagicNumber() == magic) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	void AddStrategy(SEStrategy *strategy) {
@@ -432,13 +101,25 @@ public:
 		}
 	}
 
-	void RegisterStrategyIf(bool enabled, SEStrategy *strategy) {
-		if (!enabled) {
-			delete strategy;
-			return;
-		}
+	void AggregateSnapshotData(
+		double &floatingPnl,
+		double &realizedPnl
+	) {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			SEOrderBook *book = strategies[i].GetOrderBook();
 
-		AddStrategy(strategy);
+			for (int j = 0; j < book.GetOrdersCount(); j++) {
+				EOrder *order = book.GetOrderAtIndex(j);
+				if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
+					floatingPnl += order.GetFloatingPnL();
+				}
+			}
+
+			SEStatistics *stats = strategies[i].GetStatistics();
+			if (stats != NULL) {
+				realizedPnl += stats.GetClosedNav() - stats.GetInitialBalance();
+			}
+		}
 	}
 
 	double CalculateQualityProduct() {
@@ -461,16 +142,33 @@ public:
 		return quality;
 	}
 
+	void CollectMonitorSeedSnapshots(ENUM_SNAPSHOT_EVENT event) {
+		double totalFloatingPnl = 0;
+		double totalRealizedPnl = 0;
+
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			if (strategies[i].IsPassive()) {
+				continue;
+			}
+
+			collectStrategySeedSnapshot(strategies[i], event, totalFloatingPnl, totalRealizedPnl);
+		}
+
+		collectAssetSeedSnapshot(totalFloatingPnl, totalRealizedPnl, event);
+	}
+
 	void ExportMarketSnapshots() {
-		if (CheckPointer(marketSnapshotsReporter) == POINTER_INVALID) {
+		if (CheckPointer(marketSnapshotsReporter) != POINTER_DYNAMIC) {
 			return;
 		}
 
 		marketSnapshotsReporter.Export();
 
-		logger.Info(LOG_CODE_FRAMEWORK_INIT_FAILED, StringFormat(
-			"Market history exported with %d snapshots",
-			marketSnapshotsReporter.GetSnapshotCount()
+		logger.Info(
+			LOG_CODE_STATS_EXPORTED,
+			StringFormat(
+				"Market history exported with %d snapshots",
+				marketSnapshotsReporter.GetSnapshotCount()
 		));
 	}
 
@@ -545,10 +243,12 @@ public:
 		}
 	}
 
-	void ProcessOrders() {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].ProcessOrders();
+	SEStrategy * GetStrategyAtIndex(int index) {
+		if (index < 0 || index >= ArraySize(strategies)) {
+			return NULL;
 		}
+
+		return strategies[index];
 	}
 
 	SEStrategy * GetStrategyByPrefix(string strategyPrefix) {
@@ -561,14 +261,6 @@ public:
 		return NULL;
 	}
 
-	SEStrategy * GetStrategyAtIndex(int index) {
-		if (index < 0 || index >= ArraySize(strategies)) {
-			return NULL;
-		}
-
-		return strategies[index];
-	}
-
 	int GetStrategyCount() {
 		return ArraySize(strategies);
 	}
@@ -577,24 +269,317 @@ public:
 		return symbol;
 	}
 
+	bool HandleDealClose(
+		ulong positionId,
+		SDateTime &dealTime,
+		double dealPrice,
+		double netProfit,
+		double dealProfit,
+		double dealCommission,
+		double dealSwap,
+		ENUM_DEAL_REASON reason
+	) {
+		int strategyIndex = -1;
+		int orderIndex = -1;
+
+		if (!FindOrderByPositionId(positionId, strategyIndex, orderIndex)) {
+			return false;
+		}
+
+		SEOrderBook *book = strategies[strategyIndex].GetOrderBook();
+		EOrder *order = book.GetOrderAtIndex(orderIndex);
+
+		if (order == NULL) {
+			return false;
+		}
+
+		book.OnCloseOrder(order, dealTime, dealPrice, netProfit, dealProfit, dealCommission, dealSwap, reason);
+		strategies[strategyIndex].OnCloseOrder(order, reason);
+		gateway.OnCloseOrder(order, reason, strategies[strategyIndex].GetStrategyUuid());
+
+		logger.Info(
+			LOG_CODE_ORDER_CLOSED,
+			StringFormat(
+				"Order closed with positionId=%llu, profit=%.2f",
+				positionId,
+				netProfit
+		));
+
+		return true;
+	}
+
+	bool HandleDealOpen(ulong orderId, ulong dealId, double dealPrice) {
+		int strategyIndex = -1;
+		int orderIndex = -1;
+
+		if (!FindOrderByOrderId(orderId, strategyIndex, orderIndex)) {
+			return false;
+		}
+
+		SEOrderBook *book = strategies[strategyIndex].GetOrderBook();
+		EOrder *order = book.GetOrderAtIndex(orderIndex);
+
+		if (order == NULL) {
+			return false;
+		}
+
+		if (order.GetStatus() == ORDER_STATUS_CANCELLED) {
+			ulong positionId = HistoryDealGetInteger(dealId, DEAL_POSITION_ID);
+
+			logger.Warning(
+				LOG_CODE_ORDER_ORPHAN_CLOSED,
+				StringFormat(
+					"orphan fill detected | order_ticket=%llu position_id=%llu reason='fill arrived for cancelled order' action='closing orphan'",
+					orderId,
+					positionId
+			));
+
+			if (positionId > 0) {
+				book.CloseOrphanPosition(positionId);
+			}
+
+			return true;
+		}
+
+		if (order.GetStatus() != ORDER_STATUS_OPEN) {
+			STradeResult openResult;
+			ZeroMemory(openResult);
+			openResult.dealId = dealId;
+			openResult.orderId = orderId;
+			openResult.price = dealPrice;
+			openResult.retcode = TRADE_RETCODE_DONE;
+			openResult.severity = TRADE_SEVERITY_SUCCESS;
+			book.OnOpenOrder(order, openResult);
+		}
+
+		strategies[strategyIndex].OnOpenOrder(order);
+		gateway.OnOpenOrder(order, strategies[strategyIndex].GetStrategyUuid());
+
+		return true;
+	}
+
+	bool HandleOrderCancellation(ulong orderId) {
+		int strategyIndex = -1;
+		int orderIndex = -1;
+
+		if (!FindOrderByOrderId(orderId, strategyIndex, orderIndex)) {
+			return false;
+		}
+
+		SEOrderBook *book = strategies[strategyIndex].GetOrderBook();
+		EOrder *order = book.GetOrderAtIndex(orderIndex);
+
+		if (order == NULL) {
+			return false;
+		}
+
+		if (order.GetStatus() != ORDER_STATUS_CLOSING &&
+		    order.GetStatus() != ORDER_STATUS_PENDING) {
+			return false;
+		}
+
+		book.CancelOrder(order);
+		gateway.OnCancelOrder(order, strategies[strategyIndex].GetStrategyUuid());
+
+		return true;
+	}
+
+	bool HasMagicNumber(ulong magic) {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			if (strategies[i].GetMagicNumber() == magic) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	bool IsEnabled() {
 		return isEnabled;
 	}
 
-	void SetBalance(double newBalance) {
-		balance = newBalance;
+	virtual void OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason) {
+		SEStrategy *strategy = GetStrategyByPrefix(order.GetSource());
+		string targetStrategyUuid = "";
+
+		if (strategy != NULL) {
+			strategy.OnCloseOrder(order, reason);
+			targetStrategyUuid = strategy.GetStrategyUuid();
+		}
+
+		gateway.OnCloseOrder(order, reason, targetStrategyUuid);
 	}
 
-	void SetName(string newName) {
-		name = newName;
+	virtual void OnDeinit() {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].OnDeinit();
+		}
 	}
 
-	void SetSymbol(string newSymbol) {
-		symbol = newSymbol;
+	virtual void OnEnd() {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].OnEnd();
+		}
 	}
 
-	void SetWeight(double newWeight) {
-		weight = newWeight;
+	virtual int OnInit() {
+		int strategyCount = ArraySize(strategies);
+
+		if (strategyCount == 0) {
+			logger.Info(
+				LOG_CODE_FRAMEWORK_INIT_SKIPPED,
+				StringFormat(
+					"Asset skipped (no strategies): %s",
+					name
+			));
+
+			return INIT_SUCCEEDED;
+		}
+
+		if (isEnabled && !RegisterEntities()) {
+			return INIT_FAILED;
+		}
+
+		int initResult = initializeStrategies(strategyCount);
+
+		if (initResult != INIT_SUCCEEDED) {
+			return initResult;
+		}
+
+		if (!isEnabled) {
+			return INIT_SUCCEEDED;
+		}
+
+		registerStrategiesWithMonitorSeed(strategyCount);
+
+		if (EnableMarketHistoryReport) {
+			createMarketSnapshotsReporter();
+		}
+
+		logger.Info(
+			LOG_CODE_FRAMEWORK_INIT_OK,
+			StringFormat(
+				"%s initialized | symbol: %s | strategies: %d | weight: %.4f | balance: %.2f",
+				name,
+				symbol,
+				strategyCount,
+				weight,
+				balance
+		));
+
+		gateway.Initialize(symbol, strategies);
+
+		SyncToMonitor(SNAPSHOT_ON_INIT);
+		SendHeartbeats();
+
+		return INIT_SUCCEEDED;
+	}
+
+	virtual void OnOpenOrder(EOrder &order) {
+		SEStrategy *strategy = GetStrategyByPrefix(order.GetSource());
+		string targetStrategyUuid = "";
+
+		if (strategy != NULL) {
+			strategy.OnOpenOrder(order);
+			targetStrategyUuid = strategy.GetStrategyUuid();
+		}
+
+		gateway.OnOpenOrder(order, targetStrategyUuid);
+	}
+
+	virtual void OnStartDay() {
+		if (CheckPointer(marketSnapshotsReporter) == POINTER_DYNAMIC) {
+			marketSnapshotsReporter.AddSnapshot(buildMarketSnapshot());
+		}
+
+		if (monitorSeedReporter != NULL) {
+			CollectMonitorSeedSnapshots(SNAPSHOT_ON_END_DAY);
+		}
+
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].OnStartDay();
+		}
+	}
+
+	virtual void OnStartHour() {
+		SendHeartbeats();
+
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].OnStartHour();
+		}
+	}
+
+	virtual void OnStartMinute() {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].OnStartMinute();
+		}
+	}
+
+	virtual int OnTesterInit() {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].OnTesterInit();
+		}
+
+		return INIT_SUCCEEDED;
+	}
+
+	virtual void OnTick() {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].OnTick();
+		}
+	}
+
+	virtual void OnTimer() {
+		if (ArraySize(strategies) == 0 || !isEnabled) {
+			return;
+		}
+
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].OnTimer();
+		}
+
+		gateway.ProcessEvents();
+	}
+
+	virtual void ProcessBarEvents() {
+		datetime m1BarOpen = iTime(symbol, PERIOD_M1, 0);
+
+		if (m1BarOpen > 0 && m1BarOpen != lastM1BarOpen) {
+			lastM1BarOpen = m1BarOpen;
+			if (m1Primed) {
+				OnStartMinute();
+			} else {
+				m1Primed = true;
+			}
+		}
+
+		datetime h1BarOpen = iTime(symbol, PERIOD_H1, 0);
+
+		if (h1BarOpen > 0 && h1BarOpen != lastH1BarOpen) {
+			lastH1BarOpen = h1BarOpen;
+			if (h1Primed) {
+				OnStartHour();
+			} else {
+				h1Primed = true;
+			}
+		}
+
+		datetime d1BarOpen = iTime(symbol, PERIOD_D1, 0);
+
+		if (d1BarOpen > 0 && d1BarOpen != lastD1BarOpen) {
+			lastD1BarOpen = d1BarOpen;
+			if (d1Primed) {
+				OnStartDay();
+			} else {
+				d1Primed = true;
+			}
+		}
+	}
+
+	void ProcessOrders() {
+		for (int i = 0; i < ArraySize(strategies); i++) {
+			strategies[i].ProcessOrders();
+		}
 	}
 
 	bool RegisterEntities() {
@@ -626,88 +611,13 @@ public:
 		return true;
 	}
 
-	bool registerAssetOnMonitor() {
-		string monitorAssetUuid = horizonMonitor.UpsertAsset(symbol);
-
-		if (monitorAssetUuid == "") {
-			logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, StringFormat(
-				"asset uuid missing | symbol=%s reason='horizonMonitor.UpsertAsset returned empty uuid'",
-				symbol
-			));
-			return false;
-		}
-
-		return true;
-	}
-
-	bool registerAssetOnGateway() {
-		string gatewayAssetUuid = horizonGateway.UpsertAsset(symbol);
-
-		if (gatewayAssetUuid == "") {
-			logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, StringFormat(
-				"asset uuid missing | symbol=%s reason='horizonGateway.UpsertAsset returned empty uuid'",
-				symbol
-			));
-			return false;
-		}
-
-		return true;
-	}
-
-	bool registerStrategyOnMonitor(SEStrategy *strategy) {
-		string monitorStrategyUuid = horizonMonitor.UpsertStrategy(
-			strategy.GetName(),
-			strategy.GetSymbol(),
-			strategy.GetPrefix(),
-			strategy.GetMagicNumber()
-		);
-
-		if (monitorStrategyUuid == "") {
-			logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, StringFormat(
-				"strategy uuid missing | strategy=%s magic=%llu reason='horizonMonitor.UpsertStrategy returned empty uuid'",
-				strategy.GetName(),
-				strategy.GetMagicNumber()
-			));
-			return false;
-		}
-
-		return true;
-	}
-
-	bool registerStrategyOnGateway(SEStrategy *strategy) {
-		string gatewayStrategyUuid = horizonGateway.UpsertStrategy(
-			strategy.GetName(),
-			strategy.GetSymbol(),
-			strategy.GetPrefix(),
-			strategy.GetMagicNumber()
-		);
-
-		if (gatewayStrategyUuid == "") {
-			logger.Error(LOG_CODE_CONFIG_MISSING_DEPENDENCY, StringFormat(
-				"strategy uuid missing | strategy=%s magic=%llu reason='horizonGateway.UpsertStrategy returned empty uuid'",
-				strategy.GetName(),
-				strategy.GetMagicNumber()
-			));
-			return false;
-		}
-
-		strategy.SetStrategyUuid(gatewayStrategyUuid);
-		return true;
-	}
-
-	void SyncToMonitor(string event) {
-		if (!horizonMonitor.IsEnabled()) {
+	void RegisterStrategyIf(bool enabled, SEStrategy *strategy) {
+		if (!enabled) {
+			delete strategy;
 			return;
 		}
 
-		string assetUuid = horizonMonitor.GetAssetUuid(symbol);
-		horizonMonitor.UpsertAssetMetadata(assetUuid, symbol);
-
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			strategies[i].SyncSnapshot(event);
-		}
-
-		StoreAssetSnapshot(assetUuid, event);
+		AddStrategy(strategy);
 	}
 
 	void SendHeartbeats() {
@@ -720,52 +630,62 @@ public:
 		}
 	}
 
-	void StoreAssetSnapshot(string assetUuid, string event) {
-		if (assetUuid == "") {
+	void SetBalance(double newBalance) {
+		balance = newBalance;
+	}
+
+	void SetName(string newName) {
+		name = newName;
+	}
+
+	void SetSymbol(string newSymbol) {
+		symbol = newSymbol;
+	}
+
+	void SetWeight(double newWeight) {
+		weight = newWeight;
+	}
+
+	void SyncToMonitor(ENUM_SNAPSHOT_EVENT event) {
+		if (!horizonMonitor.IsEnabled()) {
 			return;
 		}
 
-		double floatingPnl = 0;
-		double realizedPnl = 0;
+		string assetUuid = horizonMonitor.GetAssetUuid(symbol);
+		horizonMonitor.UpsertAssetMetadata(assetUuid, symbol);
 
 		for (int i = 0; i < ArraySize(strategies); i++) {
-			SEOrderBook *book = strategies[i].GetOrderBook();
-
-			for (int j = 0; j < book.GetOrdersCount(); j++) {
-				EOrder *order = book.GetOrderAtIndex(j);
-				if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
-					floatingPnl += order.GetFloatingPnL();
-				}
-			}
-
-			SEStatistics *stats = strategies[i].GetStatistics();
-			if (stats != NULL) {
-				realizedPnl += stats.GetClosedNav() - stats.GetInitialBalance();
-			}
+			strategies[i].SyncSnapshot(event);
 		}
 
-		double equity = balance + floatingPnl;
-		double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-		double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-		string profitCurrency = SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT);
-		double usdRate = GetAssetRate(profitCurrency);
-
-		horizonMonitor.StoreAssetSnapshot(assetUuid, balance, equity, floatingPnl, realizedPnl, bid, ask, usdRate, event);
+		storeAssetSnapshot(assetUuid, event);
 	}
 
-	void CollectMonitorSeedSnapshots(ENUM_SNAPSHOT_EVENT event) {
-		double totalFloatingPnl = 0;
-		double totalRealizedPnl = 0;
+private:
+	SSMarketSnapshot buildMarketSnapshot() {
+		SSMarketSnapshot snapshot;
+		double bid = 0;
+		double ask = 0;
+		readQuote(bid, ask);
 
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			if (strategies[i].IsPassive()) {
-				continue;
-			}
+		snapshot.timestamp = dtime.Timestamp();
+		snapshot.bid = bid;
+		snapshot.ask = ask;
+		snapshot.spread = ask - bid;
+		snapshot.rollingPerformance = RollingReturn(symbol, PERIOD_D1, ROLLING_PERIOD_DAYS, 0);
+		snapshot.rollingDrawdown = DrawdownFromPeak(symbol, PERIOD_D1, ROLLING_PERIOD_DAYS, 0);
+		snapshot.rollingVolatility = Volatility(symbol, PERIOD_D1, ROLLING_PERIOD_DAYS, 0);
+		return snapshot;
+	}
 
-			collectStrategySeedSnapshot(strategies[i], event, totalFloatingPnl, totalRealizedPnl);
-		}
+	void collectAssetSeedSnapshot(double totalFloatingPnl, double totalRealizedPnl, ENUM_SNAPSHOT_EVENT event) {
+		double equity = balance + totalFloatingPnl;
+		double bid = 0;
+		double ask = 0;
+		double usdRate = 0;
+		readMarketContext(bid, ask, usdRate);
 
-		collectAssetSeedSnapshot(totalFloatingPnl, totalRealizedPnl, event);
+		monitorSeedReporter.AddAssetSnapshot(symbol, balance, equity, totalFloatingPnl, totalRealizedPnl, bid, ask, usdRate, event, dtime.Timestamp());
 	}
 
 	void collectStrategySeedSnapshot(SEStrategy *strategy, ENUM_SNAPSHOT_EVENT event, double &totalFloatingPnl, double &totalRealizedPnl) {
@@ -798,35 +718,174 @@ public:
 		totalRealizedPnl += strategyRealizedPnl;
 	}
 
-	void collectAssetSeedSnapshot(double totalFloatingPnl, double totalRealizedPnl, ENUM_SNAPSHOT_EVENT event) {
-		double equity = balance + totalFloatingPnl;
-		double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-		double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-		string profitCurrency = SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT);
-		double usdRate = GetAssetRate(profitCurrency);
-
-		monitorSeedReporter.AddAssetSnapshot(symbol, balance, equity, totalFloatingPnl, totalRealizedPnl, bid, ask, usdRate, event, dtime.Timestamp());
+	void createMarketSnapshotsReporter() {
+		string marketReportName = StringFormat("%s_MARKET_Snapshots", symbol);
+		marketSnapshotsReporter = new SRReportOfMarketSnapshots(symbol, marketReportName);
 	}
 
-	void AggregateSnapshotData(
-		double &floatingPnl,
-		double &realizedPnl
-	) {
-		for (int i = 0; i < ArraySize(strategies); i++) {
-			SEOrderBook *book = strategies[i].GetOrderBook();
+	int initializeStrategies(int strategyCount) {
+		int activeCount = 0;
 
-			for (int j = 0; j < book.GetOrdersCount(); j++) {
-				EOrder *order = book.GetOrderAtIndex(j);
-				if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
-					floatingPnl += order.GetFloatingPnL();
-				}
-			}
-
-			SEStatistics *stats = strategies[i].GetStatistics();
-			if (stats != NULL) {
-				realizedPnl += stats.GetClosedNav() - stats.GetInitialBalance();
+		for (int i = 0; i < strategyCount; i++) {
+			if (!strategies[i].IsPassive()) {
+				activeCount++;
 			}
 		}
+
+		double weightPerStrategy = activeCount > 0 ? weight / activeCount : 0;
+		double balancePerStrategy = activeCount > 0 ? balance / activeCount : 0;
+
+		for (int i = 0; i < strategyCount; i++) {
+			if (strategies[i].IsPassive()) {
+				strategies[i].SetWeight(weight);
+				strategies[i].SetBalance(balance);
+			} else {
+				strategies[i].SetWeight(weightPerStrategy);
+				strategies[i].SetBalance(balancePerStrategy);
+			}
+
+			int result = strategies[i].OnInit();
+
+			if (result != INIT_SUCCEEDED) {
+				logger.Error(
+					LOG_CODE_FRAMEWORK_INIT_FAILED,
+					StringFormat(
+						"strategy init failed | strategy=%s",
+						strategies[i].GetName()
+				));
+				return INIT_FAILED;
+			}
+		}
+
+		return INIT_SUCCEEDED;
+	}
+
+	void readMarketContext(double &bid, double &ask, double &usdRate) {
+		readQuote(bid, ask);
+		string profitCurrency = SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT);
+		usdRate = GetAssetRate(profitCurrency);
+	}
+
+	void readQuote(double &bid, double &ask) {
+		bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+		ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+	}
+
+	bool registerAssetOnGateway() {
+		string gatewayAssetUuid = horizonGateway.UpsertAsset(symbol);
+
+		if (gatewayAssetUuid == "") {
+			logger.Error(
+				LOG_CODE_CONFIG_MISSING_DEPENDENCY,
+				StringFormat(
+					"asset uuid missing | symbol=%s reason='horizonGateway.UpsertAsset returned empty uuid'",
+					symbol
+			));
+			return false;
+		}
+
+		return true;
+	}
+
+	bool registerAssetOnMonitor() {
+		string monitorAssetUuid = horizonMonitor.UpsertAsset(symbol);
+
+		if (monitorAssetUuid == "") {
+			logger.Error(
+				LOG_CODE_CONFIG_MISSING_DEPENDENCY,
+				StringFormat(
+					"asset uuid missing | symbol=%s reason='horizonMonitor.UpsertAsset returned empty uuid'",
+					symbol
+			));
+			return false;
+		}
+
+		return true;
+	}
+
+	void registerStrategiesWithMonitorSeed(int strategyCount) {
+		if (monitorSeedReporter == NULL) {
+			return;
+		}
+
+		monitorSeedReporter.RegisterAsset(symbol);
+
+		for (int i = 0; i < strategyCount; i++) {
+			if (strategies[i].IsPassive()) {
+				continue;
+			}
+
+			monitorSeedReporter.RegisterStrategy(
+				strategies[i].GetName(),
+				symbol,
+				strategies[i].GetPrefix(),
+				strategies[i].GetMagicNumber()
+			);
+		}
+	}
+
+	bool registerStrategyOnGateway(SEStrategy *strategy) {
+		string gatewayStrategyUuid = horizonGateway.UpsertStrategy(
+			strategy.GetName(),
+			strategy.GetSymbol(),
+			strategy.GetPrefix(),
+			strategy.GetMagicNumber()
+		);
+
+		if (gatewayStrategyUuid == "") {
+			logger.Error(
+				LOG_CODE_CONFIG_MISSING_DEPENDENCY,
+				StringFormat(
+					"strategy uuid missing | strategy=%s magic=%llu reason='horizonGateway.UpsertStrategy returned empty uuid'",
+					strategy.GetName(),
+					strategy.GetMagicNumber()
+			));
+			return false;
+		}
+
+		strategy.SetStrategyUuid(gatewayStrategyUuid);
+		return true;
+	}
+
+	bool registerStrategyOnMonitor(SEStrategy *strategy) {
+		string monitorStrategyUuid = horizonMonitor.UpsertStrategy(
+			strategy.GetName(),
+			strategy.GetSymbol(),
+			strategy.GetPrefix(),
+			strategy.GetMagicNumber()
+		);
+
+		if (monitorStrategyUuid == "") {
+			logger.Error(
+				LOG_CODE_CONFIG_MISSING_DEPENDENCY,
+				StringFormat(
+					"strategy uuid missing | strategy=%s magic=%llu reason='horizonMonitor.UpsertStrategy returned empty uuid'",
+					strategy.GetName(),
+					strategy.GetMagicNumber()
+			));
+			return false;
+		}
+
+		return true;
+	}
+
+	void storeAssetSnapshot(string assetUuid, ENUM_SNAPSHOT_EVENT event) {
+		if (assetUuid == "") {
+			return;
+		}
+
+		double floatingPnl = 0;
+		double realizedPnl = 0;
+		AggregateSnapshotData(floatingPnl, realizedPnl);
+
+		double bid = 0;
+		double ask = 0;
+		double usdRate = 0;
+		readMarketContext(bid, ask, usdRate);
+
+		double equity = balance + floatingPnl;
+
+		horizonMonitor.StoreAssetSnapshot(assetUuid, balance, equity, floatingPnl, realizedPnl, bid, ask, usdRate, event);
 	}
 };
 

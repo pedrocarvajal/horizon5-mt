@@ -42,10 +42,12 @@ public:
 
 		collection.Flush();
 
-		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
-			"Exported %d log entries to %s",
-			entryCount,
-			collectionName
+		logger.Info(
+			LOG_CODE_STATS_EXPORT_FAILED,
+			StringFormat(
+				"Exported %d log entries to %s",
+				entryCount,
+				collectionName
 		));
 	}
 };

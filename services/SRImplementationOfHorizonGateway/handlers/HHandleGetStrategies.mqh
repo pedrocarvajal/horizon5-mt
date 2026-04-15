@@ -1,10 +1,14 @@
 #ifndef __H_HANDLE_GATEWAY_GET_STRATEGIES_MQH__
 #define __H_HANDLE_GATEWAY_GET_STRATEGIES_MQH__
 
-class SEAsset;
-
-void HandleGetStrategies(SGatewayEvent &event, HorizonGateway &gateway, SEAsset *&registeredAssets[], SELogger &eventLogger) {
-	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Event received | %s | id=%s", event.key, event.id));
+void SRImplementationOfHorizonGateway::handleGetStrategies(SGatewayEvent &event, SEAsset *&registeredAssets[]) {
+	logger.Info(
+		LOG_CODE_REMOTE_HTTP_ERROR,
+		StringFormat(
+			"Event received | %s | id=%s",
+			event.key,
+			event.id
+	));
 
 	JSON::Object ackBody;
 	SEventResponse response;
@@ -34,7 +38,13 @@ void HandleGetStrategies(SGatewayEvent &event, HorizonGateway &gateway, SEAsset 
 
 	ackBody.setProperty("strategies", strategiesArray);
 
-	eventLogger.Info(LOG_CODE_REMOTE_HTTP_ERROR, StringFormat("Event ack | %s | id=%s", event.key, event.id));
+	logger.Info(
+		LOG_CODE_REMOTE_HTTP_ERROR,
+		StringFormat(
+			"Event ack | %s | id=%s",
+			event.key,
+			event.id
+	));
 	gateway.AckEvent(event.id, ackBody);
 }
 

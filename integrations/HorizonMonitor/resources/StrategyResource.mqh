@@ -6,7 +6,8 @@
 #include "../../../helpers/HGetStrategyUuid.mqh"
 
 #include "../HorizonMonitorContext.mqh"
-#include "../helpers/HHasMonitorHttpFailed.mqh"
+
+#include "../../../services/SERequest/structs/SRequestResponse.mqh"
 
 #include "../structs/SStrategyMapping.mqh"
 
@@ -17,6 +18,23 @@ private:
 	EAccount account;
 
 	SStrategyMapping registeredStrategies[];
+
+	bool hasHttpFailed(SRequestResponse &response, const string failurePrefix) {
+		if (response.status >= 200 && response.status < 300) {
+			return false;
+		}
+
+		logger.Error(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			StringFormat(
+				"%s status=%d body='%s'",
+				failurePrefix,
+				response.status,
+				response.body
+		));
+
+		return true;
+	}
 
 	void registerStrategy(ulong magicNumber, string uuid) {
 		for (int i = 0; i < ArraySize(registeredStrategies); i++) {
@@ -68,12 +86,19 @@ public:
 		SRequestResponse response = context.Post("api/v1/strategy", body, false);
 
 		string failurePrefix = StringFormat("strategy upsert failed | name=%s magic=%llu", strategyName, magicNumber);
-		if (HasMonitorHttpFailed(response, logger, failurePrefix)) {
+		if (hasHttpFailed(response, failurePrefix)) {
 			return "";
 		}
 
 		registerStrategy(magicNumber, strategyUuid);
-		logger.Info(LOG_CODE_REMOTE_HTTP_OK, StringFormat("strategy registered | name=%s magic=%llu uuid=%s", strategyName, magicNumber, strategyUuid));
+		logger.Info(
+			LOG_CODE_REMOTE_HTTP_OK,
+			StringFormat(
+				"strategy registered | name=%s magic=%llu uuid=%s",
+				strategyName,
+				magicNumber,
+				strategyUuid
+		));
 
 		return strategyUuid;
 	}

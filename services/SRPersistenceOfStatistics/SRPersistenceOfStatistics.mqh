@@ -195,7 +195,10 @@ public:
 		delete json;
 
 		if (result) {
-			logger.Debug(LOG_CODE_PERSISTENCE_SAVE_FAILED, "Statistics saved to database");
+			logger.Debug(
+				LOG_CODE_PERSISTENCE_SAVE_FAILED,
+				"Statistics saved to database"
+			);
 		}
 
 		return result;
@@ -220,9 +223,15 @@ public:
 		delete document;
 
 		if (result) {
-			logger.Debug(LOG_CODE_PERSISTENCE_SAVE_FAILED, "Statistics restored from database");
+			logger.Debug(
+				LOG_CODE_PERSISTENCE_SAVE_FAILED,
+				"Statistics restored from database"
+			);
 		} else {
-			logger.Error(LOG_CODE_PERSISTENCE_LOAD_FAILED, "statistics load failed | reason='deserialize error'");
+			logger.Error(
+				LOG_CODE_PERSISTENCE_LOAD_FAILED,
+				"statistics load failed | reason='deserialize error'"
+			);
 		}
 
 		return result;

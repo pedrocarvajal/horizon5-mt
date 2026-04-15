@@ -45,7 +45,13 @@ public:
 			delete metadataEntries;
 		}
 
-		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat("Enrolled account %lld -> %s", tradingAccount.GetNumber(), accountUuid));
+		logger.Info(
+			LOG_CODE_STATS_EXPORT_FAILED,
+			StringFormat(
+				"Enrolled account %lld -> %s",
+				tradingAccount.GetNumber(),
+				accountUuid
+		));
 
 		return accountUuid;
 	}

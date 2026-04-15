@@ -39,7 +39,10 @@ public:
 		}
 
 		if (!HistorySelect(0, TimeCurrent())) {
-			logger.Error(LOG_CODE_PERSISTENCE_LOAD_FAILED, "deal history load failed | reason='order reconciliation'");
+			logger.Error(
+				LOG_CODE_PERSISTENCE_LOAD_FAILED,
+				"deal history load failed | reason='order reconciliation'"
+			);
 			return false;
 		}
 

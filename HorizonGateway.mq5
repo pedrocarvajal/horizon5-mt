@@ -1,6 +1,6 @@
 #property service
 #property copyright "Horizon5"
-#property version   "0.15"
+#property version   "0.16"
 #property strict
 
 #include "constants/COHorizonGateway.mqh"
@@ -57,9 +57,11 @@ void consumeAndForwardTradingEvents() {
 	int tradingCount = horizonGateway.ConsumeEvents(tradingKeys, "", tradingEvents, MAX_EVENTS_PER_POLL, "", false);
 
 	if (tradingCount > 0) {
-		gatewayLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, StringFormat(
-			"events consumed | event_type=trading count=%d",
-			tradingCount
+		gatewayLogger.Info(
+			LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+			StringFormat(
+				"events consumed | event_type=trading count=%d",
+				tradingCount
 		));
 	}
 
@@ -67,13 +69,15 @@ void consumeAndForwardTradingEvents() {
 		JSON::Object eventPayload;
 		tradingEvents[i].ToJson(eventPayload);
 		bool sent = SEMessageBus::Send(MB_CHANNEL_EVENTS_IN, tradingEvents[i].key, eventPayload);
-		gatewayLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, StringFormat(
-			"event forwarded | event_type=%s event_id=%s strategy_id=%s symbol=%s sent=%s",
-			tradingEvents[i].key,
-			tradingEvents[i].id,
-			tradingEvents[i].strategyId,
-			tradingEvents[i].symbol,
-			sent ? "ok" : "failed"
+		gatewayLogger.Info(
+			LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+			StringFormat(
+				"event forwarded | event_type=%s event_id=%s strategy_id=%s symbol=%s sent=%s",
+				tradingEvents[i].key,
+				tradingEvents[i].id,
+				tradingEvents[i].strategyId,
+				tradingEvents[i].symbol,
+				sent ? "ok" : "failed"
 		));
 	}
 }
@@ -88,10 +92,12 @@ void consumeAndForwardServiceEvents() {
 		JSON::Object eventPayload;
 		serviceEvents[i].ToJson(eventPayload);
 		SEMessageBus::Send(MB_CHANNEL_EVENTS_SERVICE, serviceEvents[i].key, eventPayload);
-		gatewayLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, StringFormat(
-			"event forwarded | event_type=%s event_id=%s channel=service",
-			serviceEvents[i].key,
-			serviceEvents[i].id
+		gatewayLogger.Info(
+			LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+			StringFormat(
+				"event forwarded | event_type=%s event_id=%s channel=service",
+				serviceEvents[i].key,
+				serviceEvents[i].id
 		));
 	}
 }
@@ -126,9 +132,11 @@ void processAckResponses() {
 		JSON::Object responseBody(responseJson);
 		horizonGateway.AckEventDirect(eventId, responseBody);
 
-		gatewayLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, StringFormat(
-			"event acked | event_id=%s",
-			eventId
+		gatewayLogger.Info(
+			LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+			StringFormat(
+				"event acked | event_id=%s",
+				eventId
 		));
 		SEMessageBus::Ack(MB_CHANNEL_EVENTS_OUT, ackMessages[i].sequence);
 	}
@@ -147,11 +155,13 @@ void logDiagnostics() {
 	int pendingEventsOut = SEMessageBus::GetPendingCount(MB_CHANNEL_EVENTS_OUT);
 	int pendingEventsService = SEMessageBus::GetPendingCount(MB_CHANNEL_EVENTS_SERVICE);
 
-	gatewayLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, StringFormat(
-		"queue diagnostics | events_in=%d events_out=%d events_service=%d",
-		pendingEventsIn,
-		pendingEventsOut,
-		pendingEventsService
+	gatewayLogger.Info(
+		LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+		StringFormat(
+			"queue diagnostics | events_in=%d events_out=%d events_service=%d",
+			pendingEventsIn,
+			pendingEventsOut,
+			pendingEventsService
 	));
 }
 
@@ -164,27 +174,41 @@ int OnStart() {
 	}
 
 	if (!horizonGateway.Initialize(HorizonGatewayUrl, HorizonGatewayEmail, HorizonGatewayPassword, IsLiveTrading())) {
-		gatewayLogger.Warning(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='gateway initialization failed'");
+		gatewayLogger.Warning(
+			LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+			"service idle | reason='gateway initialization failed'"
+		);
 		return 0;
 	}
 
 	if (horizonGateway.IsEnabled()) {
 		if (!horizonGateway.UpsertAccount()) {
-			gatewayLogger.Error(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='account registration failed'");
+			gatewayLogger.Error(
+				LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+				"service idle | reason='account registration failed'"
+			);
 			return 0;
 		}
 	}
 
 	if (!SEMessageBus::Initialize()) {
-		gatewayLogger.Error(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service idle | reason='message bus DLL initialization failed'");
+		gatewayLogger.Error(
+			LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+			"service idle | reason='message bus DLL initialization failed'"
+		);
 		return 0;
 	}
 
 	SEMessageBus::RegisterService(MB_SERVICE_GATEWAY);
-	gatewayLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
-		"service started | system=HorizonGateway version=0.15 built='2026-04-15 11:15:54'");
+	gatewayLogger.Info(
+		LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+		"service started | system=HorizonGateway version=0.16 built='2026-04-15 14:14:55'"
+	);
 
-	gatewayLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "main loop entered | system=HorizonGateway");
+	gatewayLogger.Info(
+		LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+		"main loop entered | system=HorizonGateway"
+	);
 
 	while (!IsStopped()) {
 		SEMessageBus::WaitForMessage(MB_CHANNEL_EVENTS_OUT, EVENT_POLL_INTERVAL_SECONDS * 1000);
@@ -197,7 +221,10 @@ int OnStart() {
 
 	SEMessageBus::UnregisterService(MB_SERVICE_GATEWAY);
 	SEMessageBus::Shutdown();
-	gatewayLogger.Info(LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE, "service stopped | system=HorizonGateway");
+	gatewayLogger.Info(
+		LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
+		"service stopped | system=HorizonGateway"
+	);
 
 	if (SELogger::GetGlobalEntryCount() > 0) {
 		string logEntries[];

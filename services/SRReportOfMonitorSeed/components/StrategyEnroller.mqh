@@ -53,7 +53,14 @@ public:
 			delete json;
 		}
 
-		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat("Enrolled strategy %s (%llu) -> %s", strategyName, magicNumber, strategyUuid));
+		logger.Info(
+			LOG_CODE_STATS_EXPORT_FAILED,
+			StringFormat(
+				"Enrolled strategy %s (%llu) -> %s",
+				strategyName,
+				magicNumber,
+				strategyUuid
+		));
 	}
 };
 

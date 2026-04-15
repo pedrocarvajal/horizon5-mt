@@ -43,7 +43,8 @@ public:
 	}
 
 	void Separator(string title) {
-		log(LOG_LEVEL_INFO, LOG_CODE_NONE, title + " -------------------------------- ");
+		const string separatorTail = " -------------------------------- ";
+		log(LOG_LEVEL_INFO, LOG_CODE_NONE, title + separatorTail);
 	}
 
 	void SetPrefix(string newPrefix) {
@@ -93,7 +94,7 @@ private:
 			return;
 		}
 
-		LogPersister::Append(LogFormatter::FormatPersistedEntry(level, code, prefix, message));
+		LogPersister::Append(LogFormatter::FormatPrintLine(level, code, prefix, message));
 	}
 };
 
