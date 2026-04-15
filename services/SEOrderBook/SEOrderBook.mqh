@@ -306,17 +306,21 @@ public:
 		double stopLoss = 0
 	) {
 		if (tradingStatus.isPaused) {
-			logger.Warning(LOG_CODE_TRADING_PAUSED, StringFormat(
-				"trading paused | symbol=%s reason='place order skipped'",
-				symbol
+			logger.Warning(
+				LOG_CODE_TRADING_PAUSED,
+				StringFormat(
+					"trading paused | symbol=%s reason='place order skipped'",
+					symbol
 			));
 			return NULL;
 		}
 
 		if (CheckPointer(listener) != POINTER_INVALID && !listener.IsTradable()) {
-			logger.Warning(LOG_CODE_STRATEGY_NOT_TRADABLE, StringFormat(
-				"trading paused | symbol=%s reason='strategy not tradable'",
-				symbol
+			logger.Warning(
+				LOG_CODE_STRATEGY_NOT_TRADABLE,
+				StringFormat(
+					"trading paused | symbol=%s reason='strategy not tradable'",
+					symbol
 			));
 			return NULL;
 		}

@@ -3,7 +3,9 @@
 
 #include "../../../interfaces/IRemoteLogger.mqh"
 
-#include "../../../helpers/HIsLiveTrading.mqh"
+#include "../../../helpers/HIsLiveEnvironment.mqh"
+
+#include "LogFormatter.mqh"
 
 class LogRemoteDispatcher {
 private:
@@ -26,7 +28,7 @@ public:
 		}
 
 		isDispatching = true;
-		remoteLogger.StoreLog(logSystem, level, prefix + ": " + message);
+		remoteLogger.StoreLog(logSystem, level, LogFormatter::FormatRemoteLine(prefix, message));
 		isDispatching = false;
 	}
 };

@@ -1,7 +1,7 @@
 #ifndef __PENDING_ENTRY_TRACKER_MQH__
 #define __PENDING_ENTRY_TRACKER_MQH__
 
-#include "structs/SPendingEntry.mqh"
+#include "../structs/SPendingEntry.mqh"
 
 class PendingEntryTracker {
 private:

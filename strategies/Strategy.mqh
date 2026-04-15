@@ -11,6 +11,8 @@
 
 #include "../helpers/sqx/HNormalizeLotSize.mqh"
 
+#include "../enums/ESnapshotEvent.mqh"
+
 #include "../interfaces/IStrategy.mqh"
 
 #include "../services/SELogger/SELogger.mqh"
@@ -162,10 +164,12 @@ public:
 
 		orderHistoryReporter.Export();
 
-		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
-			"order history exported | strategy=%s count=%d",
-			name,
-			orderHistoryReporter.GetOrderCount()
+		logger.Info(
+			LOG_CODE_STATS_EXPORT_FAILED,
+			StringFormat(
+				"order history exported | strategy=%s count=%d",
+				name,
+				orderHistoryReporter.GetOrderCount()
 		));
 	}
 
@@ -181,10 +185,12 @@ public:
 		strategySnapshotsReporter.AddSnapshot(statistics.GetDailySnapshot());
 		strategySnapshotsReporter.Export();
 
-		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
-			"snapshot history exported | strategy=%s count=%d",
-			name,
-			strategySnapshotsReporter.GetSnapshotCount()
+		logger.Info(
+			LOG_CODE_STATS_EXPORT_FAILED,
+			StringFormat(
+				"snapshot history exported | strategy=%s count=%d",
+				name,
+				strategySnapshotsReporter.GetSnapshotCount()
 		));
 	}
 
@@ -200,9 +206,12 @@ public:
 		}
 
 		if (orderLotSize == 0) {
-			logger.Warning(LOG_CODE_VALIDATION_VOLUME_INVALID, StringFormat(
-				"lot size invalid | strategy=%s symbol=%s reason='calculation returned zero'",
-				name, symbol
+			logger.Warning(
+				LOG_CODE_VALIDATION_VOLUME_INVALID,
+				StringFormat(
+					"lot size invalid | strategy=%s symbol=%s reason='calculation returned zero'",
+					name,
+					symbol
 			));
 			return 0;
 		}
@@ -210,9 +219,12 @@ public:
 		orderLotSize = NormalizeLotSize(orderLotSize, symbol);
 
 		if (orderLotSize == 0) {
-			logger.Warning(LOG_CODE_VALIDATION_LOT_BELOW_MIN, StringFormat(
-				"lot size below minimum | strategy=%s symbol=%s reason='normalized volume below broker minimum'",
-				name, symbol
+			logger.Warning(
+				LOG_CODE_VALIDATION_LOT_BELOW_MIN,
+				StringFormat(
+					"lot size below minimum | strategy=%s symbol=%s reason='normalized volume below broker minimum'",
+					name,
+					symbol
 			));
 			return 0;
 		}
@@ -462,7 +474,7 @@ public:
 		weight = newWeight;
 	}
 
-	void SyncSnapshot(string event) {
+	void SyncSnapshot(ENUM_SNAPSHOT_EVENT event) {
 		double floatingPnl = 0;
 
 		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
@@ -499,9 +511,11 @@ private:
 
 		tradingStatus.isPaused = true;
 		tradingStatus.reason = TRADING_PAUSE_REASON_MANUAL_CLOSE;
-		logger.Warning(LOG_CODE_TRADING_PAUSED, StringFormat(
-			"trading paused | strategy=%s reason='manual close detected' until='next day'",
-			name
+		logger.Warning(
+			LOG_CODE_TRADING_PAUSED,
+			StringFormat(
+				"trading paused | strategy=%s reason='manual close detected' until='next day'",
+				name
 		));
 	}
 
@@ -543,18 +557,22 @@ private:
 
 		for (int i = 0; i < ArraySize(reconciledOrders); i++) {
 			horizonMonitor.UpsertOrder(reconciledOrders[i]);
-			logger.Info(LOG_CODE_ORDER_RESTORED, StringFormat(
-				"order reconciled | strategy=%s order_id=%s target=monitor",
-				name,
-				reconciledOrders[i].GetId()
+			logger.Info(
+				LOG_CODE_ORDER_RESTORED,
+				StringFormat(
+					"order reconciled | strategy=%s order_id=%s target=monitor",
+					name,
+					reconciledOrders[i].GetId()
 			));
 		}
 
 		if (totalRestored > 0) {
-			logger.Info(LOG_CODE_ORDER_RESTORED, StringFormat(
-				"orders restored | strategy=%s count=%d",
-				name,
-				totalRestored
+			logger.Info(
+				LOG_CODE_ORDER_RESTORED,
+				StringFormat(
+					"orders restored | strategy=%s count=%d",
+					name,
+					totalRestored
 			));
 		}
 
@@ -563,33 +581,42 @@ private:
 
 	int validateConfiguration() {
 		if (name == "") {
-			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, "configuration invalid | field=name reason='strategy name not defined'");
+			logger.Error(
+				LOG_CODE_CONFIG_INVALID_PARAMETER,
+				"configuration invalid | field=name reason='strategy name not defined'"
+			);
 
 			return INIT_FAILED;
 		}
 
 		if (symbol == "") {
-			logger.Error(LOG_CODE_CONFIG_INVALID_SYMBOL, StringFormat(
-				"configuration invalid | strategy=%s field=symbol reason='symbol not defined'",
-				name
+			logger.Error(
+				LOG_CODE_CONFIG_INVALID_SYMBOL,
+				StringFormat(
+					"configuration invalid | strategy=%s field=symbol reason='symbol not defined'",
+					name
 			));
 
 			return INIT_FAILED;
 		}
 
 		if (prefix == "") {
-			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, StringFormat(
-				"configuration invalid | strategy=%s field=prefix reason='prefix not defined'",
-				name
+			logger.Error(
+				LOG_CODE_CONFIG_INVALID_PARAMETER,
+				StringFormat(
+					"configuration invalid | strategy=%s field=prefix reason='prefix not defined'",
+					name
 			));
 
 			return INIT_FAILED;
 		}
 
 		if (strategyMagicNumber == 0) {
-			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, StringFormat(
-				"configuration invalid | strategy=%s field=magic_number reason='magic number not defined'",
-				name
+			logger.Error(
+				LOG_CODE_CONFIG_INVALID_PARAMETER,
+				StringFormat(
+					"configuration invalid | strategy=%s field=magic_number reason='magic number not defined'",
+					name
 			));
 
 			return INIT_FAILED;
@@ -600,18 +627,23 @@ private:
 		}
 
 		if (balance <= 0) {
-			logger.Error(LOG_CODE_CONFIG_INVALID_PARAMETER, StringFormat(
-				"configuration invalid | strategy=%s field=balance reason='balance not defined'",
-				name
+			logger.Error(
+				LOG_CODE_CONFIG_INVALID_PARAMETER,
+				StringFormat(
+					"configuration invalid | strategy=%s field=balance reason='balance not defined'",
+					name
 			));
 
 			return INIT_FAILED;
 		}
 
 		if (!SymbolSelect(symbol, true)) {
-			logger.Error(LOG_CODE_CONFIG_INVALID_SYMBOL, StringFormat(
-				"configuration invalid | strategy=%s symbol=%s reason='symbol not available in market watch'",
-				name, symbol
+			logger.Error(
+				LOG_CODE_CONFIG_INVALID_SYMBOL,
+				StringFormat(
+					"configuration invalid | strategy=%s symbol=%s reason='symbol not available in market watch'",
+					name,
+					symbol
 			));
 
 			return INIT_FAILED;

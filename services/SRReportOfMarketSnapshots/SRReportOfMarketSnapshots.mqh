@@ -35,10 +35,12 @@ public:
 	void Export() {
 		marketCollection.Flush();
 
-		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
-			"Market history saved - %s.json with %d snapshots",
-			reportName,
-			marketCollection.Count()
+		logger.Info(
+			LOG_CODE_STATS_EXPORT_FAILED,
+			StringFormat(
+				"Market history saved - %s.json with %d snapshots",
+				reportName,
+				marketCollection.Count()
 		));
 	}
 

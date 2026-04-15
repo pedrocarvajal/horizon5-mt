@@ -46,7 +46,12 @@ public:
 
 		if (result) {
 			ordersCollection.Flush();
-			logger.Debug(LOG_CODE_PERSISTENCE_SAVE_FAILED, StringFormat("Order deleted from database: %s", orderId));
+			logger.Debug(
+				LOG_CODE_PERSISTENCE_SAVE_FAILED,
+				StringFormat(
+					"Order deleted from database: %s",
+					orderId
+			));
 		}
 
 		return result;
@@ -106,7 +111,12 @@ public:
 
 		if (result) {
 			ordersCollection.Flush();
-			logger.Debug(LOG_CODE_PERSISTENCE_SAVE_FAILED, StringFormat("Order saved to database: %s", order.GetId()));
+			logger.Debug(
+				LOG_CODE_PERSISTENCE_SAVE_FAILED,
+				StringFormat(
+					"Order saved to database: %s",
+					order.GetId()
+			));
 		}
 
 		return result;

@@ -53,9 +53,11 @@ public:
 		int loadedCount = persistence.LoadOrders(loadedOrders);
 
 		if (loadedCount == -1) {
-			logger.Error(LOG_CODE_PERSISTENCE_LOAD_FAILED, StringFormat(
-				"orders restore failed | strategy=%s reason='persistence load error'",
-				prefix
+			logger.Error(
+				LOG_CODE_PERSISTENCE_LOAD_FAILED,
+				StringFormat(
+					"orders restore failed | strategy=%s reason='persistence load error'",
+					prefix
 			));
 			return -1;
 		}
@@ -89,10 +91,12 @@ public:
 		ArrayResize(reconciledOrders, reconciledOffset + reconciledCount);
 
 		if (activeCount > 0) {
-			logger.Info(LOG_CODE_ORDER_RESTORED, StringFormat(
-				"orders restored | strategy=%s count=%d",
-				prefix,
-				activeCount
+			logger.Info(
+				LOG_CODE_ORDER_RESTORED,
+				StringFormat(
+					"orders restored | strategy=%s count=%d",
+					prefix,
+					activeCount
 			));
 		}
 

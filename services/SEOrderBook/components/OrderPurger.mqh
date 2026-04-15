@@ -66,9 +66,11 @@ public:
 				}
 			}
 
-			logger.Info(LOG_CODE_ORDER_PURGED, StringFormat(
-				"orders purged | count=%d",
-				purged
+			logger.Info(
+				LOG_CODE_ORDER_PURGED,
+				StringFormat(
+					"orders purged | count=%d",
+					purged
 			));
 		}
 	}

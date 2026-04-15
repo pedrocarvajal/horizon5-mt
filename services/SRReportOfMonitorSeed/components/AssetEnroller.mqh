@@ -54,7 +54,13 @@ public:
 			delete metadataEntries;
 		}
 
-		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat("Enrolled asset %s -> %s", symbolName, assetUuid));
+		logger.Info(
+			LOG_CODE_STATS_EXPORT_FAILED,
+			StringFormat(
+				"Enrolled asset %s -> %s",
+				symbolName,
+				assetUuid
+		));
 	}
 };
 

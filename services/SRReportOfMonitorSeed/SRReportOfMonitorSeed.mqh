@@ -110,14 +110,16 @@ public:
 		assetSnapshotsCollection.Flush();
 		strategySnapshotsCollection.Flush();
 
-		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
-			"Monitor seed exported | accounts: %d | assets: %d | strategies: %d | metadata: %d | orders: %d | snapshots: %d",
-			accountsCollection.Count(),
-			assetsCollection.Count(),
-			strategiesCollection.Count(),
-			accountMetadataCollection.Count() + assetMetadataCollection.Count(),
-			ordersCollection.Count(),
-			accountSnapshotsCollection.Count() + assetSnapshotsCollection.Count() + strategySnapshotsCollection.Count()
+		logger.Info(
+			LOG_CODE_STATS_EXPORT_FAILED,
+			StringFormat(
+				"Monitor seed exported | accounts: %d | assets: %d | strategies: %d | metadata: %d | orders: %d | snapshots: %d",
+				accountsCollection.Count(),
+				assetsCollection.Count(),
+				strategiesCollection.Count(),
+				accountMetadataCollection.Count() + assetMetadataCollection.Count(),
+				ordersCollection.Count(),
+				accountSnapshotsCollection.Count() + assetSnapshotsCollection.Count() + strategySnapshotsCollection.Count()
 		));
 	}
 
@@ -128,7 +130,12 @@ public:
 		initializeCollections();
 		initializeComponents();
 
-		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat("Initialized with report path: %s", reportsDir));
+		logger.Info(
+			LOG_CODE_STATS_EXPORT_FAILED,
+			StringFormat(
+				"Initialized with report path: %s",
+				reportsDir
+		));
 	}
 
 	void RegisterAccount() {

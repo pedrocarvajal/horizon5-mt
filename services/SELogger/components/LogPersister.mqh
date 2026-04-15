@@ -13,12 +13,7 @@ public:
 	}
 
 	static void GetAll(string &result[]) {
-		int size = ArraySize(entries);
-		ArrayResize(result, size);
-
-		for (int i = 0; i < size; i++) {
-			result[i] = entries[i];
-		}
+		ArrayCopy(result, entries);
 	}
 
 	static int GetCount() {

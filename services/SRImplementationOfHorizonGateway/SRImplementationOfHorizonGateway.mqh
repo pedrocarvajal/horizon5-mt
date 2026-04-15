@@ -7,24 +7,20 @@
 
 #include "../../constants/COMessageBus.mqh"
 
+#include "../../entities/EAccount.mqh"
+
 #include "../../integrations/HorizonGateway/HorizonGateway.mqh"
 #include "../../integrations/HorizonGateway/structs/SEventResponse.mqh"
+#include "../../integrations/HorizonGateway/structs/SGatewayEvent.mqh"
 
 #include "../../structs/STradingStatus.mqh"
 
 #include "../../helpers/HClampNumeric.mqh"
 #include "../../helpers/HMapTimeframe.mqh"
 
-#include "handlers/HAckServiceEventError.mqh"
-#include "handlers/HHandleGetAccountInfo.mqh"
-#include "handlers/HHandleGetTicker.mqh"
-#include "handlers/HHandleGetKlines.mqh"
-#include "handlers/HHandleGetAssets.mqh"
-#include "handlers/HHandleGetStrategies.mqh"
-#include "handlers/HHandlePatchAccountDisable.mqh"
-#include "handlers/HHandlePatchAccountEnable.mqh"
-
 extern STradingStatus tradingStatus;
+
+class SEAsset;
 
 class SRImplementationOfHorizonGateway {
 private:
@@ -99,24 +95,45 @@ public:
 			delete payload;
 
 			if (event.key == "get.account.info") {
-				HandleGetAccountInfo(event, gateway, logger);
+				handleGetAccountInfo(event);
 			} else if (event.key == "get.assets") {
-				HandleGetAssets(event, gateway, registeredAssets, logger);
+				handleGetAssets(event, registeredAssets);
 			} else if (event.key == "get.strategies") {
-				HandleGetStrategies(event, gateway, registeredAssets, logger);
+				handleGetStrategies(event, registeredAssets);
 			} else if (event.key == "get.ticker") {
-				HandleGetTicker(event, gateway, logger);
+				handleGetTicker(event);
 			} else if (event.key == "get.klines") {
-				HandleGetKlines(event, gateway, logger);
+				handleGetKlines(event);
 			} else if (event.key == "patch.account.disable") {
-				HandlePatchAccountDisable(event, gateway, logger, tradingStatus);
+				handlePatchAccountDisable(event);
 			} else if (event.key == "patch.account.enable") {
-				HandlePatchAccountEnable(event, gateway, logger, tradingStatus);
+				handlePatchAccountEnable(event);
 			}
 
 			SEMessageBus::Ack(MB_CHANNEL_EVENTS_SERVICE, messages[i].sequence);
 		}
 	}
+
+private:
+	void ackServiceEventError(SGatewayEvent &event, string message);
+
+	void handleGetAccountInfo(SGatewayEvent &event);
+	void handleGetAssets(SGatewayEvent &event, SEAsset *&registeredAssets[]);
+	void handleGetStrategies(SGatewayEvent &event, SEAsset *&registeredAssets[]);
+	void handleGetTicker(SGatewayEvent &event);
+	void handleGetKlines(SGatewayEvent &event);
+	void handlePatchAccountDisable(SGatewayEvent &event);
+	void handlePatchAccountEnable(SGatewayEvent &event);
 };
+
+#include "handlers/HAckServiceEventError.mqh"
+
+#include "handlers/HHandleGetAccountInfo.mqh"
+#include "handlers/HHandleGetAssets.mqh"
+#include "handlers/HHandleGetStrategies.mqh"
+#include "handlers/HHandleGetTicker.mqh"
+#include "handlers/HHandleGetKlines.mqh"
+#include "handlers/HHandlePatchAccountDisable.mqh"
+#include "handlers/HHandlePatchAccountEnable.mqh"
 
 #endif

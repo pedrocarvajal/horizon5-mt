@@ -22,7 +22,10 @@ public:
 		int result = MbInit();
 
 		if (result != 1) {
-			logger.Error(LOG_CODE_FRAMEWORK_INIT_FAILED, "message bus init failed | reason='dll initialization failed'");
+			logger.Error(
+				LOG_CODE_FRAMEWORK_INIT_FAILED,
+				"message bus init failed | reason='dll initialization failed'"
+			);
 			return false;
 		}
 
@@ -46,7 +49,12 @@ public:
 		int channelId = MbChannelGetOrCreate(channel);
 
 		if (channelId < 0) {
-			logger.Error(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat("message bus channel failed | channel=%s reason='get or create failed'", channel));
+			logger.Error(
+				LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+				StringFormat(
+					"message bus channel failed | channel=%s reason='get or create failed'",
+					channel
+			));
 			return false;
 		}
 
@@ -54,7 +62,12 @@ public:
 		long sequence = MbPublish(channelId, messageType, payloadStr);
 
 		if (sequence < 0) {
-			logger.Error(LOG_CODE_FRAMEWORK_INTERNAL_ERROR, StringFormat("message bus publish failed | channel=%s", channel));
+			logger.Error(
+				LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
+				StringFormat(
+					"message bus publish failed | channel=%s",
+					channel
+			));
 			return false;
 		}
 

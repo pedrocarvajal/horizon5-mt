@@ -68,10 +68,12 @@ public:
 	void Export() {
 		ordersCollection.Flush();
 
-		logger.Info(LOG_CODE_STATS_EXPORT_FAILED, StringFormat(
-			"Order history saved - %s.json with %d orders",
-			reportName,
-			ordersCollection.Count()
+		logger.Info(
+			LOG_CODE_STATS_EXPORT_FAILED,
+			StringFormat(
+				"Order history saved - %s.json with %d orders",
+				reportName,
+				ordersCollection.Count()
 		));
 	}
 

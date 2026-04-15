@@ -3,9 +3,11 @@
 
 #include "../../../helpers/HClampNumeric.mqh"
 #include "../../../helpers/HGetAssetUuid.mqh"
+#include "../../../helpers/HGetSnapshotEvent.mqh"
 
 #include "../HorizonMonitorContext.mqh"
-#include "../helpers/HHasMonitorHttpFailed.mqh"
+
+#include "../../../services/SERequest/structs/SRequestResponse.mqh"
 
 #include "../structs/SAssetMapping.mqh"
 
@@ -15,6 +17,23 @@ private:
 	SELogger logger;
 
 	SAssetMapping registeredAssets[];
+
+	bool hasHttpFailed(SRequestResponse &response, const string failurePrefix) {
+		if (response.status >= 200 && response.status < 300) {
+			return false;
+		}
+
+		logger.Error(
+			LOG_CODE_REMOTE_HTTP_ERROR,
+			StringFormat(
+				"%s status=%d body='%s'",
+				failurePrefix,
+				response.status,
+				response.body
+		));
+
+		return true;
+	}
 
 	void registerAsset(string symbolName, string uuid) {
 		for (int i = 0; i < ArraySize(registeredAssets); i++) {
@@ -59,12 +78,18 @@ public:
 		SRequestResponse response = context.Post("api/v1/asset", body, false);
 
 		string failurePrefix = StringFormat("asset upsert failed | symbol=%s", symbolName);
-		if (HasMonitorHttpFailed(response, logger, failurePrefix)) {
+		if (hasHttpFailed(response, failurePrefix)) {
 			return "";
 		}
 
 		registerAsset(symbolName, assetUuid);
-		logger.Info(LOG_CODE_REMOTE_HTTP_OK, StringFormat("asset registered | symbol=%s uuid=%s", symbolName, assetUuid));
+		logger.Info(
+			LOG_CODE_REMOTE_HTTP_OK,
+			StringFormat(
+				"asset registered | symbol=%s uuid=%s",
+				symbolName,
+				assetUuid
+		));
 
 		return assetUuid;
 	}
@@ -78,7 +103,7 @@ public:
 		double bid,
 		double ask,
 		double usdRate,
-		string event
+		ENUM_SNAPSHOT_EVENT event
 	) {
 		JSON::Object body;
 		body.setProperty("asset_id", assetUuid);
@@ -89,7 +114,7 @@ public:
 		body.setProperty("bid", ClampNumeric(bid, 10, 5));
 		body.setProperty("ask", ClampNumeric(ask, 10, 5));
 		body.setProperty("usd_rate", ClampNumeric(usdRate, 7, 8));
-		body.setProperty("event", event);
+		body.setProperty("event", GetSnapshotEvent(event));
 
 		context.Post("api/v1/assets/snapshots", body);
 	}

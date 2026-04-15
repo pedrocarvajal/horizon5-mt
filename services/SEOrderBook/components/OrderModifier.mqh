@@ -48,12 +48,14 @@ public:
 		}
 
 		if (order.GetStatus() != ORDER_STATUS_OPEN) {
-			logger.Warning(LOG_CODE_ORDER_MODIFY_REJECTED, StringFormat(
-				"order modify rejected | symbol=%s order_id=%s status=%d change=%s reason='order not open'",
-				symbol,
-				order.GetId(),
-				order.GetStatus(),
-				describeChange(hasStopLoss, hasTakeProfit)
+			logger.Warning(
+				LOG_CODE_ORDER_MODIFY_REJECTED,
+				StringFormat(
+					"order modify rejected | symbol=%s order_id=%s status=%d change=%s reason='order not open'",
+					symbol,
+					order.GetId(),
+					order.GetStatus(),
+					describeChange(hasStopLoss, hasTakeProfit)
 			));
 			return false;
 		}
@@ -63,14 +65,16 @@ public:
 		STradeResult result = trade.ModifyStopLossAndTakeProfit(newStopLossPrice, newTakeProfitPrice, magicNumber);
 
 		if (result.severity != TRADE_SEVERITY_SUCCESS) {
-			logger.Error(GetTradeRetcodeLogCode(result.retcode), StringFormat(
-				"order modify failed | symbol=%s order_id=%s position_id=%llu change=%s error=%d reason='%s'",
-				symbol,
-				order.GetId(),
-				order.GetPositionId(),
-				describeChange(hasStopLoss, hasTakeProfit),
-				result.retcode,
-				ATrade::DescribeRetcode(result.retcode)
+			logger.Error(
+				GetTradeRetcodeLogCode(result.retcode),
+				StringFormat(
+					"order modify failed | symbol=%s order_id=%s position_id=%llu change=%s error=%d reason='%s'",
+					symbol,
+					order.GetId(),
+					order.GetPositionId(),
+					describeChange(hasStopLoss, hasTakeProfit),
+					result.retcode,
+					ATrade::DescribeRetcode(result.retcode)
 			));
 			return false;
 		}
@@ -78,33 +82,39 @@ public:
 		int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
 
 		if (hasStopLoss && hasTakeProfit) {
-			logger.Info(LOG_CODE_ORDER_MODIFIED, StringFormat(
-				"order sl/tp modified | symbol=%s order_id=%s position_id=%llu sl=%.*f tp=%.*f",
-				symbol,
-				order.GetId(),
-				order.GetPositionId(),
-				digits,
-				newStopLossPrice,
-				digits,
-				newTakeProfitPrice
+			logger.Info(
+				LOG_CODE_ORDER_MODIFIED,
+				StringFormat(
+					"order sl/tp modified | symbol=%s order_id=%s position_id=%llu sl=%.*f tp=%.*f",
+					symbol,
+					order.GetId(),
+					order.GetPositionId(),
+					digits,
+					newStopLossPrice,
+					digits,
+					newTakeProfitPrice
 			));
 		} else if (hasStopLoss) {
-			logger.Info(LOG_CODE_ORDER_MODIFIED, StringFormat(
-				"order sl modified | symbol=%s order_id=%s position_id=%llu sl=%.*f",
-				symbol,
-				order.GetId(),
-				order.GetPositionId(),
-				digits,
-				newStopLossPrice
+			logger.Info(
+				LOG_CODE_ORDER_MODIFIED,
+				StringFormat(
+					"order sl modified | symbol=%s order_id=%s position_id=%llu sl=%.*f",
+					symbol,
+					order.GetId(),
+					order.GetPositionId(),
+					digits,
+					newStopLossPrice
 			));
 		} else {
-			logger.Info(LOG_CODE_ORDER_MODIFIED, StringFormat(
-				"order tp modified | symbol=%s order_id=%s position_id=%llu tp=%.*f",
-				symbol,
-				order.GetId(),
-				order.GetPositionId(),
-				digits,
-				newTakeProfitPrice
+			logger.Info(
+				LOG_CODE_ORDER_MODIFIED,
+				StringFormat(
+					"order tp modified | symbol=%s order_id=%s position_id=%llu tp=%.*f",
+					symbol,
+					order.GetId(),
+					order.GetPositionId(),
+					digits,
+					newTakeProfitPrice
 			));
 		}
 

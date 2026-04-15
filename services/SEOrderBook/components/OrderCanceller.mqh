@@ -10,8 +10,8 @@
 
 #include "../../../enums/EOrderStatuses.mqh"
 
-#include "../../../helpers/HIsMarketClosed.mqh"
-#include "../../../helpers/HResolveTransientDefer.mqh"
+#include "../../../helpers/HGetMarketStatus.mqh"
+#include "../../../helpers/HResolveTransientDeferSeconds.mqh"
 #include "../../../helpers/HTradeRetcodeToLogCode.mqh"
 
 #include "../../../interfaces/IStrategy.mqh"
@@ -66,11 +66,13 @@ public:
 		}
 
 		if (retry.count >= MAX_RETRY_COUNT_CANCEL) {
-			logger.Error(LOG_CODE_ORDER_RETRY_EXHAUSTED, StringFormat(
-				"order retry exhausted | symbol=%s order_id=%s retry=%d reason='max cancel retries reached'",
-				symbol,
-				order.GetId(),
-				retry.count
+			logger.Error(
+				LOG_CODE_ORDER_RETRY_EXHAUSTED,
+				StringFormat(
+					"order retry exhausted | symbol=%s order_id=%s retry=%d reason='max cancel retries reached'",
+					symbol,
+					order.GetId(),
+					retry.count
 			));
 			finalizer.FinalizeCancelled(order);
 			return;
@@ -87,11 +89,13 @@ public:
 			if (retry.retryable) {
 				retry.after = dtime.Timestamp() + marketStatus.opensInSeconds;
 				order.SetCancelRetry(retry);
-				logger.Warning(LOG_CODE_ORDER_RETRY_SCHEDULED, StringFormat(
-					"cancel retry scheduled | symbol=%s order_id=%s reason='market closed' retry_in_s=%d",
-					symbol,
-					order.GetId(),
-					marketStatus.opensInSeconds
+				logger.Warning(
+					LOG_CODE_ORDER_RETRY_SCHEDULED,
+					StringFormat(
+						"cancel retry scheduled | symbol=%s order_id=%s reason='market closed' retry_in_s=%d",
+						symbol,
+						order.GetId(),
+						marketStatus.opensInSeconds
 				));
 				return;
 			}
@@ -101,21 +105,25 @@ public:
 		}
 
 		if (order.GetOrderId() == 0) {
-			logger.Warning(LOG_CODE_ORDER_CANCEL_FAILED, StringFormat(
-				"order cancel failed | symbol=%s order_id=%s reason='invalid order ticket'",
-				symbol,
-				order.GetId()
+			logger.Warning(
+				LOG_CODE_ORDER_CANCEL_FAILED,
+				StringFormat(
+					"order cancel failed | symbol=%s order_id=%s reason='invalid order ticket'",
+					symbol,
+					order.GetId()
 			));
 			finalizer.FinalizeCancelled(order);
 			return;
 		}
 
 		if (!OrderSelect(order.GetOrderId())) {
-			logger.Info(LOG_CODE_ORDER_CANCELLED, StringFormat(
-				"order cancelled | symbol=%s order_id=%s order_ticket=%llu reason='order no longer exists'",
-				symbol,
-				order.GetId(),
-				order.GetOrderId()
+			logger.Info(
+				LOG_CODE_ORDER_CANCELLED,
+				StringFormat(
+					"order cancelled | symbol=%s order_id=%s order_ticket=%llu reason='order no longer exists'",
+					symbol,
+					order.GetId(),
+					order.GetOrderId()
 			));
 			finalizer.FinalizeCancelled(order);
 			return;
@@ -132,12 +140,14 @@ public:
 			retry.after = dtime.Timestamp() + CANCEL_VALIDATION_RETRY_DEFER_SECONDS;
 			order.SetCancelRetry(retry);
 			order.SetPendingToClose(true);
-			logger.Warning(LOG_CODE_ORDER_RETRY_SCHEDULED, StringFormat(
-				"cancel retry scheduled | symbol=%s order_id=%s retry=%d reason='validation failed' retry_in_s=%d",
-				symbol,
-				order.GetId(),
-				retry.count,
-				CANCEL_VALIDATION_RETRY_DEFER_SECONDS
+			logger.Warning(
+				LOG_CODE_ORDER_RETRY_SCHEDULED,
+				StringFormat(
+					"cancel retry scheduled | symbol=%s order_id=%s retry=%d reason='validation failed' retry_in_s=%d",
+					symbol,
+					order.GetId(),
+					retry.count,
+					CANCEL_VALIDATION_RETRY_DEFER_SECONDS
 			));
 			return;
 		}
@@ -145,11 +155,13 @@ public:
 		STradeResult result = trade.Cancel(order.GetOrderId());
 
 		if (result.severity == TRADE_SEVERITY_SUCCESS) {
-			logger.Info(LOG_CODE_ORDER_CANCEL_QUEUED, StringFormat(
-				"order cancel queued | symbol=%s order_id=%s order_ticket=%llu",
-				symbol,
-				order.GetId(),
-				order.GetOrderId()
+			logger.Info(
+				LOG_CODE_ORDER_CANCEL_QUEUED,
+				StringFormat(
+					"order cancel queued | symbol=%s order_id=%s order_ticket=%llu",
+					symbol,
+					order.GetId(),
+					order.GetOrderId()
 			));
 			order.SetStatus(ORDER_STATUS_CLOSING);
 			order.SetPendingToOpen(false);
@@ -177,25 +189,29 @@ public:
 			retry.after = dtime.Timestamp() + deferSeconds;
 			order.SetCancelRetry(retry);
 			order.SetPendingToClose(true);
-			logger.Warning(GetTradeRetcodeLogCode(result.retcode), StringFormat(
-				"cancel retry scheduled | symbol=%s order_id=%s reason='%s' retry_in_s=%d",
-				symbol,
-				order.GetId(),
-				ATrade::DescribeRetcode(result.retcode),
-				deferSeconds
+			logger.Warning(
+				GetTradeRetcodeLogCode(result.retcode),
+				StringFormat(
+					"cancel retry scheduled | symbol=%s order_id=%s reason='%s' retry_in_s=%d",
+					symbol,
+					order.GetId(),
+					ATrade::DescribeRetcode(result.retcode),
+					deferSeconds
 			));
 			return;
 		}
 
 		SOrderRetryState retry = order.GetCancelRetry();
 		if (!retry.retryable) {
-			logger.Error(GetTradeRetcodeLogCode(result.retcode), StringFormat(
-				"order cancel dropped | symbol=%s order_id=%s order_ticket=%llu error=%d reason='%s'",
-				symbol,
-				order.GetId(),
-				order.GetOrderId(),
-				result.retcode,
-				ATrade::DescribeRetcode(result.retcode)
+			logger.Error(
+				GetTradeRetcodeLogCode(result.retcode),
+				StringFormat(
+					"order cancel dropped | symbol=%s order_id=%s order_ticket=%llu error=%d reason='%s'",
+					symbol,
+					order.GetId(),
+					order.GetOrderId(),
+					result.retcode,
+					ATrade::DescribeRetcode(result.retcode)
 			));
 			order.SetPendingToClose(false);
 			retry.Reset();
@@ -207,14 +223,16 @@ public:
 		retry.after = dtime.Timestamp() + TRANSIENT_DEFER_DEFAULT_SECONDS;
 		order.SetCancelRetry(retry);
 		order.SetPendingToClose(true);
-		logger.Error(GetTradeRetcodeLogCode(result.retcode), StringFormat(
-			"order cancel failed | symbol=%s order_id=%s order_ticket=%llu retry=%d error=%d reason='%s'",
-			symbol,
-			order.GetId(),
-			order.GetOrderId(),
-			retry.count,
-			result.retcode,
-			ATrade::DescribeRetcode(result.retcode)
+		logger.Error(
+			GetTradeRetcodeLogCode(result.retcode),
+			StringFormat(
+				"order cancel failed | symbol=%s order_id=%s order_ticket=%llu retry=%d error=%d reason='%s'",
+				symbol,
+				order.GetId(),
+				order.GetOrderId(),
+				retry.count,
+				result.retcode,
+				ATrade::DescribeRetcode(result.retcode)
 		));
 	}
 
@@ -224,11 +242,13 @@ private:
 		retry.Reset();
 		order.SetCancelRetry(retry);
 		order.SetPendingToClose(false);
-		logger.Warning(logCode, StringFormat(
-			"order cancel dropped | symbol=%s order_id=%s reason='%s'",
-			symbol,
-			order.GetId(),
-			reason
+		logger.Warning(
+			logCode,
+			StringFormat(
+				"order cancel dropped | symbol=%s order_id=%s reason='%s'",
+				symbol,
+				order.GetId(),
+				reason
 		));
 	}
 };
