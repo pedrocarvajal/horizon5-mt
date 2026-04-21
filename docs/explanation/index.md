@@ -1,10 +1,10 @@
 # Explanation
 
-Conceptual documentation for the Horizon5 Expert Advisor architecture.
+Conceptual documentation. These pages describe _why_ Horizon5 is built the way it is.
 
-- [Service Architecture](service-architecture.md) -- How the EA offloads blocking I/O to separate service scripts via a DLL-based message bus.
-- [Portfolio Approach](portfolio-approach.md) -- Hierarchical asset/strategy model, equal-weight allocation, and deterministic identifiers.
-- [Order Lifecycle](order-lifecycle.md) -- Full order flow from signal generation through execution, closure, persistence, and recovery.
-- [Observability](observability.md) -- Monitoring, remote order management, deterministic UUIDs, and reporting.
-- [Design Decisions](design-decisions.md) -- Rationale behind key architectural and operational choices.
-- [Event System](event-system.md) -- Gateway event routing and remote order management.
+- [Service Architecture](service-architecture.md) — the EA process, the message bus, and the dedicated service scripts.
+- [Portfolio Approach](portfolio-approach.md) — the hierarchical model, equal-weight allocation, and deterministic identifiers.
+- [Order Lifecycle](order-lifecycle.md) — signal → fill → close → persistence → recovery.
+- [Event System](event-system.md) — how timer and primed-bar events drive the orchestration loop.
+- [Observability](observability.md) — local reports and optional remote telemetry.
+- [Design Decisions](design-decisions.md) — the rationale behind the main architectural choices.

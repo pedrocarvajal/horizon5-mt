@@ -1,75 +1,76 @@
-# Creating Custom Indicators
+# Custom Indicators and Helpers
 
-## Two categories
+The framework separates **market-data indicators** (functions that read bars) from **in-memory helpers** (pure utilities). Both live in their own directories with distinct prefixes.
 
-### Market-data indicators (`indicators/` directory, `IN` prefix)
+## Market-data indicators — `indicators/` (`IN` prefix)
 
-These functions call MT5's `CopyXxx` family (`CopyClose`, `CopyHigh`, `CopyBuffer`, etc.) to read market data directly. They accept a symbol, timeframe, period, and shift.
+These call MT5's `CopyXxx` family (`CopyClose`, `CopyHigh`, `CopyBuffer`, ...) to read price or indicator buffers. They accept symbol, timeframe, period, and shift.
 
-Examples:
+Representative functions:
 
-- `INRollingReturn.mqh` -- `RollingReturn(symbol, timeframe, period, shift)` calculates the percentage return over `period` bars.
-- `INHighest.mqh` -- `Highest(symbol, timeframe, priceType, period, shift)` returns the highest value in a lookback window.
-- `INDrawdownFromPeak.mqh` -- drawdown from the rolling high.
-- `INVolatility.mqh` -- rolling volatility measure.
+- `INRollingReturn.mqh` — rolling percentage return over N bars.
+- `INHighest.mqh` — highest value in a lookback window.
+- `INDrawdownFromPeak.mqh` — drawdown from the rolling peak.
+- `INVolatility.mqh` — rolling volatility.
+- `INDailyPerformance.mqh` — day-level performance.
+- `INFairValueGap.mqh`, `INSwingPoints.mqh` — structural indicators.
+- `INGetPriceValue.mqh` — price lookup at a given shift.
 
-Use these when you need raw price or indicator data from a specific symbol and timeframe.
+Use them whenever you need raw market data tied to a specific symbol/timeframe.
 
-### In-memory helpers (`helpers/` subdirectory, `H` prefix)
+## In-memory helpers — `helpers/` (`H` prefix)
 
-These functions operate on arrays or values already in memory. They do not call `CopyXxx` and have no market data dependency.
+These operate on values or arrays already in memory. No market data dependency.
 
-Examples:
+Representative functions:
 
-- `HNormalizeLotSize.mqh` -- rounds lot size to broker constraints.
-- `HCheckStopDistance.mqh` -- validates order price against broker stop level.
-- `HCrossedAbove.mqh` -- detects crossover between two indicator buffers.
-- `HIsRising.mqh` -- checks if a series of values is trending upward.
-- `HGetIndicatorValue.mqh` -- wraps `CopyBuffer` for reading custom indicator handles.
+- `HNormalizeLotSize.mqh` — round lot size to broker volume step/min/max.
+- `HCheckStopDistance.mqh` — validate SL/TP against `SYMBOL_TRADE_STOPS_LEVEL`.
+- `HGetIndicatorValue.mqh` — wrap `CopyBuffer` for custom indicator handles.
+- `HClampNumeric.mqh`, `HStringToNumber.mqh`, `HMapTimeframe.mqh` — generic utilities.
+- `HGet*Uuid.mqh` — deterministic UUID construction.
+- `HGetPipSize.mqh`, `HGetPipValue.mqh` — symbol-scale helpers.
+- `HDrawHorizontalLine.mqh`, `HDrawVerticalLine.mqh`, `HDrawRectangle.mqh` — chart annotations.
+- `HIsMarketClosed.mqh`, `HIsLiveTrading.mqh`, `HIsLiveEnvironment.mqh` — environment/status checks.
 
-## Using custom MT5 indicators
+## Using built-in or custom MT5 indicators
 
-### Creating a handle
-
-Call `iCustom()` in `OnInit()` to create an indicator handle:
+Create the handle in `OnInit()`:
 
 ```mql5
-int handleSma = iMA(symbol, PERIOD_H1, 44, 0, MODE_SMA, PRICE_CLOSE);
+int handle = iMA(symbol, PERIOD_H1, 50, 0, MODE_SMA, PRICE_CLOSE);
 ```
 
-Release handles in the destructor:
+Release it in the destructor:
 
 ```mql5
-if (handleSma != INVALID_HANDLE) {
-    IndicatorRelease(handleSma);
+if (handle != INVALID_HANDLE) {
+    IndicatorRelease(handle);
 }
 ```
 
-### Reading values
-
-Use the helpers from `HGetIndicatorValue.mqh`:
+Read values through the helper:
 
 ```mql5
 double value = GetIndicatorValue(handle, bufferIndex, shift);
 ```
 
-- `handle` -- the indicator handle from `iCustom()` or a built-in function like `iMA()`.
-- `bufferIndex` -- which output buffer to read (0 for most single-output indicators).
-- `shift` -- number of bars back from the current bar. `0` = current (forming) bar, `1` = last closed bar.
+- `bufferIndex` — the indicator output buffer (0 for most single-output indicators).
+- `shift` — number of bars back. `0` is the forming bar; use `1` for the last closed bar.
 
 For multiple values at once:
 
 ```mql5
 double values[];
-bool success = GetIndicatorValues(handle, bufferIndex, shift, count, values);
+bool ok = GetIndicatorValues(handle, bufferIndex, shift, count, values);
 ```
 
-Returns `true` if all requested values were copied. The array is set as series (index 0 = most recent).
+Returns `true` if the requested range was copied; the array is series-indexed (index 0 = most recent).
 
-## Shift parameter
+## Shift semantics
 
-The `shift` parameter in all indicators follows MT5's convention:
+All indicators follow MT5's convention:
 
-- `shift=0` reads the current forming bar (incomplete data).
-- `shift=1` reads the last fully closed bar.
-- For higher timeframes, some internal helpers add `+1` to the shift parameter, so a source shift of 1 produces an effective shift of 2 in the `CopyXxx` call. This is by design, not a bug.
+- `shift=0` — current (forming) bar, incomplete data.
+- `shift=1` — last fully closed bar. Use this for non-repainting signals.
+- For higher-timeframe helpers that internally add `+1` to shift, a source shift of `1` produces an effective shift of `2` in the underlying `CopyXxx` call. This is intentional.

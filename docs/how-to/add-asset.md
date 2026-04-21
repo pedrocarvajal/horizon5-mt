@@ -1,75 +1,67 @@
 # Adding an Asset
 
+An asset is an `SEAsset` subclass that owns one broker symbol and hosts one or more strategies for it.
+
 ## 1. Create the asset file
 
-Place it at `assets/<AssetClass>/<Instrument>.mqh`.
-
-Example: `assets/Forex/EURUSD.mqh`.
+```
+assets/<AssetClass>/<Instrument>.mqh
+```
 
 ## 2. Define the class
 
-Extend `SEAsset`, set the name and broker symbol, call `Setup()`, and register strategies:
+Extend `SEAsset`, set the name and broker symbol, then call `Setup()`:
 
 ```mql5
 #include "../Asset.mqh"
 
-input group "[EURUSD] Strategies >";
-input bool EURUSDExampleEnabled = false; // [1] > Enable Example strategy
+input group "[<Instrument>] Strategies >";
+input bool <Instrument>ExampleEnabled = false; // [1] > Enable Example strategy
 
-class EURUSDAsset:
+class <Instrument>Asset:
 public SEAsset {
 public:
-    EURUSDAsset() {
-        SetName("eurusd");
-        SetSymbol("EURUSD");
+    <Instrument>Asset() {
+        SetName("<instrument-lower>");
+        SetSymbol("<SYMBOL>");
         Setup();
     }
 
     void Setup() {
-        if (EURUSDExampleEnabled) {
+        if (<Instrument>ExampleEnabled) {
             // instantiate and AddStrategy(...)
         }
     }
 };
 ```
 
-Key points:
+- `SetName()` — lowercase identifier used in logs and file paths.
+- `SetSymbol()` — must match the broker's symbol string exactly.
+- `Setup()` — called from the constructor; it instantiates strategies based on input toggles.
+- Per-asset gateway routing (`SEGateway`) is instantiated automatically by `SEAsset`. You don't need to register it.
 
-- `SetName()` -- lowercase identifier used in logs and file paths.
-- `SetSymbol()` -- must match the exact broker symbol string in MetaTrader 5.
-- `Setup()` -- must be called at the end of the constructor. It instantiates strategies based on the input toggles.
-- Gateway (inbound order commands + outbound notifications) is handled per-asset by `SEGateway`, which is instantiated automatically inside `SEAsset` — no manual registration needed.
+## 3. Register it in `configs/Assets.mqh`
 
-## 3. Register in configs/Assets.mqh
-
-Open `configs/Assets.mqh` and make three additions:
-
-**a) Include the asset file:**
+Three additions, mirroring the existing pattern:
 
 ```mql5
-#include "../assets/Forex/EURUSD.mqh"
-```
+// a) Include the asset file:
+#include "../assets/<AssetClass>/<Instrument>.mqh"
 
-**b) Instantiate the asset:**
+// b) Instantiate it:
+SEAsset *myAsset = new <Instrument>Asset();
 
-```mql5
-SEAsset *eurusd = new EURUSDAsset();
-```
-
-**c) Add it to the `assets[]` array:**
-
-```mql5
+// c) Append it to the assets[] array:
 SEAsset *assets[] = {
-    gold,
-    bitcoin,
-    sp500,
-    nikkei225,
-    eurusd
+    /* existing assets, */
+    myAsset
 };
 ```
 
 ## 4. Compile
 
-Compile `Horizon.mq5`. The new asset will appear in the EA inputs panel where its strategies can be enabled individually.
+Compile `Horizon.mq5`. The new asset appears in the EA inputs panel, grouped under its strategies. An asset is considered enabled when at least one of its strategies is toggled on; otherwise it is silently skipped at init.
 
-An asset is considered enabled when at least one of its strategies is enabled. Assets with no enabled strategies are silently skipped during initialization.
+## Capital allocation
+
+Capital is divided equally among enabled assets, then equally among each asset's active strategies. See [Multi-Asset Portfolios](multi-asset.md) for the exact formulas and passive-strategy behavior.

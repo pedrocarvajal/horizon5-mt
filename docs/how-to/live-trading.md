@@ -1,57 +1,55 @@
 # Live Trading Setup
 
-## Required services
+Live trading requires at least one running MT5 service alongside the EA. Optional integrations add remote orchestration.
 
-### HorizonPersistence (mandatory)
+## Required service
 
-`HorizonPersistence.mq5` is a MetaTrader 5 service that must be running alongside the EA. It handles all file I/O (order state, statistics, strategy state) via a message bus, offloading disk writes from the EA's main thread.
+### HorizonPersistence
 
-The service polls the persistence channel on the message bus, deduplicates writes to the same file path, and flushes to disk. It logs queue diagnostics every 5 minutes.
+`HorizonPersistence.mq5` must be running in live trading. It polls the persistence channel on the message bus, deduplicates writes targeting the same path within each polling cycle, and flushes to disk. It also ensures target directories exist and emits queue diagnostics periodically.
 
-To start it: add `HorizonPersistence` as a service in MetaTrader 5's Navigator panel. It starts automatically when the terminal launches.
+Start it by dragging `HorizonPersistence` into the MT5 Navigator panel as a service; it starts automatically with the terminal.
 
 ## Optional integrations
 
-### HorizonMonitor (observability)
+Both depend on external backends that live in the private ecosystem — request access via [GitHub](https://github.com/pedrocarvajal) if you intend to use them.
 
-Sends order updates, account snapshots, and log entries to the Horizon API for the War Room dashboard.
+### HorizonMonitor (telemetry)
 
-Configure in EA inputs:
+Pushes account snapshots, orders, heartbeats, and logs outward for centralized observability.
 
-- `EnableHorizonMonitor` = true
-- `HorizonMonitorUrl` = base URL of the Horizon API
-- `HorizonMonitorEmail` = account email
-- `HorizonMonitorPassword` = account password
+EA inputs:
 
-### HorizonGateway (remote order management)
+- `EnableHorizonMonitor = true`
+- `HorizonMonitorUrl`, `HorizonMonitorEmail`, `HorizonMonitorPassword`
 
-Enables remote order creation and management through the Horizon API. The Gateway strategy in each asset receives orders from this channel.
+### HorizonGateway (remote orchestration)
 
-Configure in EA inputs:
+Consumes trading and service events from the backend and forwards them to the EA. The per-asset `SEGateway` dispatches inbound trading events to handlers and ACKs responses back.
 
-- `EnableHorizonGateway` = true
-- `HorizonGatewayUrl` = base URL of the Gateway API
-- `HorizonGatewayEmail` = account email
-- `HorizonGatewayPassword` = account password
+EA inputs:
 
-Both Monitor and Gateway authenticate on startup by calling `UpsertAccount()`. If authentication fails, the EA will not initialize.
+- `EnableHorizonGateway = true`
+- `HorizonGatewayUrl`, `HorizonGatewayEmail`, `HorizonGatewayPassword`
 
-## Message bus health monitoring
+Both integrations authenticate on startup via `UpsertAccount()`. If authentication fails, the EA refuses to initialize.
 
-The EA continuously monitors all required services through `CheckServiceHealth()`:
+## Service health monitoring
 
-- **HorizonPersistence** is always required.
-- **HorizonMonitor** is required only when `EnableHorizonMonitor` is true and Monitor is configured.
-- **HorizonGateway** is required only when Gateway is configured.
+`CheckServiceHealth()` runs every minute against all required services:
 
-If any required service stops responding:
+- `HorizonPersistence` is always required.
+- `HorizonMonitor` is required when Monitor is enabled.
+- `HorizonGateway` is required when Gateway is enabled.
+
+If a required service becomes unavailable:
 
 1. The message bus is shut down.
-2. `tradingStatus.isPaused` is set to `true` with reason `TRADING_PAUSE_REASON_SERVICES_DOWN`.
-3. The EA stops opening new positions until services recover.
+2. `tradingStatus.isPaused = true` with `TRADING_PAUSE_REASON_SERVICES_DOWN`.
+3. New positions are not opened; existing positions continue to be managed.
 
-When services come back online, the EA automatically resumes trading.
+When services recover, the bus reactivates and trading resumes automatically.
 
 ## Gateway account status
 
-On startup, if HorizonGateway is enabled, the EA fetches the account status. If the status is not `"active"`, trading is paused with reason `TRADING_PAUSE_REASON_ACCOUNT_INACTIVE`. This allows remote account suspension without restarting the EA.
+If Gateway is enabled, the EA fetches the account status on init. A status other than `"active"` pauses trading with `TRADING_PAUSE_REASON_ACCOUNT_INACTIVE`. This lets operators pause the account remotely without restarting the EA.

@@ -1,80 +1,75 @@
 # Event System
 
-Horizon5 uses a timer-based event system instead of relying on MetaTrader's native `OnTick` (which only fires on price changes). This guarantees consistent strategy evaluation regardless of market activity.
+Horizon5 turns MetaTrader 5's single-threaded tick callback into a deterministic, time-driven and bar-driven event pipeline. Strategies see consistent events regardless of broker tick frequency.
 
-## Timer Configuration
+## Timer
 
-The EA calls `EventSetTimer(1)` during `OnInit`, creating a 1-second system timer. Each second, `OnTimer` runs and checks whether any logical events should fire based on time comparisons.
+`OnInit()` calls `EventSetTimer(1)`, producing a 1-second timer. On every tick of that timer, `OnTimer()` runs the orchestration loop:
 
-### TickIntervalTime
+1. Dispatch `OnTimer()` to every asset (and through the asset to every strategy).
+2. Dispatch **primed bar events** (see below) via `SEAsset.ProcessBarEvents()`.
+3. When `isStartDay` flips, run daily maintenance (unpause non-critical pauses, sync Monitor, collect seed snapshots).
+4. When `isStartMinute` flips, run `CheckServiceHealth()`.
+5. When the tick interval elapses, dispatch `OnTick()` to every asset/strategy.
+6. After all events, dispatch `ProcessOrders()` to every asset so order books process pending transitions and retries.
+7. If Gateway is enabled, drain inbound service events.
+8. When `isStartHour` flips and Monitor is enabled, run hourly Monitor sync and service heartbeats.
+9. When `isStartHour` flips, run the account auditor.
 
-The `TickIntervalTime` input (default: 60 seconds) controls how often `OnTick` is dispatched to strategies. The EA compares the current timestamp against `lastTickTime` and fires only when the elapsed time meets or exceeds the configured interval.
+## Tick interval
 
-## Events
+`TickIntervalTime` (default 60s) controls `OnTick` dispatch frequency. The EA compares `now.timestamp - lastTickTime` against the input and fires `OnTick` when the threshold is reached.
 
-### OnTimer
+## Primed-bar events
 
-Fires every second (system timer). Used internally by assets and strategies for low-level polling that must happen frequently, such as order processing and service event consumption.
+`OnStartMinute`, `OnStartHour`, and `OnStartDay` are driven by **bar-open detection**, not wall-clock comparisons. Each `SEAsset` records the last seen bar open for M1, H1, and D1 via `iTime()`. When the next bar opens:
 
-### OnTick
+1. On the **first** detection the flag is primed (`m1Primed / h1Primed / d1Primed`); the event is not fired. This prevents a spurious fire on startup or after gaps.
+2. On subsequent transitions the event fires for every asset (and propagates to every strategy).
 
-Fires every `TickIntervalTime` seconds. This is the primary strategy evaluation event. Strategies check indicators and generate entry/exit signals here.
+This means events are scoped per asset's symbol and only fire when that symbol actually prints a new bar.
 
-### OnStartMinute
-
-Fires once when the minute changes. Used for service health checks (`CheckServiceHealth`) and minute-resolution tasks.
-
-### OnStartHour
-
-Fires once when the hour changes. Used for periodic sync with external APIs (e.g., `horizonMonitor.SyncAccount`).
-
-### OnStartDay
-
-Fires once when the day-of-year changes. Used for daily resets such as clearing non-critical trading pauses.
-
-## Propagation Chain
-
-Events propagate from the main EA file through assets to individual strategies:
+## Propagation chain
 
 ```
-Horizon.mq5 OnTimer()
-  |
-  +-- for each asset: asset.OnTimer()
-  |     +-- for each strategy: strategy.OnTimer()
-  |
-  +-- if isStartDay:
-  |     +-- for each asset: asset.OnStartDay()
-  |           +-- for each strategy: strategy.OnStartDay()
-  |
-  +-- if isStartHour:
-  |     +-- for each asset: asset.OnStartHour()
-  |           +-- for each strategy: strategy.OnStartHour()
-  |
-  +-- if isStartMinute:
-  |     +-- for each asset: asset.OnStartMinute()
-  |           +-- for each strategy: strategy.OnStartMinute()
-  |
-  +-- if isTickInterval:
-  |     +-- for each asset: asset.OnTick()
-  |           +-- for each strategy: strategy.OnTick()
-  |
-  +-- for each asset: asset.ProcessOrders()
-  +-- horizonGateway.ProcessServiceEvents(assets)
+Horizon.mq5::OnTimer()
+  ├── asset.OnTimer()                 → strategy.OnTimer()
+  ├── asset.ProcessBarEvents()
+  │       ├── asset.OnStartMinute()   → strategy.OnStartMinute()
+  │       ├── asset.OnStartHour()     → strategy.OnStartHour()
+  │       └── asset.OnStartDay()      → strategy.OnStartDay()
+  ├── (isStartDay)  daily maintenance + monitor sync
+  ├── (isStartMinute) CheckServiceHealth()
+  ├── (isTickInterval) asset.OnTick() → strategy.OnTick()
+  ├── asset.ProcessOrders()           → strategy order book retries/submits
+  ├── gateway.ProcessServiceEvents()
+  └── (isStartHour) monitor sync, heartbeats, account audit
 ```
 
-## Trade Transaction Callbacks
+## Trade transactions
 
-`OnTradeTransaction` is a MetaTrader 5 native callback that fires when broker-side events occur (deal executed, order cancelled, etc.). Horizon5 handles two entry types:
+`OnTradeTransaction` is an MT5 native callback fired by broker-side events. The EA handles:
 
-- **DEAL_ENTRY_IN** -- A new position was opened. The EA matches the deal to the correct order via `orderId` and updates it to OPEN state.
-- **DEAL_ENTRY_OUT** -- A position was closed. The EA matches via `positionId`, records final prices and profit, and transitions the order to CLOSED state.
-- **ORDER_STATE_CANCELED / ORDER_STATE_EXPIRED** -- A pending broker order was cancelled or expired. The EA propagates cancellation to the matching internal order.
+- `TRADE_TRANSACTION_DEAL_ADD` with `DEAL_ENTRY_IN` — a new position is live. The EA looks up the owning order by MT5 order ticket and moves it to `OPEN`.
+- `TRADE_TRANSACTION_DEAL_ADD` with `DEAL_ENTRY_OUT` — a position closed. The EA computes net P&L (`profit + commission * 2 + swap`) and moves the order to `CLOSED`.
+- `TRADE_TRANSACTION_HISTORY_ADD` with `ORDER_STATE_CANCELED` or `ORDER_STATE_EXPIRED` — a pending broker order was abandoned. The owning order transitions to `CANCELLED`.
 
-## Strategy Callbacks
+Routing is by magic number: the EA walks the asset array and delegates to the asset that owns the matching magic.
 
-Strategies implement the `IStrategy` interface, which includes:
+## Strategy callbacks
 
-- `OnOpenOrder(EOrder &order)` -- Called after a position is confirmed open by the broker.
-- `OnCloseOrder(EOrder &order, ENUM_DEAL_REASON reason)` -- Called after a position is confirmed closed, with the close reason.
-- `OnEnd()` -- Called during normal EA shutdown (not on parameter changes or chart changes).
-- `OnDeinit()` -- Called on every EA removal for local cleanup. No I/O or remote calls allowed here.
+Strategies implement `IStrategy`. The callbacks that fire as a result of the loop:
+
+| Callback                                   | When                                                                               |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `OnInit()` / `OnTesterInit()`              | Startup (live or tester).                                                          |
+| `OnTimer()`                                | Every second.                                                                      |
+| `OnTick()`                                 | At the configured tick interval.                                                   |
+| `OnStartMinute / OnStartHour / OnStartDay` | When a new M1/H1/D1 bar opens on the strategy's symbol.                            |
+| `OnPendingOrderPlaced(order)`              | After a pending order is created in the book.                                      |
+| `OnOpenOrder(order)`                       | After the broker confirms a fill.                                                  |
+| `OnOrderUpdated(order)`                    | After an order's fields are modified (e.g. SL/TP).                                 |
+| `OnCloseOrder(order, reason)`              | After the broker confirms the exit.                                                |
+| `OnCancelOrder(order)`                     | After a pending order is cancelled/expired or a close request is rejected finally. |
+| `OnEnd()`                                  | On normal EA shutdown (not chart/param change). Safe for final I/O.                |
+| `OnDeinit()`                               | On every deinit. **No remote or heavy I/O** — local cleanup only.                  |

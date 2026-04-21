@@ -1,17 +1,17 @@
-# Configuring Risk Management
+# Risk Management
 
 ## Equity at risk
 
-The `EquityAtRisk` input (default: `1`) sets the percentage of capital risked per trade. A value of `1` means 1% of the strategy's allocated balance (or NAV, if compounding is on).
+Two EA inputs control the risk model:
 
-The `EquityAtRiskCompounded` input controls which balance figure is used:
+| Input                    | Effect                                                                                         |
+| ------------------------ | ---------------------------------------------------------------------------------------------- |
+| `EquityAtRisk`           | Percentage of capital risked per trade (default `1` → 1%)                                      |
+| `EquityAtRiskCompounded` | When `true`, risk is calculated on the strategy's current NAV instead of its allocated balance |
 
-- **Off (default)** -- uses the static balance allocated at startup.
-- **On** -- uses the strategy's current NAV (Net Asset Value), which accounts for realized P&L. As the strategy profits, position sizes grow; as it loses, they shrink.
+## Lot size formula
 
-## Lot size calculation
-
-The formula in `SELotSize.CalculateByStopLoss()`:
+`SELotSize::CalculateByStopLoss()` computes:
 
 ```
 dollarValuePerPoint = tickValue / tickSize
@@ -21,22 +21,33 @@ lotSize             = riskAmount / (stopLossDistance * dollarValuePerPoint)
 
 Where:
 
-- `tickValue` and `tickSize` come from `SymbolInfoDouble`.
-- `stopLossDistance` is the absolute price distance from entry to stop-loss.
-- `nav` is either the static balance or the compounded NAV.
+- `tickValue`, `tickSize` come from `SymbolInfoDouble`.
+- `stopLossDistance` is the absolute price distance from entry to stop.
+- `nav` is either the allocated balance (non-compounded) or the strategy's current NAV (compounded).
 
-## MaxLotsByOrder cap
+## Volume cap
 
-Each strategy sets a `maxLotsByOrder` value in its constructor (e.g., `SetMaxLotsByOrder(10.0)`). After the lot size formula runs, the result is capped to this maximum. This prevents outsized positions even if the risk calculation produces a large number.
+Each strategy declares a `maxLotsByOrder` in its constructor via `SetMaxLotsByOrder(...)`. After the formula runs, the result is clamped to that value to prevent outsized positions.
 
-## NormalizeLotSize
+## Volume normalization
 
-After calculation and capping, `NormalizeLotSize()` enforces broker constraints:
+`NormalizeLotSize()` enforces broker constraints in order:
 
-1. Rounds down to the nearest `SYMBOL_VOLUME_STEP`.
-2. Returns `0` if the result is below `SYMBOL_VOLUME_MIN` (trade is skipped).
-3. Caps at `SYMBOL_VOLUME_MAX`.
+1. Round down to `SYMBOL_VOLUME_STEP`.
+2. Return `0` (skip trade) if the result is below `SYMBOL_VOLUME_MIN`.
+3. Cap at `SYMBOL_VOLUME_MAX`.
 
-## CheckStopDistance validation
+## Stop-distance validation
 
-Before placing a pending order, `CheckStopDistance()` verifies that the stop/limit price respects the broker's `SYMBOL_TRADE_STOPS_LEVEL`. If the price is too close to the current market, the order is rejected to avoid broker errors.
+`CheckStopDistance()` verifies the stop/limit price respects `SYMBOL_TRADE_STOPS_LEVEL`. If the target price is too close to the current market, the order is rejected before it reaches the broker.
+
+## Trading pause
+
+Various conditions pause trading with a typed reason (`ETradingPauseReason`):
+
+- **Services down** — a required MT5 service stopped responding. Trading resumes automatically when services recover.
+- **Account inactive** — the Gateway reported the account as not active.
+- **Horizon API request** — remote pause command.
+- **Manual close** — a human closed a position on the terminal/mobile/web; pause holds until the next day.
+
+While paused, strategies do not open new positions but continue to manage existing ones.

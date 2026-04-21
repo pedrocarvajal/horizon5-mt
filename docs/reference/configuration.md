@@ -1,118 +1,99 @@
 # Configuration
 
-All input parameters for `Horizon.mq5` and asset-level configuration files.
+All input parameters exposed by `Horizon.mq5`, grouped exactly as they appear in MT5's inputs dialog.
 
 ## General Settings
 
-| Parameter          | Type                      | Default             | Description                                                                    |
-| ------------------ | ------------------------- | ------------------- | ------------------------------------------------------------------------------ |
-| `TickIntervalTime` | `int`                     | `60`                | Tick interval in seconds. Controls how often `OnTick` fires for each strategy. |
-| `FillingMode`      | `ENUM_ORDER_TYPE_FILLING` | `ORDER_FILLING_IOC` | Order filling mode sent to the broker.                                         |
-| `DebugLevel`       | `ENUM_DEBUG_LEVEL`        | `DEBUG_LEVEL_ALL`   | Controls log verbosity and persistence.                                        |
+| Parameter          | Type                      | Default             | Description                                                  |
+| ------------------ | ------------------------- | ------------------- | ------------------------------------------------------------ |
+| `TickIntervalTime` | `int`                     | `60`                | Tick interval in seconds. Controls how often `OnTick` fires. |
+| `FillingMode`      | `ENUM_ORDER_TYPE_FILLING` | `ORDER_FILLING_IOC` | Broker fill policy for outbound orders.                      |
+| `DebugLevel`       | `ENUM_DEBUG_LEVEL`        | `DEBUG_LEVEL_ALL`   | Log verbosity and optional file persistence.                 |
 
 ### Debug levels
 
-| Value                        | Description                               |
-| ---------------------------- | ----------------------------------------- |
-| `DEBUG_LEVEL_NONE`           | No logs                                   |
-| `DEBUG_LEVEL_ERRORS`         | Errors and warnings only                  |
-| `DEBUG_LEVEL_ERRORS_PERSIST` | Errors and warnings with file persistence |
-| `DEBUG_LEVEL_ALL`            | All logs                                  |
-| `DEBUG_LEVEL_ALL_PERSIST`    | All logs with file persistence            |
+| Value                        | Behavior                               |
+| ---------------------------- | -------------------------------------- |
+| `DEBUG_LEVEL_NONE`           | No logs                                |
+| `DEBUG_LEVEL_ERRORS`         | Errors and warnings only               |
+| `DEBUG_LEVEL_ERRORS_PERSIST` | Errors and warnings, persisted to file |
+| `DEBUG_LEVEL_ALL`            | All logs                               |
+| `DEBUG_LEVEL_ALL_PERSIST`    | All logs, persisted to file            |
 
-## Reporting
+## Reporting > Strategy Reports
 
-These inputs control CSV report generation during strategy tester runs.
+Per-strategy exports, primarily intended for tester runs.
 
-| Parameter                     | Type   | Default | Description                                    |
-| ----------------------------- | ------ | ------- | ---------------------------------------------- |
-| `EnableOrderHistoryReport`    | `bool` | `false` | Export order history to CSV on tester.         |
-| `EnableSnapshotHistoryReport` | `bool` | `false` | Export strategy snapshots to CSV on tester.    |
-| `EnableMarketHistoryReport`   | `bool` | `false` | Export market data snapshots to CSV on tester. |
+| Parameter                     | Type   | Default | Description                       |
+| ----------------------------- | ------ | ------- | --------------------------------- |
+| `EnableOrderHistoryReport`    | `bool` | `false` | Export per-strategy order history |
+| `EnableSnapshotHistoryReport` | `bool` | `false` | Export per-strategy snapshots     |
+| `EnableMarketHistoryReport`   | `bool` | `false` | Export per-asset market snapshots |
 
-## Risk Management
+## Reporting > Monitor Seed
 
-| Parameter                | Type     | Default | Description                                                                 |
-| ------------------------ | -------- | ------- | --------------------------------------------------------------------------- |
-| `EquityAtRiskCompounded` | `bool`   | `false` | When true, risk is calculated on current equity instead of initial balance. |
-| `EquityAtRisk`           | `double` | `1`     | Maximum equity at risk per trade, as a percentage.                          |
+Dataset seeding for the Monitor backend. Produces structured collections during backtest runs so external systems can bootstrap from tester output.
+
+| Parameter              | Type   | Default | Description                             |
+| ---------------------- | ------ | ------- | --------------------------------------- |
+| `EnableSeedAccounts`   | `bool` | `false` | Export accounts collection              |
+| `EnableSeedAssets`     | `bool` | `false` | Export assets collection                |
+| `EnableSeedStrategies` | `bool` | `false` | Export strategies collection            |
+| `EnableSeedMetadata`   | `bool` | `false` | Export metadata collection              |
+| `EnableSeedOrders`     | `bool` | `false` | Export orders collection                |
+| `EnableSeedSnapshots`  | `bool` | `false` | Export account/asset/strategy snapshots |
+
+## Reporting > Logs
+
+| Parameter         | Type   | Default | Description                          |
+| ----------------- | ------ | ------- | ------------------------------------ |
+| `EnableLogExport` | `bool` | `false` | Export portfolio logs on EA shutdown |
+
+## Risk management
+
+| Parameter                | Type     | Default | Description                                                           |
+| ------------------------ | -------- | ------- | --------------------------------------------------------------------- |
+| `EquityAtRiskCompounded` | `bool`   | `false` | Use current NAV instead of the initial allocation when computing risk |
+| `EquityAtRisk`           | `double` | `1`     | Maximum equity at risk per trade, as a percentage                     |
 
 ## Horizon Monitor
 
-Connection to the Horizon Monitor API for remote logging, account sync, and dashboard reporting.
+Optional outbound telemetry integration. Active only in live trading.
 
-| Parameter                | Type     | Default | Description                                                          |
-| ------------------------ | -------- | ------- | -------------------------------------------------------------------- |
-| `EnableHorizonMonitor`   | `bool`   | `true`  | Toggle for Horizon Monitor integration. Only active in live trading. |
-| `HorizonMonitorUrl`      | `string` | `""`    | Base URL for the Horizon Monitor API.                                |
-| `HorizonMonitorEmail`    | `string` | `""`    | Authentication email for Horizon Monitor.                            |
-| `HorizonMonitorPassword` | `string` | `""`    | Authentication password for Horizon Monitor.                         |
+| Parameter                | Type     | Default | Description                              |
+| ------------------------ | -------- | ------- | ---------------------------------------- |
+| `EnableHorizonMonitor`   | `bool`   | `false` | Toggle the Monitor integration on or off |
+| `HorizonMonitorUrl`      | `string` | `""`    | Base URL of the Monitor backend          |
+| `HorizonMonitorEmail`    | `string` | `""`    | Authentication email                     |
+| `HorizonMonitorPassword` | `string` | `""`    | Authentication password                  |
 
 ## Horizon Gateway
 
-Connection to the Horizon Gateway API for remote order management and account status.
+Optional inbound orchestration integration. Active only in live trading.
 
-| Parameter                | Type     | Default | Description                                                          |
-| ------------------------ | -------- | ------- | -------------------------------------------------------------------- |
-| `EnableHorizonGateway`   | `bool`   | `true`  | Toggle for Horizon Gateway integration. Only active in live trading. |
-| `HorizonGatewayUrl`      | `string` | `""`    | Base URL for the Horizon Gateway API.                                |
-| `HorizonGatewayEmail`    | `string` | `""`    | Authentication email for Horizon Gateway.                            |
-| `HorizonGatewayPassword` | `string` | `""`    | Authentication password for Horizon Gateway.                         |
+| Parameter                | Type     | Default | Description                              |
+| ------------------------ | -------- | ------- | ---------------------------------------- |
+| `EnableHorizonGateway`   | `bool`   | `false` | Toggle the Gateway integration on or off |
+| `HorizonGatewayUrl`      | `string` | `""`    | Base URL of the Gateway backend          |
+| `HorizonGatewayEmail`    | `string` | `""`    | Authentication email                     |
+| `HorizonGatewayPassword` | `string` | `""`    | Authentication password                  |
 
-## Asset-level Strategy Toggles
+## Asset-level strategy toggles
 
-Each asset file defines boolean inputs to enable or disable individual strategies. The naming pattern is `<Asset><Strategy>Enabled`. All default to `false`.
+Each asset file defines `input bool` toggles for its strategies. The naming pattern is:
 
-### Gold (XAUUSD)
+```
+<Instrument><Strategy>Enabled
+```
 
-Defined in `assets/Commodities/Gold.mqh`.
+All default to `false`. The specific set of toggles depends on which assets and strategies you have registered — see the corresponding asset file under `assets/<AssetClass>/<Instrument>.mqh`.
 
-| Parameter               | Strategy   |
-| ----------------------- | ---------- |
-| `GoldBallaratEnabled`   | Ballarat   |
-| `GoldBendigoEnabled`    | Bendigo    |
-| `GoldCairnsEnabled`     | Cairns     |
-| `GoldDarwinEnabled`     | Darwin     |
-| `GoldGeelongEnabled`    | Geelong    |
-| `GoldHobartEnabled`     | Hobart     |
-| `GoldMackayEnabled`     | Mackay     |
-| `GoldTamworthEnabled`   | Tamworth   |
-| `GoldToowoombaEnabled`  | Toowoomba  |
-| `GoldWollongongEnabled` | Wollongong |
-| `GoldTestEnabled`       | Test       |
+## Service-level inputs
 
-### Nikkei225
+The standalone service scripts expose their own inputs when started as MT5 services:
 
-Defined in `assets/Indices/Nikkei225.mqh`.
+- `HorizonPersistence.mq5` — `DebugLevel`, `PollIntervalMs`.
+- `HorizonMonitor.mq5` — `DebugLevel`, `HorizonMonitorUrl`, `HorizonMonitorEmail`, `HorizonMonitorPassword`.
+- `HorizonGateway.mq5` — `DebugLevel`, `HorizonGatewayUrl`, `HorizonGatewayEmail`, `HorizonGatewayPassword`.
 
-| Parameter                  | Strategy |
-| -------------------------- | -------- |
-| `Nikkei225SapporoEnabled`  | Sapporo  |
-| `Nikkei225NaraEnabled`     | Nara     |
-| `Nikkei225KobeEnabled`     | Kobe     |
-| `Nikkei225NagoyaEnabled`   | Nagoya   |
-| `Nikkei225OsakaEnabled`    | Osaka    |
-| `Nikkei225KyotoEnabled`    | Kyoto    |
-| `Nikkei225NikkoEnabled`    | Nikko    |
-| `Nikkei225NiigataEnabled`  | Niigata  |
-| `Nikkei225FukuokaEnabled`  | Fukuoka  |
-| `Nikkei225YokohamaEnabled` | Yokohama |
-| `Nikkei225TestEnabled`     | Test     |
-
-### SP500
-
-Defined in `assets/Indices/SP500.mqh`.
-
-| Parameter               | Strategy  |
-| ----------------------- | --------- |
-| `SP500DenverEnabled`    | Denver    |
-| `SP500RaleighEnabled`   | Raleigh   |
-| `SP500PortlandEnabled`  | Portland  |
-| `SP500AustinEnabled`    | Austin    |
-| `SP500PhoenixEnabled`   | Phoenix   |
-| `SP500TucsonEnabled`    | Tucson    |
-| `SP500MemphisEnabled`   | Memphis   |
-| `SP500NashvilleEnabled` | Nashville |
-| `SP500CharlotteEnabled` | Charlotte |
-| `SP500TampaEnabled`     | Tampa     |
-| `SP500TestEnabled`      | Test      |
+The Monitor/Gateway service inputs must match the values configured in the EA.

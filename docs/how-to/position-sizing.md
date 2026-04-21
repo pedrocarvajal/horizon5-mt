@@ -1,48 +1,52 @@
 # Position Sizing
 
-## SELotSize service
+## `SELotSize`
 
-Each strategy owns an `SELotSize` instance, initialized with the strategy's symbol. The primary method is:
+Every strategy owns an `SELotSize` instance (created automatically by the base class) initialized with its symbol. The main entry point is:
 
 ```
 double GetLotSizeByStopLoss(double stopLossDistance)
 ```
 
-Return values:
+Return semantics:
 
-- **Positive value** -- the calculated lot size (before normalization).
-- **-1** -- the strategy has no allocated balance (deactivated).
-- **0** -- invalid inputs (zero or negative NAV, stop-loss distance, or tick data).
+| Value           | Meaning                                                        |
+| --------------- | -------------------------------------------------------------- |
+| Positive number | Calculated lot size (before broker normalization)              |
+| `-1`            | Strategy has no allocated balance (deactivated)                |
+| `0`             | Invalid inputs (non-positive NAV, stop distance, or tick data) |
 
-After this call, the strategy should pass the result through `NormalizeLotSize()` to enforce broker volume constraints before placing the order.
+After this call, pass the result through `NormalizeLotSize(symbol)` before submitting the order.
 
 ## Balance flow
 
-Capital flows through three levels:
+Capital propagates down three levels:
 
-1. **EA level** -- `account.GetBalance()` reads the MT5 account balance at startup.
-2. **Asset level** -- the EA divides the total balance equally among enabled assets: `balance * (1 / enabledAssetCount)`.
-3. **Strategy level** -- each asset divides its allocation equally among active (non-passive) strategies: `assetBalance / activeStrategyCount`. Passive strategies (like Gateway) receive the full asset balance since they do not trade independently.
+1. **EA level** — `account.GetBalance()` at startup seeds the whole portfolio.
+2. **Asset level** — EA divides balance equally among enabled assets.
+3. **Strategy level** — each asset divides its balance equally among active (non-passive) strategies. Passive strategies receive the full asset balance.
 
-## Compounding mode
+See [Multi-Asset Portfolios](multi-asset.md) for the formulas.
 
-Controlled by the `EquityAtRiskCompounded` input:
+## Compounding
 
-- **Off** -- `GetLotSizeByStopLoss` uses the static balance assigned at startup. Position sizes remain constant regardless of P&L.
-- **On** -- uses `statistics.GetNav()`, which tracks realized gains and losses. Position sizes increase after wins and decrease after losses, producing a geometric growth curve.
+`EquityAtRiskCompounded` controls which balance is used:
 
-## Practical example
+- **Off** — the static allocation at startup. Position size is constant regardless of realized P&L.
+- **On** — the strategy's current NAV (`statistics.GetNav()`), which incorporates realized gains and losses. Size grows after wins and shrinks after losses.
+
+## Worked example
 
 Given:
 
 - Strategy balance: $10,000
-- EquityAtRisk: 1%
+- `EquityAtRisk`: `1` (1%)
 - Stop-loss distance: 50 points
 - Dollar value per point: $10
 
 ```
-riskAmount = 0.01 * 10000 = $100
-lotSize    = 100 / (50 * 10) = 0.20 lots
+riskAmount = 0.01 * 10000 = 100
+lotSize    = 100 / (50 * 10) = 0.20
 ```
 
-If `maxLotsByOrder` is 0.10, the result is capped to 0.10. Then `NormalizeLotSize` rounds to the broker's volume step.
+If `maxLotsByOrder` is `0.10`, the result caps at `0.10`. `NormalizeLotSize` then rounds to the broker's volume step (and rejects if below minimum).

@@ -1,66 +1,36 @@
-# Creating Your First Strategy
+# Your First Strategy
 
-This guide walks through creating a new strategy from scratch. The example creates a simplified long-only strategy for the S&P 500 called "Savannah" (following the American city naming convention).
+This walkthrough adds a minimal, framework-only strategy so you can see the extension pattern end to end. The strategy itself does nothing meaningful — it is a skeleton you can fill with your own logic.
 
-## Step 1: Create the strategy file
+Throughout, replace the placeholders with your own values:
 
-Create the file at `strategies/Indices/SP500/Savannah/Savannah.mqh`.
+- `<AssetClass>` — e.g. `Commodities`, `Indices`, `Forex`. Used only for folder organization.
+- `<Instrument>` — the asset name you register (e.g. `MyAsset`).
+- `<SYMBOL>` — the broker symbol string for that instrument.
+- `<StrategyName>` — a descriptive, easy-to-pronounce name (e.g. `Example`).
+- `<PRFX>` — a 3-letter uppercase prefix, unique across the entire portfolio.
 
-The path follows the pattern `strategies/<AssetClass>/<Instrument>/<Name>/<Name>.mqh`.
+## Step 1 — Create the strategy file
+
+Create `strategies/<AssetClass>/<Instrument>/<StrategyName>/<StrategyName>.mqh`:
 
 ```mql5
-#ifndef __STRATEGY_SAVANNAH_MQH__
-#define __STRATEGY_SAVANNAH_MQH__
-
-#include "../../../../helpers/HGetIndicatorValue.mqh"
-#include "../../../../helpers/HFixMarketPrice.mqh"
-#include "../../../../helpers/HCheckStopDistance.mqh"
-#include "../../../../helpers/HNormalizeLotSize.mqh"
-
-#include "../../../../services/SEDateTime/structs/SDateTime.mqh"
+#ifndef __STRATEGY_EXAMPLE_MQH__
+#define __STRATEGY_EXAMPLE_MQH__
 
 #include "../../../Strategy.mqh"
 
-extern SEDateTime dtime;
-
-class Savannah:
+class Example:
 public SEStrategy {
-private:
-    int handleMovingAverage;
-    int handleAtr;
-
 public:
-    Savannah() {
-        SetName("Savannah");
-        SetPrefix("SVN");
+    Example() {
+        SetName("Example");
+        SetPrefix("EXM");
         SetMaxLotsByOrder(10.0);
-
-        handleMovingAverage = INVALID_HANDLE;
-        handleAtr = INVALID_HANDLE;
     }
 
-    ~Savannah() {
-        if (handleMovingAverage != INVALID_HANDLE) {
-            IndicatorRelease(handleMovingAverage);
-        }
-
-        if (handleAtr != INVALID_HANDLE) {
-            IndicatorRelease(handleAtr);
-        }
-    }
-
-    int OnInit() {
-        SEStrategy::OnInit();
-
-        handleMovingAverage = iMA(symbol, PERIOD_H1, 50, 0, MODE_SMA, PRICE_CLOSE);
-        handleAtr = iATR(symbol, PERIOD_H1, 14);
-
-        if (handleMovingAverage == INVALID_HANDLE || handleAtr == INVALID_HANDLE) {
-            logger.Error("Failed to create indicator handles");
-            return INIT_FAILED;
-        }
-
-        return INIT_SUCCEEDED;
+    int OnInit() override {
+        return SEStrategy::OnInit();
     }
 
     void OnStartHour() override {
@@ -70,139 +40,62 @@ public:
             return;
         }
 
-        if (!checkLongSignal()) {
-            return;
-        }
-
-        placeBuyOrder();
-    }
-
-private:
-    bool checkLongSignal() {
-        double maValue = GetIndicatorValue(handleMovingAverage, 0, 1);
-        double closePrice[];
-
-        if (CopyClose(symbol, PERIOD_H1, 1, 1, closePrice) <= 0) {
-            return false;
-        }
-
-        return closePrice[0] > maValue;
-    }
-
-    void placeBuyOrder() {
-        double atrValue = GetIndicatorValue(handleAtr, 0, 1);
-
-        if (atrValue == 0) {
-            return;
-        }
-
-        double stopLossDistance = 1.5 * atrValue;
-        double takeProfitDistance = 3.0 * atrValue;
-
-        double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-        double stopLossPrice = FixMarketPrice(ask - stopLossDistance, symbol);
-        double takeProfitPrice = FixMarketPrice(ask + takeProfitDistance, symbol);
-        double roundedStopLossDistance = ask - stopLossPrice;
-        double lotSize = GetLotSizeByStopLoss(roundedStopLossDistance);
-
-        if (lotSize <= 0) {
-            return;
-        }
-
-        lotSize = NormalizeLotSize(lotSize, symbol);
-
-        if (lotSize == 0) {
-            return;
-        }
-
-        orderBook.PlaceOrder(
-            ORDER_TYPE_BUY,
-            ask,
-            lotSize,
-            false,
-            takeProfitPrice,
-            stopLossPrice
-        );
+        // Your signal logic goes here.
     }
 };
 
 #endif
 ```
 
-### Key points in the strategy file
+Key points:
 
-- **Extend `SEStrategy`** -- this is the base class that provides `orderBook`, `logger`, `symbol`, lot sizing, state persistence, and statistics.
-- **Set name and prefix in the constructor** -- `SetName("Savannah")` and `SetPrefix("SVN")`. The 3-letter prefix must be unique across all strategies in the entire portfolio.
-- **Call the parent in overrides** -- always call `SEStrategy::OnInit()` at the start of `OnInit()` and `SEStrategy::OnStartHour()` at the start of `OnStartHour()`. The base class performs critical setup in these methods.
-- **Use shift=1** -- when reading indicator values, use shift 1 (the previous closed bar) to avoid repainting signals on the current forming bar.
-- **Guard against duplicate orders** -- use `orderBook.HasActiveOrders()` or `orderBook.HasPendingOrder()` before placing orders.
-- **Position sizing** -- `GetLotSizeByStopLoss(stopLossDistance)` calculates the lot size based on the equity-at-risk percentage configured in the EA inputs.
-- **Release indicator handles** -- always release handles in the destructor with `IndicatorRelease()`.
-- **Normalize before placing** -- use `NormalizeLotSize()` and `FixMarketPrice()` to round values to broker-valid increments.
+- **Extend `SEStrategy`** — you get `orderBook`, `logger`, `symbol`, sizing, statistics, persistence, and lifecycle plumbing for free.
+- **Set name, prefix, and max lots in the constructor.** Prefix must be unique across the whole portfolio — it feeds into the magic-number hash.
+- **Call the parent first** in overridden lifecycle methods (`OnInit`, `OnStartHour`, etc.). The base class performs required setup.
+- **Use shift 1** (`CopyXxx` / `GetIndicatorValue` with `shift=1`) when reading indicators so you see the last closed bar, not the forming one.
+- **Guard duplicates** with `orderBook.HasActiveOrders()` or `orderBook.HasPendingOrder()` before placing.
+- **Release resources** (indicator handles, pointers) in the destructor.
 
-## Step 2: Register in the asset file
+## Step 2 — Register the strategy in its asset file
 
-Open `assets/Indices/SP500.mqh` and add three things:
-
-### 2a. Include the strategy file
-
-Add the include at the top of the file, alongside the other strategy includes:
+Open `assets/<AssetClass>/<Instrument>.mqh` and add three things, mirroring the existing pattern:
 
 ```mql5
-#include "../../strategies/Indices/SP500/Savannah/Savannah.mqh"
-```
+// a) Include it:
+#include "../../strategies/<AssetClass>/<Instrument>/Example/Example.mqh"
 
-### 2b. Add the input toggle
+// b) Add an input toggle:
+input bool <Instrument>ExampleEnabled = false; // [N] > Enable Example strategy
 
-Add a new `input bool` in the strategy toggles section:
-
-```mql5
-input bool SP500SavannahEnabled = false; // [N] > Enable Savannah strategy
-```
-
-Replace `[N]` with the next sequential number in the list.
-
-### 2c. Add the if-block in Setup()
-
-Inside the `Setup()` method, add the conditional instantiation:
-
-```mql5
-if (SP500SavannahEnabled) {
-    Savannah *savannah = new Savannah();
-    AddStrategy(savannah);
+// c) Inside Setup(), conditionally instantiate and register it:
+if (<Instrument>ExampleEnabled) {
+    Example *example = new Example();
+    AddStrategy(example);
 }
 ```
 
-This follows the same pattern used by every other strategy in the asset file. The `AddStrategy()` call registers the strategy with the asset, which handles initialization, tick routing, and lifecycle management.
+`AddStrategy()` assigns the strategy its symbol, computes its deterministic magic number, and hooks it into the asset's lifecycle dispatch.
 
-## Step 3: Register a new asset (only if needed)
+## Step 3 — (If needed) Register a new asset
 
-If you are adding a strategy for an instrument that does not yet have an asset file, you also need to:
+If the instrument does not exist yet, create `assets/<AssetClass>/<Instrument>.mqh` extending `SEAsset`, and register it in `configs/Assets.mqh` (include, instantiate, append to the `assets[]` array). See [How-To > Add an Asset](../how-to/add-asset.md).
 
-1. Create a new asset file at `assets/<AssetClass>/<Instrument>.mqh` following the pattern in `assets/Commodities/Gold.mqh`.
-2. Register it in `configs/Assets.mqh` by adding an include, instantiating the asset, and adding it to the `assets[]` array.
+## Step 4 — Compile and test
 
-The current registered assets are Gold (XAUUSD), Bitcoin, SP500, and Nikkei225.
+Compile `Horizon.mq5`. If your toggle is on, the strategy appears in the portfolio, receives capital through equal-weight allocation, and participates in the event loop. Run it in the MT5 Strategy Tester first.
 
-## Naming conventions
+## Lifecycle hooks you can override
 
-Strategies are named after cities, grouped by asset class:
-
-| Asset Class | Convention        | Examples                                              |
-| ----------- | ----------------- | ----------------------------------------------------- |
-| Gold        | Australian cities | Ballarat, Bendigo, Cairns, Darwin, Hobart, Wollongong |
-| Nikkei 225  | Japanese cities   | Fukuoka, Kobe, Kyoto, Nagoya, Osaka, Sapporo          |
-| S&P 500     | American cities   | Austin, Denver, Memphis, Nashville, Portland, Tampa   |
-
-Choose city names that are easy to pronounce. The 3-letter uppercase prefix (e.g. SVN, DNV, AUS) must be unique across the entire portfolio, not just within the asset class.
-
-## Lifecycle overview
-
-Once registered, the EA manages the strategy lifecycle automatically:
-
-1. **OnInit()** -- called once at startup. Create indicator handles, restore persisted state.
-2. **OnStartHour()** -- called at the start of each hour. This is where most strategies evaluate signals and place orders.
-3. **OnStartDay()** -- called at the start of each trading day. Use for daily resets or recalculations.
-4. **OnOpenOrder(order)** -- called when a pending order fills.
-5. **OnCloseOrder(order, reason)** -- called when a position closes.
-6. **OnDeinit()** -- called at shutdown. Do not perform I/O here; only clean up local resources.
+| Hook                                             | Fires when                                                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `OnInit()`                                       | Once, at startup. Create indicator handles, read persisted state.                                 |
+| `OnTesterInit()`                                 | Once, at tester startup.                                                                          |
+| `OnTimer()`                                      | Every second (dispatch loop).                                                                     |
+| `OnTick()`                                       | At the configured tick interval (default 60s).                                                    |
+| `OnStartMinute() / OnStartHour() / OnStartDay()` | When a new M1/H1/D1 bar opens for the strategy's symbol.                                          |
+| `OnPendingOrderPlaced(order)`                    | After a pending order is created.                                                                 |
+| `OnOpenOrder(order)`                             | After a fill is confirmed by the broker.                                                          |
+| `OnOrderUpdated(order)`                          | After an order's fields are modified (SL/TP changes, etc.).                                       |
+| `OnCloseOrder(order, reason)`                    | After the broker confirms the exit.                                                               |
+| `OnCancelOrder(order)`                           | After a pending order is cancelled/expired or a close request is rejected.                        |
+| `OnEnd()` / `OnDeinit()`                         | On normal shutdown / on any deinit. Use `OnEnd` for final I/O; `OnDeinit` for local cleanup only. |
