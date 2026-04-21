@@ -1,41 +1,56 @@
 # Order States
 
-Orders in Horizon5 follow a deterministic state machine defined in `enums/EOrderStatuses.mqh`.
+Orders follow a deterministic state machine defined in `enums/EOrderStatuses.mqh`.
 
-## State Machine
+## State machine
 
 ```
-PENDING ----> OPEN ----> CLOSING ----> CLOSED
-   |                        |
-   +---> CANCELLED          +---> CANCELLED
+PENDING ─┬─→ OPEN ──→ CLOSING ──→ CLOSED
+         │                     └─→ CANCELLED
+         └─→ CANCELLED
 ```
 
 ## States
 
-### PENDING
+### `ORDER_STATUS_PENDING`
 
-The order has been created by a strategy signal but has not yet been submitted to the broker. Orders remain in this state while waiting for market conditions to be met (e.g., price reaching `openAtPrice`) or while the market is closed. The order processing loop in `OnTimer` picks up pending orders and attempts execution each cycle.
+Created by a strategy signal but not yet live at the broker. Stays here while:
 
-### OPEN
+- waiting for the market to reopen,
+- waiting for a limit/stop to trigger,
+- being retried after a transient send failure (bounded by `MAX_RETRY_COUNT_OPEN`).
 
-The broker has confirmed a fill. The order now has a valid `positionId`, `dealId`, `openPrice`, and `openAt` timestamp. The position is actively tracked and exposed to strategy callbacks like `OnOpenOrder`.
+`SEOrderBook.ProcessOrders()` picks up pending orders every cycle and attempts submission.
 
-### CLOSING
+### `ORDER_STATUS_OPEN`
 
-A close signal has been issued (by the strategy, stop-loss, take-profit, or a remote Gateway command) but the broker has not yet confirmed the exit. The order stays in this state until the `OnTradeTransaction` callback processes the closing deal.
+Broker confirmed the fill. The order has a valid `positionId`, `dealId`, `openPrice`, and `openAt`. Strategies receive `OnOpenOrder()`. Further modifications (SL/TP updates) keep the state `OPEN` and fire `OnOrderUpdated()`.
 
-### CLOSED
+### `ORDER_STATUS_CLOSING`
 
-The broker has confirmed the exit. Final values for `closePrice`, `profitInDollars`, `commission`, `swap`, and `closeAt` are recorded. The strategy receives an `OnCloseOrder` callback with the close reason.
+A close intent was issued (by the strategy, SL/TP, or a remote command) but the broker has not yet confirmed the exit. The order stays here until `OnTradeTransaction` delivers the matching close deal. Failures here are retried (`MAX_RETRY_COUNT_CLOSE`); exhaustion transitions to `CANCELLED`.
 
-### CANCELLED
+### `ORDER_STATUS_CLOSED`
 
-The order was abandoned before reaching the CLOSED state. This can happen from PENDING (e.g., strategy revokes the signal, market conditions expire) or from CLOSING (e.g., broker rejects the close request, order expires).
+Broker confirmed the exit. `closePrice`, `profitInDollars`, `commission`, `swap`, and `closeAt` are all recorded. Net profit is `profit + commission * 2 + swap`. Strategies receive `OnCloseOrder(order, reason)`.
 
-## Persistence and Recovery
+### `ORDER_STATUS_CANCELLED`
 
-All order state transitions are serialized to JSON files by `SRPersistenceOfOrders`. On EA restart, the persistence layer deserializes saved orders and restores them into each strategy's `SEOrderBook`. This ensures that open positions are not lost during crashes, VPS reboots, or planned restarts.
+The order was abandoned before `CLOSED`. Possible paths:
 
-## Automatic Queueing
+- From `PENDING` — signal revoked, pending expired, or retry budget exhausted.
+- From `CLOSING` — broker rejected the close request and the retry budget was exhausted.
 
-When the market is closed, orders in PENDING state are automatically queued. The order processing loop detects that the symbol is not tradeable and retries on subsequent timer cycles until the market reopens. Retry logic uses `retryCount` and `retryAfter` fields to implement backoff.
+## Persistence and recovery
+
+Every transition is serialized by `SRPersistenceOfOrders`. In live trading the write goes through the message bus to the Persistence service; in tester mode it writes directly.
+
+On startup, each strategy reloads its order JSON and reconciles open orders against the current MT5 positions (by magic number and position ID). `SRAccountAuditor` cross-checks the resulting view on init and on every new hour, emitting diagnostics when MT5 state diverges from tracked state.
+
+## Market-closed queueing
+
+Orders placed while the market is closed are held with `pendingToOpen = true`. The order book checks market status each cycle; when the market reopens, queued orders are submitted in order.
+
+## Retry budgets
+
+Each transition has an independent retry budget declared as a constant (`MAX_RETRY_COUNT_OPEN`, `MAX_RETRY_COUNT_CANCEL`, `MAX_RETRY_COUNT_CLOSE`, default `3` each). Retries are spaced using `HResolveTransientDeferSeconds.mqh` for transient retcodes. Permanent retcodes transition straight to `CANCELLED`.

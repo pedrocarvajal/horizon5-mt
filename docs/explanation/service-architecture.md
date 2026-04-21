@@ -2,61 +2,64 @@
 
 ## The problem: single-threaded execution
 
-MetaTrader 5 runs Expert Advisors on a single thread. Any blocking operation -- HTTP requests, file writes, long computations -- freezes the EA and delays trade processing. In a live trading environment where order fills and price ticks arrive asynchronously, even a 200ms HTTP call can cause missed events.
+MetaTrader 5 runs every Expert Advisor on a single thread. Any blocking operation — HTTP calls, file writes, long computations — freezes the EA and delays trade processing. In a live environment where fills and ticks arrive asynchronously, even a 200ms HTTP timeout can cause missed events or stale order state.
 
 ## The solution: service scripts and a message bus
 
-Horizon5 splits blocking I/O into separate `.mq5` service scripts that run as independent MT5 services. The EA and its services communicate through a shared-memory message bus backed by a custom DLL (`HorizonMessageBus`).
+Horizon5 pushes blocking I/O out of the EA entirely. Each concern that can block is owned by a standalone `.mq5` **service script** that MT5 runs as an independent service. The EA and its services communicate through a shared-memory **message bus**, backed by a custom DLL (`HorizonMessageBus`).
 
-Each service runs its own polling loop, reads messages from assigned channels, performs the blocking work, and acknowledges completion. The EA never blocks on I/O.
+Each service runs its own polling loop, reads messages from its assigned channels, performs the blocking work, and ACKs. The EA publishes fire-and-forget and never blocks on I/O.
 
 ## Message bus channels
 
-The message bus defines five named channels (in `constants/COMessageBus.mqh`):
+Defined in `constants/COMessageBus.mqh`:
 
-| Channel           | Constant                    | Direction                 | Purpose                                                         |
-| ----------------- | --------------------------- | ------------------------- | --------------------------------------------------------------- |
-| `connector`       | `MB_CHANNEL_CONNECTOR`      | EA -> Monitor service     | HTTP POST requests for the Monitor API                          |
-| `persistence`     | `MB_CHANNEL_PERSISTENCE`    | EA -> Persistence service | File write requests (JSON order state, statistics)              |
-| `events_inbound`  | `MB_CHANNEL_EVENTS_IN`      | Gateway service -> EA     | Trading events from the API (post/delete/put/get orders)        |
-| `events_outbound` | `MB_CHANNEL_EVENTS_OUT`     | EA -> Gateway service     | Acknowledgment responses back to the API                        |
-| `events_service`  | `MB_CHANNEL_EVENTS_SERVICE` | Gateway service -> EA     | Service-level events (account info, asset queries, ticker data) |
+| Channel           | Constant                    | Direction                | Purpose                                                      |
+| ----------------- | --------------------------- | ------------------------ | ------------------------------------------------------------ |
+| `connector`       | `MB_CHANNEL_CONNECTOR`      | EA → Monitor service     | Outbound HTTP POST bodies for the Monitor backend            |
+| `persistence`     | `MB_CHANNEL_PERSISTENCE`    | EA → Persistence service | File-write requests (JSON order state, statistics, state KV) |
+| `events_inbound`  | `MB_CHANNEL_EVENTS_IN`      | Gateway service → EA     | Remote trading events (post/delete/put/get order)            |
+| `events_outbound` | `MB_CHANNEL_EVENTS_OUT`     | EA → Gateway service     | ACK responses back to the Gateway backend                    |
+| `events_service`  | `MB_CHANNEL_EVENTS_SERVICE` | Gateway service → EA     | Service-level queries (account info, assets, ticker, klines) |
 
-Each message carries a `messageType` string and a JSON payload. The bus assigns a monotonic sequence number to every published message, enabling acknowledgment-based flow control.
+Each message carries a `messageType` string and a JSON payload. The bus assigns a monotonic sequence number to every published message, enabling ACK-based flow control.
 
-## Service registration and health monitoring
+## Service registration and health supervision
 
-Each service registers itself on startup:
+On startup, each service registers itself:
 
-- **HorizonPersistence** registers as `MB_SERVICE_PERSISTENCE`
-- **HorizonGateway** registers as `MB_SERVICE_GATEWAY`
-- **HorizonMonitor** registers as `MB_SERVICE_MONITOR`
+- `HorizonPersistence.mq5` → `MB_SERVICE_PERSISTENCE`
+- `HorizonGateway.mq5` → `MB_SERVICE_GATEWAY`
+- `HorizonMonitor.mq5` → `MB_SERVICE_MONITOR`
 
-On initialization, the EA calls `InitializeMessageBus()` which checks that all required services are running via `SEMessageBus::AreServicesReady()`. If any required service is missing, the EA refuses to start.
+On EA init, `InitializeMessageBus()` verifies that all required services are alive via `SEMessageBus::AreServicesReady()`. Missing required services block initialization.
 
-During runtime, the EA calls `CheckServiceHealth()` every minute. If required services go down, trading is paused (`TRADING_PAUSE_REASON_SERVICES_DOWN`) and the message bus is shut down. When services recover, trading resumes automatically.
+During runtime, `CheckServiceHealth()` runs once a minute:
+
+- If required services go down, trading is paused with `TRADING_PAUSE_REASON_SERVICES_DOWN` and the bus is shut down.
+- When services recover, the bus reactivates and trading resumes automatically.
 
 ## HorizonPersistence
 
-Always required in live trading. Polls the `persistence` channel every 200ms (configurable via `PollIntervalMs`). Receives file write requests from the EA -- primarily JSON-serialized order state and statistics.
+Always required in live trading. Polls `MB_CHANNEL_PERSISTENCE` every `PollIntervalMs` (default 200ms) and receives write requests — primarily JSON-serialized order state and statistics.
 
-Key behavior: **deduplication**. When multiple writes target the same file path within a single poll cycle, only the latest content is written. Earlier messages for that path are acknowledged without writing, reducing disk I/O when order state changes rapidly.
+Key behavior: **deduplication**. When multiple writes target the same path within a single poll cycle, only the latest content is written. Earlier messages for that path are ACKed without writing. This keeps disk I/O bounded even when order state changes rapidly.
 
-The service also ensures target directories exist before writing and logs queue diagnostics every 5 minutes.
+The service also ensures target directories exist before writing, and emits queue diagnostics on an interval.
 
 ## HorizonGateway
 
-Optional. Only starts when Gateway URL and credentials are configured and the EA runs in live mode. Polls the Horizon API every 3 seconds (`EVENT_POLL_INTERVAL_SECONDS`) for pending events.
+Optional. Only starts when URL and credentials are configured and the EA runs in live mode. Polls the Gateway backend every `EVENT_POLL_INTERVAL_SECONDS` (default 3s) for pending events.
 
-The service handles two categories of events:
+Handles two categories:
 
-- **Trading events** (`post.order`, `delete.order`, `put.order`, `get.orders`): forwarded to the EA via `MB_CHANNEL_EVENTS_IN` for order management.
-- **Service events** (`get.account.info`, `get.assets`, `get.strategies`, `get.ticker`, `get.klines`, `patch.account.disable`, `patch.account.enable`): forwarded via `MB_CHANNEL_EVENTS_SERVICE` for informational responses.
+- **Trading events** (`post.order`, `delete.order`, `put.order`, `get.orders`) — forwarded to the EA via `MB_CHANNEL_EVENTS_IN` for order management.
+- **Service events** (`get.account.info`, `get.assets`, `get.strategies`, `get.ticker`, `get.klines`, `patch.account.disable`, `patch.account.enable`) — forwarded via `MB_CHANNEL_EVENTS_SERVICE`.
 
-The EA processes inbound trading events through `SEGateway` (per asset), which dispatches to specific handlers (`HHandlePostOrder`, `HHandleDeleteOrder`, etc.). Acknowledgments flow back through `MB_CHANNEL_EVENTS_OUT`.
+The EA processes inbound trading events through `SEGateway` (per asset), which dispatches to specific handlers. ACKs flow back through `MB_CHANNEL_EVENTS_OUT`.
 
 ## HorizonMonitor
 
-Optional. Forwards HTTP POST requests from the EA to the Horizon Monitor API. Polls `MB_CHANNEL_CONNECTOR` every 100ms. Prioritizes order-related endpoints over other requests to minimize latency on trade state synchronization.
+Optional. Forwards outbound HTTP POSTs from the EA to the Monitor backend. Polls `MB_CHANNEL_CONNECTOR` frequently (default 100ms) and **prioritizes order-related endpoints** over general telemetry to minimize latency on trade-state synchronization.
 
-The Monitor service processes requests containing a `path` and JSON body, executes the HTTP POST, and acknowledges the message. It does not return response data to the EA -- monitoring is fire-and-forget.
+Requests carry a `path` and a JSON body. The service executes the POST and ACKs the message — monitoring is fire-and-forget from the EA's perspective.

@@ -1,27 +1,16 @@
 # Naming Conventions
 
-## Strategy Names
+## File paths
 
-Strategies are named after cities, grouped by the asset class they trade.
+Asset and strategy files live at fixed paths so the registry, magic-number hashing, and log namespacing all stay aligned.
 
-### Gold (XAUUSD) -- Australian cities
+### Asset files
 
-Ballarat, Bendigo, Cairns, Darwin, Geelong, Hobart, Mackay, Tamworth, Toowoomba, Wollongong.
+```
+assets/<AssetClass>/<Instrument>.mqh
+```
 
-### Nikkei225 -- Japanese cities
-
-Fukuoka, Kobe, Kyoto, Nagoya, Nara, Niigata, Nikko, Osaka, Sapporo, Yokohama.
-
-### SP500 -- American cities
-
-Austin, Charlotte, Denver, Memphis, Nashville, Phoenix, Portland, Raleigh, Tampa, Tucson.
-
-### Rules
-
-- Names must be easy to pronounce. Avoid obscure or hard-to-say city names.
-- Each strategy has a 3-letter uppercase prefix used in logs and identifiers (e.g., DNV for Denver, SPR for Sapporo).
-
-## File Paths
+`<AssetClass>` is a free-form grouping label (e.g. `Commodities`, `Indices`, `Forex`) — it affects only the directory tree. `<Instrument>` is the asset name you register (matches `SetName()`'s value, PascalCase).
 
 ### Strategy files
 
@@ -29,34 +18,34 @@ Austin, Charlotte, Denver, Memphis, Nashville, Phoenix, Portland, Raleigh, Tampa
 strategies/<AssetClass>/<Instrument>/<Name>/<Name>.mqh
 ```
 
-Examples:
+Each strategy gets its own folder. The folder name, the file name, and `SetName()` should all match.
 
-- `strategies/Commodities/Gold/Ballarat/Ballarat.mqh`
-- `strategies/Indices/Nikkei225/Osaka/Osaka.mqh`
-- `strategies/Indices/SP500/Denver/Denver.mqh`
+## Strategy identifiers
 
-### Asset registration files
+Each strategy must declare:
 
-```
-assets/<AssetClass>/<Instrument>.mqh
-```
+- **Name** — descriptive, easy-to-pronounce label. Used in logs, file paths, and reporting.
+- **Prefix** — 3-letter uppercase code. Unique **across the entire portfolio**, not just within its asset. The prefix is part of the magic-number seed, so uniqueness is a hard invariant enforced on init.
 
-Examples:
+Pick names you can say out loud in a conversation or log line without ambiguity. The framework does not prescribe a naming theme — only that names and prefixes stay memorable and unique.
 
-- `assets/Commodities/Gold.mqh`
-- `assets/Indices/Nikkei225.mqh`
-- `assets/Indices/SP500.mqh`
+## Code prefixes
 
-Each asset file includes strategy headers and defines the `<Asset><Strategy>Enabled` input toggles.
+| Prefix | Location      | Role                                                                                |
+| ------ | ------------- | ----------------------------------------------------------------------------------- |
+| `H`    | `helpers/`    | Pure utility functions operating on values or arrays — no market-data access        |
+| `IN`   | `indicators/` | Market-data functions that call `CopyXxx` to read bars or indicator buffers         |
+| `SE`   | `services/`   | Core services (time, logging, sizing, bus, order book, statistics, gateway routing) |
+| `SR`   | `services/`   | Persistence, reports, integrations, reconciliation                                  |
+| `E`    | `entities/`   | Domain entities (e.g. `EOrder`, `EAccount`)                                         |
+| `S`    | `structs/`    | Plain data-transfer structs (e.g. `SDateTime`, `STradingStatus`)                    |
+| `I`    | `interfaces/` | Interface definitions (e.g. `IStrategy`, `IAsset`)                                  |
+| `CO`   | `constants/`  | Compile-time constant groups (times, message bus channels, order limits, etc.)      |
+| `A`    | `adapters/`   | Thin wrappers over MT5 subsystems (e.g. `ATrade` around `CTrade`)                   |
 
-## Code Prefixes
+## Identifier policy
 
-| Prefix | Location      | Purpose                                                                          |
-| ------ | ------------- | -------------------------------------------------------------------------------- |
-| `H`    | `helpers/`    | Pure utility functions that operate on arrays or values (no market data access). |
-| `IN`   | `indicators/` | Market data functions that use `CopyXxx` to read price/indicator buffers.        |
-| `SE`   | `services/`   | Core services: logging, time, lot sizing, order management, messaging.           |
-| `SR`   | `services/`   | Persistence, reports, integrations, and remote order management.                 |
-| `E`    | `entities/`   | Data entities such as `EOrder` and `EAccount`.                                   |
-| `S`    | `structs/`    | Plain structs for data transfer (e.g., `SDateTime`, `STradingStatus`).           |
-| `I`    | `interfaces/` | Interface definitions (e.g., `IStrategy`).                                       |
+- **Magic numbers** — derived deterministically from `"{symbol}_{assetName}_{strategyName}"` via DJB2 hash, modulo 1 billion. Computed locally, validated for uniqueness at init.
+- **UUIDs** — deterministic UUID v5-style values derived from seed strings (account, asset, strategy, order). The EA and any external backend (Monitor, Gateway) compute matching UUIDs independently — no registration handshake is needed.
+
+See [Explanation > Portfolio Approach](../explanation/portfolio-approach.md) for the rationale.

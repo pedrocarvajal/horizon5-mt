@@ -1,25 +1,9 @@
-# Horizon5 Documentation
+# Getting Started
 
-Horizon5 is an algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with portfolio-level risk management.
+Setup, compilation, and the shape of the project.
 
-## Documentation sections
+- [Installation](installation.md) — requirements, clone location, compilation, attaching the EA, and input configuration.
+- [Project Structure](project-structure.md) — directory layout, prefixes, and where each piece of the framework lives.
+- [First Strategy](first-strategy.md) — a minimal, generic strategy walked end-to-end so you can understand the extension pattern.
 
-### [Getting Started](./installation.md)
-
-Setup, installation, project structure, and creating your first strategy.
-
-- [Installation](./installation.md) -- requirements, compilation, and configuration
-- [Project Structure](./project-structure.md) -- directory layout and key files
-- [First Strategy](./first-strategy.md) -- step-by-step guide to adding a new strategy
-
-### [How-To Guides](../how-to/)
-
-Task-oriented guides for common operations (deploy, backtest, manage strategies).
-
-### [Reference](../reference/)
-
-API reference for classes, services, and configuration options.
-
-### [Explanation](../explanation/)
-
-Architecture decisions, design patterns, and system internals.
+Once you can compile, attach, and run the EA in the Strategy Tester, move on to the [How-To Guides](../how-to/) for task-oriented recipes and to [Explanation](../explanation/) for the architectural rationale.

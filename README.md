@@ -1,143 +1,133 @@
-# Horizon5
+<p align="center">
+  <img src="docs/assets/logo.png" alt="Horizon5" width="220" />
+</p>
 
-![MQL5](https://img.shields.io/badge/MQL5-MetaTrader%205-blue.svg)
-![Platform](https://img.shields.io/badge/platform-windows-lightgrey.svg)
-![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-orange.svg)
+<h1 align="center">Horizon5</h1>
 
-A portfolio-based algorithmic trading framework for MetaTrader 5. Build, backtest, and deploy multiple trading strategies across different assets with event-driven architecture, risk-adjusted position sizing, and optional remote integrations.
+<p align="center">
+  A portfolio-oriented algorithmic trading framework for MetaTrader 5.<br/>
+  Build, backtest, orchestrate, and operate multiple trading strategies from a single Expert Advisor.
+</p>
 
-## Overview
+<p align="center">
+  <img src="https://img.shields.io/badge/MQL5-MetaTrader%205-blue.svg" alt="MQL5" />
+  <img src="https://img.shields.io/badge/platform-windows-lightgrey.svg" alt="Platform" />
+  <img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-orange.svg" alt="License" />
+</p>
 
-Horizon5 uses a hierarchical portfolio pattern where the Expert Advisor manages multiple assets, each containing independent strategies that generate signals and manage orders. Capital is allocated equally across enabled assets, then split equally among each asset's active strategies.
+---
 
-```text
-Horizon.mq5 --> SEAsset[] --> SEStrategy[] --> EOrder[]
-```
+## Built with Horizon5 — live portfolio case study
 
-## Key Features
+Horizon5 is the framework I built to run my own multi-asset trading portfolio. The chart below is real out-of-sample performance of that portfolio against its benchmarks — produced by strategies implemented on top of this very framework.
 
-- **Multi-asset portfolio** -- Trade Gold, Bitcoin, SP500, Nikkei225 (or add your own) from a single EA
-- **Event-driven architecture** -- Timer-based system with day, hour, and minute transitions propagated down the hierarchy
-- **Risk-adjusted position sizing** -- ATR-based dynamic stops with configurable equity-at-risk percentage
-- **Order state machine** -- Full lifecycle (PENDING, OPEN, CLOSING, CLOSED) with JSON persistence for live trading recovery
-- **Performance tracking** -- NAV, drawdown, quality metrics per strategy
-- **Message bus IPC** -- DLL-based inter-process communication between the EA and companion services
-- **Remote integrations** -- Optional Gateway (remote order management) and Monitor (observability) via Horizon API
-- **Persistence service** -- Async file writer for order and state recovery across EA restarts
+<p align="center">
+  <img src="docs/assets/portfolio-returns.png" alt="Horizon5 portfolio performance vs. benchmarks" width="820" />
+</p>
 
-## Quick Start
+**See the full performance report:** [Horizon5 portfolio report (PDF)](https://drive.google.com/file/d/11PaDyKSfkM5XJ_rWKQIaMqYABIsIcQRh/view?usp=sharing)
 
-1. Clone into your MetaTrader 5 Experts folder:
+The strategies themselves are proprietary and not part of this repository — what you get here is the **production-grade infrastructure** that made the portfolio possible: event-driven orchestration, deterministic identity, crash-safe persistence, risk-adjusted sizing, and optional remote observability.
 
-```bash
-git clone <repo-url> /path/to/MetaTrader5/MQL5/Experts/Horizon5/
-```
+---
 
-2. Open `Horizon.mq5` in MetaEditor and compile
-3. Attach the Expert Advisor to any chart
-4. Enable strategies via the input parameters panel
+## What is Horizon5
 
-For companion services setup and full configuration, see [Installation Guide](docs/getting-started/installation.md).
+Horizon5 is **not a strategy**. It is the infrastructure a strategy needs in order to be treated as a long-running, auditable production system:
 
-## Architecture
+- A hierarchical **EA → Asset → Strategy → Order** model with equal-weight capital allocation at every level.
+- An **event-driven core** that turns MT5's single-threaded tick loop into deterministic timer and primed-bar events (minute / hour / day).
+- A strict **order state machine** with crash-safe persistence and automatic recovery on restart.
+- A **service-oriented runtime**: blocking I/O (file writes, HTTP, remote APIs) is pushed out of the EA thread via a DLL-backed message bus and dedicated MT5 service scripts.
+- **Deterministic magic numbers and UUIDs**, so the same logical entity maps to the same identity across restarts, backtests, and external systems.
+- **Local-first reporting** (order history, strategy snapshots, market snapshots, logs) plus **optional remote observability and orchestration**.
 
-```text
-+------------------+      +---------------------+
-|   Horizon.mq5    |      | HorizonPersistence  |
-|   (Expert Advisor) <---->  (Service .mq5)     |
-|                  |  MB  |  Async file writer   |
-|  Assets[]        |      +---------------------+
-|   Strategies[]   |
-|    Orders[]      |      +---------------------+
-|                  | MB   | HorizonGateway       |
-|  Event loop      <-----> (Service .mq5)       |
-|  Risk management |      |  Remote order sync   |
-|  Statistics      |      +---------------------+
-|                  |
-|                  |      +---------------------+
-|                  | MB   | HorizonMonitor       |
-|                  <-----> (Service .mq5)       |
-+------------------+      |  Monitoring push     |
-                          +---------------------+
-       MB = MessageBus (DLL-based IPC)
-```
+## Capabilities at a glance
 
-The EA runs as the main process. Three companion services run as separate `.mq5` service scripts, communicating through a shared message bus:
+| Capability                    | What it gives you                                                                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Portfolio orchestration       | One EA handles many instruments and many strategies per instrument, each in an isolated scope with its own balance and statistics. |
+| Risk-adjusted position sizing | Equity-at-risk sizing (static or compounded) driven by stop-loss distance, normalized against broker volume constraints.           |
+| Order lifecycle               | `PENDING → OPEN → CLOSING → CLOSED` (with `CANCELLED` branches), retry budgets per transition, and market-closed queueing.         |
+| Crash-safe persistence        | JSON-serialized order state, statistics, and strategy-defined key/value state — loaded back on init for seamless recovery.         |
+| Async I/O via message bus     | A shared-memory DLL (`HorizonMessageBus`) routes file writes and remote calls to dedicated service scripts so the EA never blocks. |
+| Service health supervision    | The EA monitors required services every minute; trading auto-pauses on outage and auto-resumes on recovery.                        |
+| Deterministic identity        | DJB2-based magic numbers and UUID v5-style identifiers derived from stable seeds — no central registry, no drift across restarts.  |
+| Local reporting               | Order-history, strategy-snapshot, market-snapshot, and log exports per asset for post-hoc analysis.                                |
+| Optional remote orchestration | Plug-in integrations for remote order management, account monitoring, and live dashboards.                                         |
+| Backtester-friendly           | The same code path runs in the MT5 Strategy Tester; persistence and message bus gracefully degrade when not in live mode.          |
 
-| Service     | File                     | Required     | Purpose                                                 |
-| ----------- | ------------------------ | ------------ | ------------------------------------------------------- |
-| Persistence | `HorizonPersistence.mq5` | Live trading | Async file writer for order/state recovery              |
-| Gateway     | `HorizonGateway.mq5`     | Optional     | Event bridge to Horizon API for remote order management |
-| Monitor     | `HorizonMonitor.mq5`     | Optional     | Pushes account/strategy data to monitoring dashboard    |
-
-Gateway and Monitor require a running [Horizon API](https://github.com/pedrocarvajal/horizon5-mt-api) instance. If you don't use the Horizon API, leave these services disabled.
-
-For details on the service architecture and message bus, see [Service Architecture](docs/explanation/service-architecture.md).
-
-## Project Structure
+## Architecture, at a glance
 
 ```text
-horizon5-portfolio/
-+-- Horizon.mq5                     Main Expert Advisor
-+-- HorizonGateway.mq5              Gateway service (optional)
-+-- HorizonMonitor.mq5              Monitor service (optional)
-+-- HorizonPersistence.mq5          Persistence service (live trading)
-+-- adapters/                       Trade execution adapter (CTrade wrapper)
-+-- assets/                         Asset definitions by class
-|   +-- Commodities/Gold.mqh        Gold (XAUUSD) - 10 strategies
-|   +-- Crypto/Bitcoin.mqh          Bitcoin (BTCUSD)
-|   +-- Indices/SP500.mqh           S&P 500 (US500) - 10 strategies
-|   +-- Indices/Nikkei225.mqh       Nikkei 225 - 10 strategies
-+-- configs/                        Asset registry
-+-- constants/                      Time constants
-+-- entities/                       Domain entities (Account, Asset, Order)
-+-- enums/                          Enumerations (statuses, debug levels)
-+-- helpers/                        Utility functions (UUID, pip calc, market status)
-+-- indicators/                     Market data functions (CopyXxx-based)
-+-- integrations/                   External API integrations
-|   +-- HorizonGateway/             Remote order management
-|   +-- HorizonMonitor/             Monitoring data push
-+-- interfaces/                     Abstract contracts (IAsset, IStrategy)
-+-- libraries/                      External MQL5 libraries
-+-- services/                       Business logic (20 services)
-+-- strategies/                     Strategy implementations
-|   +-- Strategy.mqh                SEStrategy base class
-|   +-- Commodities/Gold/           Australian city names (Ballarat, Bendigo, ...)
-|   +-- Indices/Nikkei225/          Japanese city names (Kyoto, Osaka, ...)
-|   +-- Indices/SP500/              American city names (Austin, Denver, ...)
-|   +-- Generic/                    Gateway and Test strategies
-+-- structs/                        Data structures
-+-- docs/                           Documentation
++-------------------------------------------------------------+
+|                       Horizon.mq5 (EA)                      |
+|                                                             |
+|   configs/Assets.mqh  ->  SEAsset[]                         |
+|                             |                               |
+|                             +-> SEStrategy[]                |
+|                                     |                       |
+|                                     +-> SEOrderBook         |
+|                                             |               |
+|                                             +-> EOrder[]    |
+|                                                             |
+|   Event loop (OnTimer + primed-bar detection)               |
+|   Risk sizing (SELotSize)                                   |
+|   Statistics (SEStatistics)                                 |
+|   Persistence, reporting, remote integration                |
++--------------------------+----------------------------------+
+                           |
+                     MessageBus (DLL, shared memory)
+                           |
+   +-----------------------+-------------------------+
+   |                       |                         |
++--v--------------+  +-----v-----------+   +---------v---------+
+| HorizonPersist. |  | HorizonGateway  |   | HorizonMonitor    |
+| (async file I/O)|  | (remote orders) |   | (observability)   |
++-----------------+  +-----------------+   +-------------------+
 ```
 
-For a detailed breakdown, see [Project Structure](docs/getting-started/project-structure.md).
+The EA runs in a single MT5 thread. Dedicated `.mq5` **services** run as independent MT5 service scripts and communicate with the EA exclusively through the message bus — there is no shared state and no blocking call between them.
+
+## How orchestration works
+
+1. The EA boots, validates magic numbers, allocates capital equally across enabled assets, then across each asset's active strategies.
+2. A 1-second timer drives an orchestration loop that dispatches primed-bar events (`OnStartMinute`, `OnStartHour`, `OnStartDay`) and configurable tick intervals down the hierarchy.
+3. Strategies generate signals, hand orders to their order book, and let the framework handle sizing, normalization, broker submission, retries, market-closed queueing, and recovery.
+4. Broker-side trade transactions bubble back up through the EA, are routed to the owning strategy via magic number, and move orders through the state machine.
+5. Every state change is serialized; in live trading the write goes through the persistence service, so disk I/O never blocks the trading thread.
+6. If any required service goes down, trading pauses with a typed reason and resumes automatically when the service recovers.
+
+## Who this is for
+
+- Builders of **multi-strategy, multi-instrument** MT5 portfolios who have outgrown the "one EA per chart" workflow.
+- Quant-leaning traders who want **deterministic identifiers, crash safety, and observability** baked in, not bolted on.
+- Teams that want a **clean extension surface** — add a strategy, add an asset, add a helper, add a service — without touching the core.
 
 ## Documentation
 
-| Section                                  | Description                                            |
-| ---------------------------------------- | ------------------------------------------------------ |
-| [Getting Started](docs/getting-started/) | Installation, project structure, first strategy        |
-| [How-To Guides](docs/how-to/)            | Add strategies, configure risk, go live                |
-| [Reference](docs/reference/)             | Configuration, services, events, naming conventions    |
-| [Explanation](docs/explanation/)         | Architecture decisions, order lifecycle, observability |
+The full framework reference lives under [`docs/`](docs/):
+
+| Section                                  | What's inside                                                                   |
+| ---------------------------------------- | ------------------------------------------------------------------------------- |
+| [Getting Started](docs/getting-started/) | Requirements, installation, compilation, and the shape of the project           |
+| [How-To Guides](docs/how-to/)            | Adding strategies and assets, risk configuration, live setup, custom indicators |
+| [Reference](docs/reference/)             | Inputs, services, events, order states, naming rules, monitor wire contract     |
+| [Explanation](docs/explanation/)         | Architecture, portfolio model, order lifecycle, service model, design rationale |
 
 ## Ecosystem
 
-| Project                    | Description                                                          | Status  |
-| -------------------------- | -------------------------------------------------------------------- | ------- |
-| **Horizon EA** (this repo) | MetaTrader 5 Expert Advisor                                          | Public  |
-| **Horizon Gateway**        | Laravel REST API for account/strategy management and event streaming | Private |
-| **Horizon Monitor**        | Laravel REST API for trade monitoring, snapshots, and EA heartbeats  | Private |
+Horizon5 can run fully standalone. For teams that want the full operational surface — remote order management, centralized monitoring, and a live dashboard — there is a private ecosystem around the EA:
 
-## Project Status
+- **Horizon Gateway** — remote order management and event streaming.
+- **Horizon Monitor** — centralized account, strategy, order, and log telemetry.
+- **Horizon War Room** — dashboard that consumes the Monitor telemetry.
 
-This project is currently in **unstable pre-release** (version `0.x`). The API, architecture, and conventions may change without notice. Version `1.0` will mark the first stable release.
+These components are **not part of the public repository**. If you want to run Horizon5 at full capacity with the full ecosystem enabled, reach out via my [GitHub profile](https://github.com/pedrocarvajal) to get access and onboarding.
 
-## About
+## Project status
 
-Horizon5 is the codebase behind a personal live trading portfolio. I built it for my own use and I maintain it as long as I'm actively trading with it. Strategies are not published as they are proprietary intellectual property.
-
-If you're interested in collaborating, building on this framework, or need support, feel free to reach out through my [GitHub profile](https://github.com/pedrocarvajal).
+Horizon5 is in **unstable pre-release** (version `0.x`). Inputs, interfaces, and internals may change without notice. Version `1.0` will mark the first stable release.
 
 ## Disclaimer
 
@@ -145,4 +135,4 @@ This software is provided for educational and research purposes. Algorithmic tra
 
 ## License
 
-This project is licensed under the PolyForm Noncommercial License. See [LICENSE.md](LICENSE.md) for details.
+Licensed under the PolyForm Noncommercial License. See [LICENSE.md](LICENSE.md) for details.
