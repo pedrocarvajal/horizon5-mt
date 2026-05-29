@@ -31,7 +31,7 @@ Each strategy declares a `maxLotsByOrder` in its constructor via `SetMaxLotsByOr
 
 ## Volume normalization
 
-`NormalizeLotSize()` enforces broker constraints in order:
+Volume is normalized against broker constraints in order:
 
 1. Round down to `SYMBOL_VOLUME_STEP`.
 2. Return `0` (skip trade) if the result is below `SYMBOL_VOLUME_MIN`.
@@ -39,7 +39,7 @@ Each strategy declares a `maxLotsByOrder` in its constructor via `SetMaxLotsByOr
 
 ## Stop-distance validation
 
-`CheckStopDistance()` verifies the stop/limit price respects `SYMBOL_TRADE_STOPS_LEVEL`. If the target price is too close to the current market, the order is rejected before it reaches the broker.
+Stop/limit prices are validated against `SYMBOL_TRADE_STOPS_LEVEL`. If the target price is too close to the current market, the order is rejected before it reaches the broker.
 
 ## Trading pause
 

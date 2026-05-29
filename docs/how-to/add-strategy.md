@@ -47,7 +47,7 @@ Override the lifecycle hooks you need. Typical pattern:
 
 - Evaluate signals inside `OnStartHour()` (or another bar-level hook) after calling the parent.
 - Compute lot size via `GetLotSizeByStopLoss(stopLossDistance)`.
-- Normalize and validate with `NormalizeLotSize()`, `FixMarketPrice()`, `CheckStopDistance()`.
+- Normalize the volume and validate stop/limit distances against broker constraints before submitting.
 - Submit orders through the inherited `orderBook`.
 
 See [Position Sizing](position-sizing.md) and [Risk Management](risk-management.md) for the math and guardrails.

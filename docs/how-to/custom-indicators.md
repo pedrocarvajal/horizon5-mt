@@ -24,9 +24,6 @@ These operate on values or arrays already in memory. No market data dependency.
 
 Representative functions:
 
-- `HNormalizeLotSize.mqh` — round lot size to broker volume step/min/max.
-- `HCheckStopDistance.mqh` — validate SL/TP against `SYMBOL_TRADE_STOPS_LEVEL`.
-- `HGetIndicatorValue.mqh` — wrap `CopyBuffer` for custom indicator handles.
 - `HClampNumeric.mqh`, `HStringToNumber.mqh`, `HMapTimeframe.mqh` — generic utilities.
 - `HGet*Uuid.mqh` — deterministic UUID construction.
 - `HGetPipSize.mqh`, `HGetPipValue.mqh` — symbol-scale helpers.
@@ -49,23 +46,18 @@ if (handle != INVALID_HANDLE) {
 }
 ```
 
-Read values through the helper:
+Read values with `CopyBuffer`:
 
 ```mql5
-double value = GetIndicatorValue(handle, bufferIndex, shift);
+double values[];
+int copied = CopyBuffer(handle, bufferIndex, shift, count, values);
 ```
 
 - `bufferIndex` — the indicator output buffer (0 for most single-output indicators).
 - `shift` — number of bars back. `0` is the forming bar; use `1` for the last closed bar.
+- `count` — number of values to copy. Use `1` for a single value.
 
-For multiple values at once:
-
-```mql5
-double values[];
-bool ok = GetIndicatorValues(handle, bufferIndex, shift, count, values);
-```
-
-Returns `true` if the requested range was copied; the array is series-indexed (index 0 = most recent).
+`CopyBuffer` returns the number of values copied (`-1` on error); the array is series-indexed (index 0 = most recent).
 
 ## Shift semantics
 

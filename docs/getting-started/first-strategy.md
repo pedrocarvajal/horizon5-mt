@@ -52,7 +52,7 @@ Key points:
 - **Extend `SEStrategy`** — you get `orderBook`, `logger`, `symbol`, sizing, statistics, persistence, and lifecycle plumbing for free.
 - **Set name, prefix, and max lots in the constructor.** Prefix must be unique across the whole portfolio — it feeds into the magic-number hash.
 - **Call the parent first** in overridden lifecycle methods (`OnInit`, `OnStartHour`, etc.). The base class performs required setup.
-- **Use shift 1** (`CopyXxx` / `GetIndicatorValue` with `shift=1`) when reading indicators so you see the last closed bar, not the forming one.
+- **Use shift 1** (`CopyXxx` with `shift=1`) when reading indicators so you see the last closed bar, not the forming one.
 - **Guard duplicates** with `orderBook.HasActiveOrders()` or `orderBook.HasPendingOrder()` before placing.
 - **Release resources** (indicator handles, pointers) in the destructor.
 
