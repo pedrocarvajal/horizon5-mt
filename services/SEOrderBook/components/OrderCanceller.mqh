@@ -89,6 +89,7 @@ public:
 			if (retry.retryable) {
 				retry.after = dtime.Timestamp() + marketStatus.opensInSeconds;
 				order.SetCancelRetry(retry);
+				order.SetPendingToClose(true);
 				logger.Warning(
 					LOG_CODE_ORDER_RETRY_SCHEDULED,
 					StringFormat(

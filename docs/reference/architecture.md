@@ -1,6 +1,6 @@
 # Architecture Overview
 
-High-level view of how Horizon5 is wired. For the rationale behind these choices, see [Explanation > Design Decisions](../explanation/design-decisions.md). For the service model in depth, see [Explanation > Service Architecture](../explanation/service-architecture.md).
+High-level view of how Horizon5 is wired. For the rationale behind these choices, see [Explanation > Design Decisions](../explanation/design-decisions.md).
 
 ## Process topology
 
@@ -10,23 +10,14 @@ High-level view of how Horizon5 is wired. For the rationale behind these choices
 |                                                              |
 |   Event loop  ─────────► Assets ─► Strategies ─► OrderBooks  |
 |                                                              |
-|   Inputs    → risk model, reporting, integrations            |
+|   Inputs    → risk model, reporting                          |
 |   Services  → SEDateTime, SELogger, SELotSize, SEStatistics, |
-|               SEOrderBook, SEMessageBus, SEGateway, ...      |
-|   Entities  → EAccount, EAsset, EOrder                       |
-+---------------------------+----------------------------------+
-                            |
-                    MessageBus DLL (shared memory)
-                            |
-   +------------------------+----------------------------+
-   |                        |                            |
-+--v--------------+  +------v----------+   +-------------v------+
-| HorizonPersist. |  | HorizonGateway  |   | HorizonMonitor     |
-| (.mq5 service)  |  | (.mq5 service)  |   | (.mq5 service)     |
-+-----------------+  +-----------------+   +--------------------+
+|               SEOrderBook, SEDb, ...                         |
+|   Entities  → EAccount, EOrder, ETradingStatus               |
++--------------------------------------------------------------+
 ```
 
-The EA is the only process that holds trading state. Services are stateless relays: they poll their assigned channels, perform I/O, and ACK messages.
+The EA is a single self-contained program and the only process that holds trading state. It loads no DLLs, needs no companion MT5 services, and makes no WebRequest calls; all persistence and reporting is plain JSON written through `SEDb`.
 
 ## Hierarchy inside the EA
 
@@ -34,6 +25,7 @@ The EA is the only process that holds trading state. Services are stateless rela
 EA
 ├── EAccount (static account entity)
 └── SEAsset[]                 (1 per tradable instrument)
+     ├── ETradingStatus        (the asset's trading pause)
      └── SEStrategy[]          (1..N per asset)
           └── SEOrderBook       (1 per strategy)
                └── EOrder[]      (lifecycle records)
@@ -41,17 +33,19 @@ EA
 
 Events flow top-down through `OnTimer`/primed-bar dispatch; trade transactions flow bottom-up through magic-number routing.
 
-## Message bus channels
+## Files on disk
 
-| Channel           | Direction        | Purpose                                                  |
-| ----------------- | ---------------- | -------------------------------------------------------- |
-| `connector`       | EA → Monitor     | Outbound HTTP POST bodies                                |
-| `persistence`     | EA → Persistence | File-write requests (JSON order state, statistics)       |
-| `events_inbound`  | Gateway → EA     | Remote trading events (post/delete/put/get order)        |
-| `events_outbound` | EA → Gateway     | ACK responses to inbound events                          |
-| `events_service`  | Gateway → EA     | Service-level events (account info, assets, klines, ...) |
+All files live under MT5's Common Files folder, namespaced by account login.
 
-Each message carries a `messageType` and a JSON payload; every message has a monotonic sequence number that enables ACK-based flow control and deduplication.
+| Path                                                  | Written by                    | When                                           |
+| ----------------------------------------------------- | ----------------------------- | ---------------------------------------------- |
+| `<login>\Live\<symbol>\<prefix>\orders.json`          | `SRPersistenceOfOrders`       | Live trading, on every order transition        |
+| `<login>\Live\<symbol>\<prefix>\statistics.json`      | `SRPersistenceOfStatistics`   | Live trading                                   |
+| `<login>\Live\<symbol>\<prefix>\state.json`           | `SRPersistenceOfState`        | Live trading                                   |
+| `<login>\Reports\<symbol>_<prefix>_Orders.json`       | `SRReportOfOrderHistory`      | `OnTester()`, if `EnableOrderHistoryReport`    |
+| `<login>\Reports\<symbol>_<prefix>_Snapshots.json`    | `SRReportOfStrategySnapshots` | `OnTester()`, if `EnableSnapshotHistoryReport` |
+| `<login>\Reports\<symbol>_MARKET_Snapshots.json`      | `SRReportOfMarketSnapshots`   | `OnTester()`, if `EnableMarketHistoryReport`   |
+| `<login>\Logs\Portfolio\<timestamp>_<seed>\Logs.json` | `SRReportOfLogs`              | EA shutdown, if `EnableLogExport`              |
 
 ## Extension surface
 
@@ -59,4 +53,3 @@ Each message carries a `messageType` and a JSON payload; every message has a mon
 - **Add an asset** — create a subclass of `SEAsset` under `assets/.../` and register it in `configs/Assets.mqh`.
 - **Add a helper / indicator** — drop a file in `helpers/` or `indicators/` following the `H` / `IN` naming convention.
 - **Add a service** — new `SE` / `SR` folder under `services/` with its own public surface.
-- **Add a standalone service script** — new `.mq5` file at the root using `SEMessageBus` to register as a named service and poll its channel.

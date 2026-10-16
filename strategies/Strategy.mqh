@@ -1,23 +1,12 @@
 #ifndef __SE_STRATEGY_MQH__
 #define __SE_STRATEGY_MQH__
 
-#include "../constants/COTime.mqh"
-
-#include "../enums/EOrderStatuses.mqh"
-
-#include "../structs/SSOrderHistory.mqh"
-#include "../structs/SSStatisticsSnapshot.mqh"
-#include "../structs/STradingStatus.mqh"
-
 #include "../helpers/HNormalizeLotSize.mqh"
-
-#include "../enums/ESnapshotEvent.mqh"
 
 #include "../interfaces/IStrategy.mqh"
 
 #include "../services/SELogger/SELogger.mqh"
 #include "../services/SEDateTime/SEDateTime.mqh"
-#include "../services/SEDateTime/structs/SDateTime.mqh"
 #include "../services/SEOrderBook/SEOrderBook.mqh"
 #include "../services/SEStatistics/SEStatistics.mqh"
 #include "../services/SELotSize/SELotSize.mqh"
@@ -26,20 +15,15 @@
 #include "../services/SRPersistenceOfOrders/SRPersistenceOfOrders.mqh"
 #include "../services/SRPersistenceOfStatistics/SRPersistenceOfStatistics.mqh"
 #include "../services/SRPersistenceOfState/SRPersistenceOfState.mqh"
-#include "../services/SRImplementationOfHorizonMonitor/SRImplementationOfHorizonMonitor.mqh"
-#include "../services/SRReportOfMonitorSeed/SRReportOfMonitorSeed.mqh"
 
 #include "../entities/EOrder.mqh"
+#include "../entities/ETradingStatus.mqh"
 
 extern SEDateTime dtime;
-extern SRImplementationOfHorizonMonitor horizonMonitor;
-extern STradingStatus tradingStatus;
-extern SRReportOfMonitorSeed *monitorSeedReporter;
 
 class SEStrategy:
 public IStrategy {
 private:
-	double weight;
 	double balance;
 
 	SEStatistics *statistics;
@@ -49,6 +33,7 @@ private:
 	SRPersistenceOfOrders *orderPersistence;
 	SRPersistenceOfStatistics *statisticsPersistence;
 	SRPersistenceOfState *statePersistence;
+	ETradingStatus *tradingStatus;
 
 protected:
 	SELogger logger;
@@ -57,10 +42,8 @@ protected:
 	string name;
 	string symbol;
 	string prefix;
-	string strategyUuid;
 	ulong strategyMagicNumber;
 	double maxLotsByOrder;
-	bool isPassive;
 
 	void SetStateDouble(string key, double value) {
 		if (CheckPointer(statePersistence) != POINTER_INVALID) {
@@ -194,10 +177,6 @@ public:
 		));
 	}
 
-	double GetBalance() {
-		return balance;
-	}
-
 	double CalculateLotSize(double stopLossDistance) {
 		double orderLotSize = GetLotSizeByStopLoss(stopLossDistance);
 
@@ -254,10 +233,6 @@ public:
 		return strategyMagicNumber;
 	}
 
-	string GetStrategyUuid() {
-		return strategyUuid;
-	}
-
 	double GetMaxLotsByOrder() {
 		return maxLotsByOrder;
 	}
@@ -278,10 +253,6 @@ public:
 		return statistics;
 	}
 
-	string GetSymbol() {
-		return symbol;
-	}
-
 	double GetTodayClosedPnl() {
 		return statistics.GetTodayClosedPnl();
 	}
@@ -292,31 +263,17 @@ public:
 		return statistics.GetTodayTotalPnl(ordersSnapshot);
 	}
 
-	double GetWeight() {
-		return weight;
-	}
-
-	bool IsPassive() {
-		return isPassive;
-	}
-
 	bool IsTradable() {
 		return CheckPointer(statistics) == POINTER_INVALID || statistics.GetClosedNav() > 0;
 	}
 
 	bool CanTrade() {
-		return !tradingStatus.isPaused && IsTradable();
+		return !isTradingPaused() && IsTradable();
 	}
 
 	virtual void OnCancelOrder(EOrder& order) {
-		horizonMonitor.UpsertOrder(order);
-
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
-		}
-
-		if (CheckPointer(monitorSeedReporter) != POINTER_INVALID && !isPassive) {
-			monitorSeedReporter.AddOrder(order);
 		}
 	}
 
@@ -329,17 +286,9 @@ public:
 			statisticsPersistence.Save(statistics);
 		}
 
-		horizonMonitor.UpsertOrder(order);
-
 		if (CheckPointer(orderHistoryReporter) != POINTER_INVALID) {
 			orderHistoryReporter.AddOrderSnapshot(order.GetSnapshot());
 		}
-
-		if (CheckPointer(monitorSeedReporter) != POINTER_INVALID && !isPassive) {
-			monitorSeedReporter.AddOrder(order);
-		}
-
-		detectManualClose(reason);
 	}
 
 	virtual void OnDeinit() {
@@ -376,10 +325,32 @@ public:
 
 			statisticsPersistence = new SRPersistenceOfStatistics();
 			statisticsPersistence.Initialize(symbol, prefix);
+
+			if (statisticsPersistence.HasLoadError()) {
+				logger.Error(
+					LOG_CODE_PERSISTENCE_LOAD_FAILED,
+					StringFormat(
+						"statistics restore failed | strategy=%s reason='persistence file unreadable'",
+						name
+				));
+				return INIT_FAILED;
+			}
+
 			statisticsPersistence.Load(statistics);
 
 			statePersistence = new SRPersistenceOfState();
 			statePersistence.Initialize(symbol, prefix);
+
+			if (statePersistence.HasLoadError()) {
+				logger.Error(
+					LOG_CODE_PERSISTENCE_LOAD_FAILED,
+					StringFormat(
+						"state restore failed | strategy=%s reason='persistence file unreadable'",
+						name
+				));
+				return INIT_FAILED;
+			}
+
 			statePersistence.Load();
 		}
 
@@ -390,15 +361,12 @@ public:
 		EOrder ordersSnapshot[];
 		orderBook.CopyOrders(ordersSnapshot);
 		statistics.OnOpenOrder(order, ordersSnapshot);
-		horizonMonitor.UpsertOrder(order);
 	}
 
 	virtual void OnOrderUpdated(EOrder& order) {
-		horizonMonitor.UpsertOrder(order);
 	}
 
 	virtual void OnPendingOrderPlaced(EOrder& order) {
-		horizonMonitor.UpsertOrder(order);
 	}
 
 	virtual void OnStartDay() {
@@ -446,20 +414,12 @@ public:
 		strategyMagicNumber = magic;
 	}
 
-	void SetStrategyUuid(string uuid) {
-		strategyUuid = uuid;
-	}
-
 	void SetMaxLotsByOrder(double lots) {
 		maxLotsByOrder = lots;
 	}
 
 	void SetName(string strategyName) {
 		name = strategyName;
-	}
-
-	void SetPassive(bool passive) {
-		isPassive = passive;
 	}
 
 	void SetPrefix(string strategyPrefix) {
@@ -470,55 +430,11 @@ public:
 		symbol = strategySymbol;
 	}
 
-	virtual void SetWeight(double newWeight) {
-		weight = newWeight;
-	}
-
-	void SyncSnapshot(ENUM_SNAPSHOT_EVENT event) {
-		double floatingPnl = 0;
-
-		for (int i = 0; i < orderBook.GetOrdersCount(); i++) {
-			EOrder *order = orderBook.GetOrderAtIndex(i);
-			if (order != NULL && order.GetStatus() == ORDER_STATUS_OPEN) {
-				floatingPnl += order.GetFloatingPnL();
-			}
-		}
-
-		double realizedPnl = statistics.GetClosedNav() - statistics.GetInitialBalance();
-		double equity = balance + floatingPnl;
-
-		horizonMonitor.StoreStrategySnapshot(
-			strategyMagicNumber,
-			balance,
-			equity,
-			floatingPnl,
-			realizedPnl,
-			event
-		);
+	void SetTradingStatus(ETradingStatus *tradingStatusRef) {
+		tradingStatus = tradingStatusRef;
 	}
 
 private:
-	void detectManualClose(ENUM_DEAL_REASON reason) {
-		if (tradingStatus.isPaused) {
-			return;
-		}
-
-		if (reason != DEAL_REASON_CLIENT &&
-		    reason != DEAL_REASON_MOBILE &&
-		    reason != DEAL_REASON_WEB) {
-			return;
-		}
-
-		tradingStatus.isPaused = true;
-		tradingStatus.reason = TRADING_PAUSE_REASON_MANUAL_CLOSE;
-		logger.Warning(
-			LOG_CODE_TRADING_PAUSED,
-			StringFormat(
-				"trading paused | strategy=%s reason='manual close detected' until='next day'",
-				name
-		));
-	}
-
 	void initializeServices() {
 		logger.SetPrefix(name);
 		statistics = new SEStatistics(balance);
@@ -527,6 +443,7 @@ private:
 		orderBook = new SEOrderBook();
 		orderBook.Initialize(symbol, prefix, strategyMagicNumber);
 		orderBook.SetListener(GetPointer(this));
+		orderBook.SetTradingStatus(tradingStatus);
 
 		if (EnableOrderHistoryReport) {
 			string reportName = StringFormat("%s_%s_Orders", symbol, prefix);
@@ -539,9 +456,12 @@ private:
 		}
 	}
 
+	bool isTradingPaused() {
+		return CheckPointer(tradingStatus) != POINTER_INVALID && tradingStatus.IsPaused();
+	}
+
 	int restoreOrders() {
-		EOrder reconciledOrders[];
-		int totalRestored = orderBook.RestoreOrders(reconciledOrders);
+		int totalRestored = orderBook.RestoreOrders();
 
 		if (totalRestored == -1) {
 			return -1;
@@ -553,17 +473,6 @@ private:
 			if (addedOrder != NULL) {
 				OnOpenOrder(addedOrder);
 			}
-		}
-
-		for (int i = 0; i < ArraySize(reconciledOrders); i++) {
-			horizonMonitor.UpsertOrder(reconciledOrders[i]);
-			logger.Info(
-				LOG_CODE_ORDER_RESTORED,
-				StringFormat(
-					"order reconciled | strategy=%s order_id=%s target=monitor",
-					name,
-					reconciledOrders[i].GetId()
-			));
 		}
 
 		if (totalRestored > 0) {
@@ -620,10 +529,6 @@ private:
 			));
 
 			return INIT_FAILED;
-		}
-
-		if (isPassive) {
-			return INIT_SUCCEEDED;
 		}
 
 		if (balance <= 0) {

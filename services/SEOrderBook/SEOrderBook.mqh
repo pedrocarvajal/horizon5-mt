@@ -7,6 +7,7 @@
 
 #include "../../entities/EAccount.mqh"
 #include "../../entities/EOrder.mqh"
+#include "../../entities/ETradingStatus.mqh"
 
 #include "../../enums/EOrderStatuses.mqh"
 
@@ -14,8 +15,6 @@
 #include "helpers/HFilterOrders.mqh"
 
 #include "../../interfaces/IStrategy.mqh"
-
-#include "../../structs/STradingStatus.mqh"
 
 #include "../SEDateTime/SEDateTime.mqh"
 #include "../SEDateTime/structs/SDateTime.mqh"
@@ -36,7 +35,6 @@
 #include "validators/OrderValidator.mqh"
 
 extern SEDateTime dtime;
-extern STradingStatus tradingStatus;
 
 class SEOrderBook {
 private:
@@ -58,6 +56,7 @@ private:
 
 	IStrategy *listener;
 	SRPersistenceOfOrders *orderPersistence;
+	ETradingStatus *tradingStatus;
 
 	string symbol;
 	string prefix;
@@ -68,6 +67,7 @@ public:
 		logger.SetPrefix("OrderBook");
 		orderPersistence = NULL;
 		listener = NULL;
+		tradingStatus = NULL;
 	}
 
 	void AddOrder(EOrder &order) {
@@ -137,16 +137,6 @@ public:
 		for (int i = 0; i < count; i++) {
 			out[i] = orders[i];
 		}
-	}
-
-	int FindOrderIndexById(string id) {
-		for (int i = 0; i < ArraySize(orders); i++) {
-			if (orders[i].GetId() == id) {
-				return i;
-			}
-		}
-
-		return -1;
 	}
 
 	int FindOrderIndexByOrderId(ulong orderId) {
@@ -260,25 +250,14 @@ public:
 		return modifier.ModifyStopLoss(order, newStopLossPrice);
 	}
 
-	bool ModifyStopLossAndTakeProfit(EOrder &order, double newStopLossPrice, double newTakeProfitPrice) {
-		return modifier.ModifyStopLossAndTakeProfit(order, newStopLossPrice, newTakeProfitPrice);
-	}
-
-	bool ModifyTakeProfit(EOrder &order, double newTakeProfitPrice) {
-		return modifier.ModifyTakeProfit(order, newTakeProfitPrice);
-	}
-
 	void OnCloseOrder(
 		EOrder &order,
 		const SDateTime &time,
 		double price,
 		double profits,
-		double grossProfit,
-		double commission,
-		double swap,
 		ENUM_DEAL_REASON reason
 	) {
-		closer.HandleCloseResult(order, time, price, profits, grossProfit, commission, swap, reason);
+		closer.HandleCloseResult(order, time, price, profits, reason);
 	}
 
 	void OnDeinit() {
@@ -305,7 +284,7 @@ public:
 		double takeProfit = 0,
 		double stopLoss = 0
 	) {
-		if (tradingStatus.isPaused) {
+		if (CheckPointer(tradingStatus) != POINTER_INVALID && tradingStatus.IsPaused()) {
 			logger.Warning(
 				LOG_CODE_TRADING_PAUSED,
 				StringFormat(
@@ -339,13 +318,9 @@ public:
 		purger.Purge(orders);
 	}
 
-	int QueryPersistedOrders(SEDbQuery &query, JSON::Object *&results[]) {
-		return restorer.QueryOrders(query, results);
-	}
-
-	int RestoreOrders(EOrder &reconciledOrders[]) {
+	int RestoreOrders() {
 		EOrder activeOrders[];
-		int totalRestored = restorer.LoadAndSplit(orders, activeOrders, reconciledOrders);
+		int totalRestored = restorer.LoadActiveOrders(orders, activeOrders);
 
 		if (totalRestored == -1) {
 			return -1;
@@ -371,6 +346,11 @@ public:
 		finalizer.SetPersistence(orderPersistence);
 		restorer.SetPersistence(orderPersistence);
 		purger.SetPersistence(orderPersistence);
+	}
+
+	void SetTradingStatus(ETradingStatus *tradingStatusRef) {
+		tradingStatus = tradingStatusRef;
+		processor.SetTradingStatus(tradingStatus);
 	}
 
 private:

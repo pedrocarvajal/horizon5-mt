@@ -21,7 +21,6 @@ interface IStrategy {
 	void OnEnd();
 	void OnDeinit();
 
-	void SetWeight(double allocatedWeight);
 	void SetMagicNumber(ulong magic);
 
 	bool IsTradable();

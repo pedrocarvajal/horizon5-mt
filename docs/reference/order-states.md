@@ -28,22 +28,22 @@ Broker confirmed the fill. The order has a valid `positionId`, `dealId`, `openPr
 
 ### `ORDER_STATUS_CLOSING`
 
-A close intent was issued (by the strategy, SL/TP, or a remote command) but the broker has not yet confirmed the exit. The order stays here until `OnTradeTransaction` delivers the matching close deal. Failures here are retried (`MAX_RETRY_COUNT_CLOSE`); exhaustion transitions to `CANCELLED`.
+A close intent was issued (by the strategy or SL/TP) but the broker has not yet confirmed the exit. The order stays here until `OnTradeTransaction` delivers the matching close deal. Failures here are retried (`MAX_RETRY_COUNT_CLOSE`); exhaustion transitions to `CANCELLED`.
 
 ### `ORDER_STATUS_CLOSED`
 
-Broker confirmed the exit. `closePrice`, `profitInDollars`, `commission`, `swap`, and `closeAt` are all recorded. Net profit is `profit + commission * 2 + swap`. Strategies receive `OnCloseOrder(order, reason)`.
+Broker confirmed the exit. `closePrice`, `profitInDollars`, and `closeAt` are all recorded. Net profit is `profit + commission * 2 + swap`. Strategies receive `OnCloseOrder(order, reason)`.
 
 ### `ORDER_STATUS_CANCELLED`
 
 The order was abandoned before `CLOSED`. Possible paths:
 
-- From `PENDING` — signal revoked, pending expired, or retry budget exhausted.
+- From `PENDING` — signal revoked, pending expired, the asset paused after a manual intervention, or retry budget exhausted.
 - From `CLOSING` — broker rejected the close request and the retry budget was exhausted.
 
 ## Persistence and recovery
 
-Every transition is serialized by `SRPersistenceOfOrders`. In live trading the write goes through the message bus to the Persistence service; in tester mode it writes directly.
+In live trading, every transition is serialized by `SRPersistenceOfOrders` to the strategy's `orders.json` (see [Architecture > Files on disk](architecture.md#files-on-disk)); persistence is skipped in the Strategy Tester.
 
 On startup, each strategy reloads its order JSON and reconciles open orders against the current MT5 positions (by magic number and position ID). `SRAccountAuditor` cross-checks the resulting view on init and on every new hour, emitting diagnostics when MT5 state diverges from tracked state.
 

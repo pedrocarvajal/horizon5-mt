@@ -46,6 +46,10 @@ public:
 	}
 
 	int Load(EOrder &restoredOrders[]) {
+		if (collection.HasLoadError()) {
+			return -1;
+		}
+
 		int documentCount = collection.Count();
 		logger.Debug(
 			LOG_CODE_PERSISTENCE_SAVE_FAILED,
@@ -58,9 +62,8 @@ public:
 			return 0;
 		}
 
-		SEDbQuery findAll;
 		JSON::Object *documents[];
-		int foundCount = collection.Find(findAll, documents);
+		int foundCount = collection.FindAll(documents);
 
 		string idsToDelete[];
 		int loadedCount = 0;
@@ -111,10 +114,6 @@ private:
 	void cleanupOrphanedOrders(string &idsToDelete[]) {
 		for (int i = 0; i < ArraySize(idsToDelete); i++) {
 			collection.DeleteOne("_id", idsToDelete[i]);
-		}
-
-		if (ArraySize(idsToDelete) > 0) {
-			collection.Flush();
 		}
 	}
 

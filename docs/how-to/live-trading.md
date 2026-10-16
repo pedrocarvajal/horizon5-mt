@@ -1,55 +1,21 @@
 # Live Trading Setup
 
-Live trading requires at least one running MT5 service alongside the EA. Optional integrations add remote orchestration.
+Live trading runs entirely inside `Horizon.mq5`. No companion MT5 service, DLL import, or WebRequest URL is required: attach the EA to a chart on a live account and it handles persistence, recovery, and reconciliation itself.
 
-## Required service
+## Crash-recovery persistence
 
-### HorizonPersistence
+In live trading, each strategy persists its state as JSON under MT5's Common Files folder, in `<login>\Live\<symbol>\<prefix>\`:
 
-`HorizonPersistence.mq5` must be running in live trading. It polls the persistence channel on the message bus, deduplicates writes targeting the same path within each polling cycle, and flushes to disk. It also ensures target directories exist and emits queue diagnostics periodically.
+- `orders.json` — the strategy's orders (`SRPersistenceOfOrders`).
+- `statistics.json` — cumulative statistics (`SRPersistenceOfStatistics`).
+- `state.json` — strategy-defined key/value state (`SRPersistenceOfState`).
 
-Start it by dragging `HorizonPersistence` into the MT5 Navigator panel as a service; it starts automatically with the terminal.
+Files are written through `SEDb`, a JSON document store implemented in pure MQL5. On init each strategy reloads them; if its orders cannot be restored, the EA refuses to initialize. Persistence is skipped in the Strategy Tester.
 
-## Optional integrations
+## Order reconciliation
 
-Both depend on external backends that live in the private ecosystem — request access via [GitHub](https://github.com/pedrocarvajal) if you intend to use them.
+`SRAccountAuditor` cross-checks MT5 positions, pending orders, and tracked orders on init and at the start of every hour, and logs any divergence.
 
-### HorizonMonitor (telemetry)
+## Manual-intervention pause
 
-Pushes account snapshots, orders, heartbeats, and logs outward for centralized observability.
-
-EA inputs:
-
-- `EnableHorizonMonitor = true`
-- `HorizonMonitorUrl`, `HorizonMonitorEmail`, `HorizonMonitorPassword`
-
-### HorizonGateway (remote orchestration)
-
-Consumes trading and service events from the backend and forwards them to the EA. The per-asset `SEGateway` dispatches inbound trading events to handlers and ACKs responses back.
-
-EA inputs:
-
-- `EnableHorizonGateway = true`
-- `HorizonGatewayUrl`, `HorizonGatewayEmail`, `HorizonGatewayPassword`
-
-Both integrations authenticate on startup via `UpsertAccount()`. If authentication fails, the EA refuses to initialize.
-
-## Service health monitoring
-
-`CheckServiceHealth()` runs every minute against all required services:
-
-- `HorizonPersistence` is always required.
-- `HorizonMonitor` is required when Monitor is enabled.
-- `HorizonGateway` is required when Gateway is enabled.
-
-If a required service becomes unavailable:
-
-1. The message bus is shut down.
-2. `tradingStatus.isPaused = true` with `TRADING_PAUSE_REASON_SERVICES_DOWN`.
-3. New positions are not opened; existing positions continue to be managed.
-
-When services recover, the bus reactivates and trading resumes automatically.
-
-## Gateway account status
-
-If Gateway is enabled, the EA fetches the account status on init. A status other than `"active"` pauses trading with `TRADING_PAUSE_REASON_ACCOUNT_INACTIVE`. This lets operators pause the account remotely without restarting the EA.
+If a position of an asset is closed by hand from the terminal, mobile, or web, or one of its pending orders is cancelled outside the EA, that asset pauses until the start of the next day. Its pending orders are cancelled and no new entries are placed; its open positions keep their stops and continue to be managed. Other assets keep trading.

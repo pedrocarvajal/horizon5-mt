@@ -38,7 +38,6 @@ public:
 - `SetName()` — lowercase identifier used in logs and file paths.
 - `SetSymbol()` — must match the broker's symbol string exactly.
 - `Setup()` — called from the constructor; it instantiates strategies based on input toggles.
-- Per-asset gateway routing (`SEGateway`) is instantiated automatically by `SEAsset`. You don't need to register it.
 
 ## 3. Register it in `configs/Assets.mqh`
 
@@ -64,4 +63,4 @@ Compile `Horizon.mq5`. The new asset appears in the EA inputs panel, grouped und
 
 ## Capital allocation
 
-Capital is divided equally among enabled assets, then equally among each asset's active strategies. See [Multi-Asset Portfolios](multi-asset.md) for the exact formulas and passive-strategy behavior.
+Capital is divided equally among enabled assets, then equally among each asset's enabled strategies. See [Multi-Asset Portfolios](multi-asset.md) for the exact formulas.

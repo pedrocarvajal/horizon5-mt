@@ -3,9 +3,9 @@
 
 #include "../../../entities/EOrder.mqh"
 
-#include "../../../enums/EOrderStatuses.mqh"
+#include "../../../entities/ETradingStatus.mqh"
 
-#include "../../../structs/STradingStatus.mqh"
+#include "../../../enums/EOrderStatuses.mqh"
 
 #include "../../SELogger/SELogger.mqh"
 
@@ -15,14 +15,13 @@
 
 #include "OrderOpener.mqh"
 
-extern STradingStatus tradingStatus;
-
 class OrderProcessor {
 private:
 	SELogger logger;
 	OrderOpener *opener;
 	OrderCloser *closer;
 	OrderCanceller *canceller;
+	ETradingStatus *tradingStatus;
 
 public:
 	OrderProcessor() {
@@ -30,6 +29,7 @@ public:
 		opener = NULL;
 		closer = NULL;
 		canceller = NULL;
+		tradingStatus = NULL;
 	}
 
 	void Initialize(
@@ -53,8 +53,8 @@ public:
 			if (currentStatus == ORDER_STATUS_PENDING) {
 				if (orders[i].IsPendingToClose()) {
 					canceller.CheckToCancel(orders[i]);
-				} else if (tradingStatus.isPaused) {
-					canceller.Cancel(orders[i]);
+				} else if (isTradingPaused()) {
+					canceller.CheckToCancel(orders[i]);
 				} else {
 					opener.CheckToOpen(orders[i]);
 				}
@@ -62,6 +62,15 @@ public:
 				closer.CheckToClose(orders[i]);
 			}
 		}
+	}
+
+	void SetTradingStatus(ETradingStatus *tradingStatusRef) {
+		tradingStatus = tradingStatusRef;
+	}
+
+private:
+	bool isTradingPaused() {
+		return CheckPointer(tradingStatus) != POINTER_INVALID && tradingStatus.IsPaused();
 	}
 };
 

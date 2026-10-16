@@ -22,10 +22,6 @@ public:
 		return debugLevel == DEBUG_LEVEL_ERRORS_PERSIST
 		       || debugLevel == DEBUG_LEVEL_ALL_PERSIST;
 	}
-
-	static bool IsEnabled(ENUM_DEBUG_LEVEL debugLevel) {
-		return debugLevel != DEBUG_LEVEL_NONE;
-	}
 };
 
 #endif

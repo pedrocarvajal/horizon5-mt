@@ -1,41 +1,29 @@
 #ifndef __SE_DB_MQH__
 #define __SE_DB_MQH__
 
-#include "SEFileDbDLL.mqh"
-
 #include "SEDbCollection.mqh"
 
 #include "../../entities/EAccount.mqh"
 
 class SEDb {
 private:
-	int databaseHandle;
 	string basePath;
 	bool useCommonFiles;
 	bool isInitialized;
-	static bool dllInitialized;
 	SEDbCollection *collections[];
 
 public:
 	SEDb() {
-		databaseHandle = -1;
 		basePath = "";
 		useCommonFiles = false;
 		isInitialized = false;
 	}
 
 	void Initialize(string databasePath, bool commonFiles = false) {
-		if (!dllInitialized) {
-			string commonDataPath = TerminalInfoString(TERMINAL_COMMONDATA_PATH) + "\\Files";
-			FdbInit(commonDataPath);
-			dllInitialized = true;
-		}
-
 		EAccount localAccount;
 		long accountNumber = localAccount.GetNumber();
-		basePath = StringFormat("%lld/%s", accountNumber, databasePath);
+		basePath = normalizePath(StringFormat("%lld/%s", accountNumber, databasePath));
 		useCommonFiles = commonFiles;
-		databaseHandle = FdbDatabaseCreate(basePath);
 		isInitialized = true;
 	}
 
@@ -57,23 +45,14 @@ public:
 			return NULL;
 		}
 
-		int index = FindCollectionIndex(collectionName);
+		int index = findCollectionIndex(collectionName);
 
 		if (index != -1) {
 			return collections[index];
 		}
 
-		int collectionHandle = FdbCollectionGet(databaseHandle, collectionName);
-
-		if (collectionHandle == -1) {
-			Print("[ERROR] SEDb: Cannot create collection '", collectionName, "'");
-			return NULL;
-		}
-
-		FdbCollectionLoad(collectionHandle);
-
 		SEDbCollection *collection = new SEDbCollection();
-		collection.Initialize(collectionName, collectionHandle, basePath, useCommonFiles);
+		collection.Initialize(collectionName, basePath, useCommonFiles);
 
 		int size = ArraySize(collections);
 		ArrayResize(collections, size + 1);
@@ -83,7 +62,7 @@ public:
 	}
 
 private:
-	int FindCollectionIndex(string collectionName) {
+	int findCollectionIndex(string collectionName) {
 		int size = ArraySize(collections);
 
 		for (int i = 0; i < size; i++) {
@@ -94,8 +73,23 @@ private:
 
 		return -1;
 	}
-};
 
-bool SEDb::dllInitialized = false;
+	string normalizePath(string path) {
+		string normalizedPath = path;
+		StringReplace(normalizedPath, "/", "\\");
+
+		int replacedCount = 1;
+
+		while (replacedCount > 0) {
+			replacedCount = StringReplace(normalizedPath, "\\\\", "\\");
+		}
+
+		while (StringLen(normalizedPath) > 0 && normalizedPath[0] == '\\') {
+			normalizedPath = StringSubstr(normalizedPath, 1);
+		}
+
+		return normalizedPath;
+	}
+};
 
 #endif

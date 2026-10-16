@@ -3,68 +3,53 @@
 
 #include "../../libraries/Json/index.mqh"
 
-#include "../SEMessageBus/SEMessageBus.mqh"
+#include "components/CollectionFileStore.mqh"
 
-#include "SEFileDbDLL.mqh"
+#include "helpers/HGenerateDocumentId.mqh"
 
-#include "SEDbQuery.mqh"
+#include "structs/SDbDocument.mqh"
 
-#include "../../constants/COMessageBus.mqh"
 #include "../../constants/COSEDb.mqh"
 
 class SEDbCollection {
 private:
 	string name;
-	int collectionHandle;
-	string filePath;
-	int fileFlags;
+	bool autoFlush;
+	int documentCount;
+	SDbDocument documents[];
+	CollectionFileStore fileStore;
 
 public:
 	SEDbCollection() {
 		name = "";
-		collectionHandle = -1;
-		filePath = "";
-		fileFlags = FILE_TXT | FILE_ANSI;
+		autoFlush = true;
+		documentCount = 0;
 	}
 
-	void Initialize(string collectionName, int handle, string dbBasePath, bool useCommonFiles) {
+	void Initialize(string collectionName, string databasePath, bool useCommonFiles) {
 		name = collectionName;
-		collectionHandle = handle;
-		filePath = StringFormat("%s/%s.json", dbBasePath, collectionName);
-		fileFlags = FILE_TXT | FILE_ANSI;
+		autoFlush = true;
+		documentCount = 0;
+		ArrayResize(documents, 0);
+		fileStore.Initialize(StringFormat("%s\\%s.json", databasePath, collectionName), useCommonFiles);
 
-		if (useCommonFiles) {
-			fileFlags |= FILE_COMMON;
-		}
+		loadDocuments();
 	}
 
 	string GetName() {
 		return name;
 	}
 
-	void SetAutoFlush(bool enabled) {
-		FdbCollectionSetAutoFlush(collectionHandle, enabled ? 1 : 0);
+	bool HasLoadError() {
+		return fileStore.HasLoadError();
 	}
 
-	bool Load() {
-		return FdbCollectionLoad(collectionHandle) == 1;
+	void SetAutoFlush(bool enabled) {
+		autoFlush = enabled;
 	}
 
 	bool Flush() {
-		if (SEMessageBus::IsActive()) {
-			string jsonData = BuildJsonFromDll();
-
-			JSON::Object payload;
-			payload.setProperty("filePath", filePath);
-			payload.setProperty("fileFlags", fileFlags);
-			payload.setProperty("data", jsonData);
-
-			if (SEMessageBus::Send(MB_CHANNEL_PERSISTENCE, "flush", payload)) {
-				return true;
-			}
-		}
-
-		return FdbCollectionFlush(collectionHandle) == 1;
+		return fileStore.Write(documents, documentCount);
 	}
 
 	bool InsertOne(JSON::Object *document) {
@@ -72,48 +57,46 @@ public:
 			return false;
 		}
 
-		string documentJson = document.toString();
-		return FdbInsertOne(collectionHandle, documentJson) == 1;
+		if (!document.isSerializable()) {
+			Print("[ERROR] SEDb: Rejected document with a non-finite number in collection '", name, "'");
+			return false;
+		}
+
+		string documentText = document.toString();
+		string documentId = readDocumentId(document);
+
+		if (documentId == "") {
+			documentId = GenerateDocumentId();
+			documentText = appendDocumentId(documentText, documentId);
+		}
+
+		appendDocument(documentText, documentId);
+
+		if (autoFlush) {
+			Flush();
+		}
+
+		return true;
 	}
 
 	JSON::Object *FindOne(string key, string value) {
-		int found = FdbFindOne(collectionHandle, key, value);
+		int index = findDocumentIndex(key, value);
 
-		if (found == 0) {
+		if (index == -1) {
 			return NULL;
 		}
 
-		int resultSize = FdbFindOneResultSize();
-		int bufferSize = MathMax(resultSize, SEDB_RESULT_BUFFER_SIZE);
-		string buffer = "";
-		StringInit(buffer, bufferSize);
-		FdbFindOneGetResult(buffer, bufferSize);
-
-		return new JSON::Object(buffer);
+		return parseDocument(index);
 	}
 
-	int Find(SEDbQuery &query, JSON::Object *&results[]) {
-		ArrayResize(results, 0);
+	int FindAll(JSON::Object *&results[]) {
+		ArrayResize(results, documentCount);
 
-		int queryHandle = query.GetHandle();
-		int count = FdbFind(collectionHandle, queryHandle);
-
-		if (count == 0) {
-			return 0;
+		for (int i = 0; i < documentCount; i++) {
+			results[i] = parseDocument(i);
 		}
 
-		ArrayResize(results, count);
-
-		for (int i = 0; i < count; i++) {
-			int resultSize = FdbFindResultSize(i);
-			int bufferSize = MathMax(resultSize, SEDB_RESULT_BUFFER_SIZE);
-			string buffer = "";
-			StringInit(buffer, bufferSize);
-			FdbFindGetResult(i, buffer, bufferSize);
-			results[i] = new JSON::Object(buffer);
-		}
-
-		return count;
+		return documentCount;
 	}
 
 	bool UpdateOne(string key, string value, JSON::Object *newData) {
@@ -121,34 +104,216 @@ public:
 			return false;
 		}
 
-		string patchJson = newData.toString();
-		return FdbUpdateOne(collectionHandle, key, value, patchJson) == 1;
+		if (!newData.isSerializable()) {
+			Print("[ERROR] SEDb: Rejected update with a non-finite number in collection '", name, "'");
+			return false;
+		}
+
+		int index = findDocumentIndex(key, value);
+
+		if (index == -1) {
+			return false;
+		}
+
+		string documentText = documents[index].text;
+		JSON::Object document(documentText);
+
+		if (!isParsedDocument(document, documents[index].text)) {
+			Print("[ERROR] SEDb: Cannot parse document in collection '", name, "' for update");
+			return false;
+		}
+
+		string patchKeys[];
+		newData.getKeysToArray(patchKeys);
+
+		for (int i = 0; i < ArraySize(patchKeys); i++) {
+			copyProperty(GetPointer(document), newData, patchKeys[i]);
+		}
+
+		documents[index].text = document.toString();
+		documents[index].id = readDocumentId(GetPointer(document));
+
+		if (autoFlush) {
+			Flush();
+		}
+
+		return true;
+	}
+
+	bool UpsertOne(string key, string value, JSON::Object *document) {
+		if (findDocumentIndex(key, value) == -1) {
+			return InsertOne(document);
+		}
+
+		return UpdateOne(key, value, document);
 	}
 
 	bool DeleteOne(string key, string value) {
-		return FdbDeleteOne(collectionHandle, key, value) == 1;
+		int index = findDocumentIndex(key, value);
+
+		if (index == -1) {
+			return false;
+		}
+
+		int lastIndex = documentCount - 1;
+
+		if (index != lastIndex) {
+			documents[index] = documents[lastIndex];
+		}
+
+		documents[lastIndex].text = "";
+		documents[lastIndex].id = "";
+		documentCount--;
+
+		if (autoFlush) {
+			Flush();
+		}
+
+		return true;
 	}
 
 	int Count() {
-		return FdbCollectionCount(collectionHandle);
-	}
-
-	bool DeleteFile() {
-		return FdbCollectionDeleteFile(collectionHandle) == 1;
+		return documentCount;
 	}
 
 private:
-	string BuildJsonFromDll() {
-		int resultSize = FdbCollectionSerializeAll(collectionHandle);
-
-		if (resultSize <= 2) {
-			return "[]";
+	void appendDocument(string documentText, string documentId) {
+		if (documentCount >= ArraySize(documents)) {
+			ArrayResize(documents, documentCount + 1, MathMax(documentCount, SEDB_MINIMUM_DOCUMENT_RESERVE));
 		}
 
-		string buffer = "";
-		StringInit(buffer, resultSize);
-		FdbCollectionSerializeAllGetResult(buffer, resultSize);
-		return buffer;
+		documents[documentCount].text = documentText;
+		documents[documentCount].id = documentId;
+		documentCount++;
+	}
+
+	string appendDocumentId(string documentText, string documentId) {
+		string idProperty = "\"_id\": \"" + documentId + "\"";
+
+		if (isEmptyObjectText(documentText)) {
+			return "{" + idProperty + "}";
+		}
+
+		return StringSubstr(documentText, 0, StringLen(documentText) - 1) + "," + idProperty + "}";
+	}
+
+	JSON::Array *cloneArray(JSON::Array *source) {
+		JSON::Array *clone = new JSON::Array();
+
+		for (int i = 0; i < source.getLength(); i++) {
+			if (source.isString(i)) {
+				clone.add(source.getString(i));
+			} else if (source.isNumber(i)) {
+				clone.add(source.getNumber(i));
+			} else if (source.isBoolean(i)) {
+				clone.add(source.getBoolean(i));
+			} else if (source.isObject(i)) {
+				clone.add(cloneObject(source.getObject(i)));
+			} else if (source.isArray(i)) {
+				clone.add(cloneArray(source.getArray(i)));
+			}
+		}
+
+		return clone;
+	}
+
+	JSON::Object *cloneObject(JSON::Object *source) {
+		JSON::Object *clone = new JSON::Object();
+		string keys[];
+		source.getKeysToArray(keys);
+
+		for (int i = 0; i < ArraySize(keys); i++) {
+			copyProperty(clone, source, keys[i]);
+		}
+
+		return clone;
+	}
+
+	void copyProperty(JSON::Object *target, JSON::Object *source, string key) {
+		if (source.isString(key)) {
+			target.setProperty(key, source.getString(key));
+		} else if (source.isNumber(key)) {
+			target.setProperty(key, source.getNumber(key));
+		} else if (source.isBoolean(key)) {
+			target.setProperty(key, source.getBoolean(key));
+		} else if (source.isObject(key)) {
+			target.setProperty(key, cloneObject(source.getObject(key)));
+		} else if (source.isArray(key)) {
+			target.setProperty(key, cloneArray(source.getArray(key)));
+		}
+	}
+
+	int findDocumentIndex(string key, string value) {
+		if (key == "_id") {
+			if (value == "") {
+				return -1;
+			}
+
+			for (int i = documentCount - 1; i >= 0; i--) {
+				if (documents[i].id == value) {
+					return i;
+				}
+			}
+
+			return -1;
+		}
+
+		for (int i = 0; i < documentCount; i++) {
+			string documentText = documents[i].text;
+			JSON::Object document(documentText);
+
+			if (document.isString(key) && document.getString(key) == value) {
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	bool isEmptyObjectText(string documentText) {
+		string compactText = documentText;
+		StringReplace(compactText, " ", "");
+		StringReplace(compactText, "\t", "");
+		StringReplace(compactText, "\r", "");
+		StringReplace(compactText, "\n", "");
+		return compactText == "{}";
+	}
+
+	bool isParsedDocument(JSON::Object &document, string documentText) {
+		string keys[];
+		document.getKeysToArray(keys);
+		return ArraySize(keys) > 0 || isEmptyObjectText(documentText);
+	}
+
+	void loadDocuments() {
+		string documentTexts[];
+
+		if (!fileStore.Read(documentTexts)) {
+			return;
+		}
+
+		for (int i = 0; i < ArraySize(documentTexts); i++) {
+			string documentText = documentTexts[i];
+			JSON::Object document(documentText);
+
+			if (!isParsedDocument(document, documentText)) {
+				documentCount = 0;
+				ArrayResize(documents, 0);
+				fileStore.Quarantine(StringFormat("unparseable document at index %d", i));
+				return;
+			}
+
+			appendDocument(documentText, readDocumentId(GetPointer(document)));
+		}
+	}
+
+	JSON::Object *parseDocument(int index) {
+		string documentText = documents[index].text;
+		return new JSON::Object(documentText);
+	}
+
+	string readDocumentId(JSON::Object *document) {
+		return document.isString("_id") ? document.getString("_id") : "";
 	}
 };
 

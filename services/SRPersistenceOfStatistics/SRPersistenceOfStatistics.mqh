@@ -172,6 +172,10 @@ public:
 		statisticsCollection = database.Collection("statistics");
 	}
 
+	bool HasLoadError() {
+		return statisticsCollection != NULL && statisticsCollection.HasLoadError();
+	}
+
 	bool Save(SEStatistics *stats) {
 		if (!IsLiveTrading()) {
 			return true;
@@ -182,16 +186,7 @@ public:
 		}
 
 		JSON::Object *json = serialize(stats);
-		JSON::Object *existing = statisticsCollection.FindOne("_id", "state");
-		bool result;
-
-		if (existing != NULL) {
-			delete existing;
-			result = statisticsCollection.UpdateOne("_id", "state", json);
-		} else {
-			result = statisticsCollection.InsertOne(json);
-		}
-
+		bool result = statisticsCollection.UpsertOne("_id", "state", json);
 		delete json;
 
 		if (result) {

@@ -8,13 +8,10 @@ Horizon5 turns MetaTrader 5's single-threaded tick callback into a deterministic
 
 1. Dispatch `OnTimer()` to every asset (and through the asset to every strategy).
 2. Dispatch **primed bar events** (see below) via `SEAsset.ProcessBarEvents()`.
-3. When `isStartDay` flips, run daily maintenance (unpause non-critical pauses, sync Monitor, collect seed snapshots).
-4. When `isStartMinute` flips, run `CheckServiceHealth()`.
-5. When the tick interval elapses, dispatch `OnTick()` to every asset/strategy.
-6. After all events, dispatch `ProcessOrders()` to every asset so order books process pending transitions and retries.
-7. If Gateway is enabled, drain inbound service events.
-8. When `isStartHour` flips and Monitor is enabled, run hourly Monitor sync and service heartbeats.
-9. When `isStartHour` flips, run the account auditor.
+3. When `isStartDay` flips, run daily maintenance (every asset clears its trading pause).
+4. When the tick interval elapses, dispatch `OnTick()` to every asset/strategy.
+5. After all events, dispatch `ProcessOrders()` to every asset so order books process pending transitions and retries.
+6. When `isStartHour` flips, run the account auditor.
 
 ## Tick interval
 
@@ -38,12 +35,10 @@ Horizon.mq5::OnTimer()
   │       ├── asset.OnStartMinute()   → strategy.OnStartMinute()
   │       ├── asset.OnStartHour()     → strategy.OnStartHour()
   │       └── asset.OnStartDay()      → strategy.OnStartDay()
-  ├── (isStartDay)  daily maintenance + monitor sync
-  ├── (isStartMinute) CheckServiceHealth()
+  ├── (isStartDay)  daily maintenance
   ├── (isTickInterval) asset.OnTick() → strategy.OnTick()
   ├── asset.ProcessOrders()           → strategy order book retries/submits
-  ├── gateway.ProcessServiceEvents()
-  └── (isStartHour) monitor sync, heartbeats, account audit
+  └── (isStartHour) account audit
 ```
 
 ## Trade transactions

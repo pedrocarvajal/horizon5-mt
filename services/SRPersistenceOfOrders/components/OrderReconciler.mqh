@@ -77,9 +77,6 @@ public:
 			order.SetCloseAt(dealTime);
 			order.SetClosePrice(dealPrice);
 			order.SetProfitInDollars(netProfit);
-			order.SetGrossProfit(dealProfit);
-			order.SetCommission(dealCommission);
-			order.SetSwap(dealSwap);
 			order.SetCloseReason(dealReason);
 			order.SetStatus(ORDER_STATUS_CLOSED);
 

@@ -30,19 +30,6 @@ Per-strategy exports, primarily intended for tester runs.
 | `EnableSnapshotHistoryReport` | `bool` | `false` | Export per-strategy snapshots     |
 | `EnableMarketHistoryReport`   | `bool` | `false` | Export per-asset market snapshots |
 
-## Reporting > Monitor Seed
-
-Dataset seeding for the Monitor backend. Produces structured collections during backtest runs so external systems can bootstrap from tester output.
-
-| Parameter              | Type   | Default | Description                             |
-| ---------------------- | ------ | ------- | --------------------------------------- |
-| `EnableSeedAccounts`   | `bool` | `false` | Export accounts collection              |
-| `EnableSeedAssets`     | `bool` | `false` | Export assets collection                |
-| `EnableSeedStrategies` | `bool` | `false` | Export strategies collection            |
-| `EnableSeedMetadata`   | `bool` | `false` | Export metadata collection              |
-| `EnableSeedOrders`     | `bool` | `false` | Export orders collection                |
-| `EnableSeedSnapshots`  | `bool` | `false` | Export account/asset/strategy snapshots |
-
 ## Reporting > Logs
 
 | Parameter         | Type   | Default | Description                          |
@@ -56,28 +43,6 @@ Dataset seeding for the Monitor backend. Produces structured collections during 
 | `EquityAtRiskCompounded` | `bool`   | `false` | Use current NAV instead of the initial allocation when computing risk |
 | `EquityAtRisk`           | `double` | `1`     | Maximum equity at risk per trade, as a percentage                     |
 
-## Horizon Monitor
-
-Optional outbound telemetry integration. Active only in live trading.
-
-| Parameter                | Type     | Default | Description                              |
-| ------------------------ | -------- | ------- | ---------------------------------------- |
-| `EnableHorizonMonitor`   | `bool`   | `false` | Toggle the Monitor integration on or off |
-| `HorizonMonitorUrl`      | `string` | `""`    | Base URL of the Monitor backend          |
-| `HorizonMonitorEmail`    | `string` | `""`    | Authentication email                     |
-| `HorizonMonitorPassword` | `string` | `""`    | Authentication password                  |
-
-## Horizon Gateway
-
-Optional inbound orchestration integration. Active only in live trading.
-
-| Parameter                | Type     | Default | Description                              |
-| ------------------------ | -------- | ------- | ---------------------------------------- |
-| `EnableHorizonGateway`   | `bool`   | `false` | Toggle the Gateway integration on or off |
-| `HorizonGatewayUrl`      | `string` | `""`    | Base URL of the Gateway backend          |
-| `HorizonGatewayEmail`    | `string` | `""`    | Authentication email                     |
-| `HorizonGatewayPassword` | `string` | `""`    | Authentication password                  |
-
 ## Asset-level strategy toggles
 
 Each asset file defines `input bool` toggles for its strategies. The naming pattern is:
@@ -87,13 +52,3 @@ Each asset file defines `input bool` toggles for its strategies. The naming patt
 ```
 
 All default to `false`. The specific set of toggles depends on which assets and strategies you have registered — see the corresponding asset file under `assets/<AssetClass>/<Instrument>.mqh`.
-
-## Service-level inputs
-
-The standalone service scripts expose their own inputs when started as MT5 services:
-
-- `HorizonPersistence.mq5` — `DebugLevel`, `PollIntervalMs`.
-- `HorizonMonitor.mq5` — `DebugLevel`, `HorizonMonitorUrl`, `HorizonMonitorEmail`, `HorizonMonitorPassword`.
-- `HorizonGateway.mq5` — `DebugLevel`, `HorizonGatewayUrl`, `HorizonGatewayEmail`, `HorizonGatewayPassword`.
-
-The Monitor/Gateway service inputs must match the values configured in the EA.

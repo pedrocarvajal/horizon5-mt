@@ -35,10 +35,6 @@ public:
 		return ModifyStopLossAndTakeProfit(order, newStopLossPrice, 0);
 	}
 
-	bool ModifyTakeProfit(EOrder &order, double newTakeProfitPrice) {
-		return ModifyStopLossAndTakeProfit(order, 0, newTakeProfitPrice);
-	}
-
 	bool ModifyStopLossAndTakeProfit(EOrder &order, double newStopLossPrice, double newTakeProfitPrice) {
 		bool hasStopLoss = (newStopLossPrice > 0);
 		bool hasTakeProfit = (newTakeProfitPrice > 0);

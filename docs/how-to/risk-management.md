@@ -31,7 +31,7 @@ Each strategy declares a `maxLotsByOrder` in its constructor via `SetMaxLotsByOr
 
 ## Volume normalization
 
-Volume is normalized against broker constraints in order:
+`NormalizeLotSize()` enforces broker constraints in order:
 
 1. Round down to `SYMBOL_VOLUME_STEP`.
 2. Return `0` (skip trade) if the result is below `SYMBOL_VOLUME_MIN`.
@@ -39,15 +39,13 @@ Volume is normalized against broker constraints in order:
 
 ## Stop-distance validation
 
-Stop/limit prices are validated against `SYMBOL_TRADE_STOPS_LEVEL`. If the target price is too close to the current market, the order is rejected before it reaches the broker.
+`CheckStopDistance()` verifies the stop/limit price respects `SYMBOL_TRADE_STOPS_LEVEL`. If the target price is too close to the current market, the order is rejected before it reaches the broker.
 
 ## Trading pause
 
-Various conditions pause trading with a typed reason (`ETradingPauseReason`):
+Each asset pauses on its own, until the start of the next day, when:
 
-- **Services down** — a required MT5 service stopped responding. Trading resumes automatically when services recover.
-- **Account inactive** — the Gateway reported the account as not active.
-- **Horizon API request** — remote pause command.
-- **Manual close** — a human closed a position on the terminal/mobile/web; pause holds until the next day.
+- **Manual close** — a human closed one of its positions on the terminal/mobile/web.
+- **Manual cancel** — one of its pending orders was cancelled outside the EA.
 
-While paused, strategies do not open new positions but continue to manage existing ones.
+While an asset is paused, its pending orders are cancelled and its strategies place no new entries; its open positions keep being managed. Other assets are not affected.

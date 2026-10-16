@@ -16,12 +16,11 @@ The quality function lives in `SEStatistics` (per strategy) and is aggregated up
 
 Enable during tester runs via EA inputs:
 
-- `EnableOrderHistoryReport` — per-strategy order history CSV.
-- `EnableSnapshotHistoryReport` — per-strategy snapshot CSV.
-- `EnableMarketHistoryReport` — per-asset market snapshot CSV.
-- `EnableSeedAccounts / EnableSeedAssets / EnableSeedStrategies / EnableSeedMetadata / EnableSeedOrders / EnableSeedSnapshots` — seed datasets for the Monitor backend.
+- `EnableOrderHistoryReport` — per-strategy order history JSON.
+- `EnableSnapshotHistoryReport` — per-strategy snapshot JSON.
+- `EnableMarketHistoryReport` — per-asset market snapshot JSON.
 
-Reports and seeds are written during `OnTester()` via each asset's `ExportOrderHistory()`, `ExportStrategySnapshots()`, and `ExportMarketSnapshots()` calls.
+Reports are written under `<login>\Reports\` in MT5's Common Files folder during `OnTester()` via each asset's `ExportOrderHistory()`, `ExportStrategySnapshots()`, and `ExportMarketSnapshots()` calls.
 
 ## Parameter surface
 

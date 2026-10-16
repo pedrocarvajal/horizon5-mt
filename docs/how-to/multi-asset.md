@@ -17,23 +17,19 @@ Assets with zero enabled strategies are skipped entirely — they neither receiv
 
 ### Strategy level (within each asset)
 
-Each asset divides its share equally among its **active** (non-passive) strategies:
+Each asset divides its share equally among its enabled strategies:
 
 ```
-weightPerStrategy  = assetWeight  / activeStrategyCount
-balancePerStrategy = assetBalance / activeStrategyCount
+balancePerStrategy = assetBalance / strategyCount
 ```
-
-**Passive strategies** (e.g. the Gateway strategy) receive the **full asset weight and balance**. They do not trade autonomously — they relay orders from the Gateway service — and need the entire asset context to size those orders correctly.
 
 ### Example
 
-Account: $100,000. Two assets enabled. Asset A has three active strategies and one passive Gateway strategy; asset B has one active strategy.
+Account: $100,000. Two assets enabled. Asset A has three enabled strategies; asset B has one.
 
 - Each asset gets $50,000.
-- Asset A's three active strategies each get $16,666.67.
-- Asset A's passive strategy gets the full $50,000.
-- Asset B's one active strategy gets $50,000.
+- Asset A's three strategies each get $16,666.67.
+- Asset B's one strategy gets $50,000.
 
 ## Enabling and disabling assets
 

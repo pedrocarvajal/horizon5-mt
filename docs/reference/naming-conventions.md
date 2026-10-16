@@ -31,21 +31,21 @@ Pick names you can say out loud in a conversation or log line without ambiguity.
 
 ## Code prefixes
 
-| Prefix | Location      | Role                                                                                |
-| ------ | ------------- | ----------------------------------------------------------------------------------- |
-| `H`    | `helpers/`    | Pure utility functions operating on values or arrays — no market-data access        |
-| `IN`   | `indicators/` | Market-data functions that call `CopyXxx` to read bars or indicator buffers         |
-| `SE`   | `services/`   | Core services (time, logging, sizing, bus, order book, statistics, gateway routing) |
-| `SR`   | `services/`   | Persistence, reports, integrations, reconciliation                                  |
-| `E`    | `entities/`   | Domain entities (e.g. `EOrder`, `EAccount`)                                         |
-| `S`    | `structs/`    | Plain data-transfer structs (e.g. `SDateTime`, `STradingStatus`)                    |
-| `I`    | `interfaces/` | Interface definitions (e.g. `IStrategy`, `IAsset`)                                  |
-| `CO`   | `constants/`  | Compile-time constant groups (times, message bus channels, order limits, etc.)      |
-| `A`    | `adapters/`   | Thin wrappers over MT5 subsystems (e.g. `ATrade` around `CTrade`)                   |
+| Prefix | Location      | Role                                                                         |
+| ------ | ------------- | ---------------------------------------------------------------------------- |
+| `H`    | `helpers/`    | Pure utility functions operating on values or arrays — no market-data access |
+| `IN`   | `indicators/` | Market-data functions that call `CopyXxx` to read bars or indicator buffers  |
+| `SE`   | `services/`   | Core services (time, logging, sizing, JSON storage, order book, statistics)  |
+| `SR`   | `services/`   | Persistence, reports, reconciliation                                         |
+| `E`    | `entities/`   | Domain entities (e.g. `EOrder`, `EAccount`)                                  |
+| `S`    | `structs/`    | Plain data-transfer structs (e.g. `SDateTime`, `SMarketStatus`)              |
+| `I`    | `interfaces/` | Interface definitions (e.g. `IStrategy`, `IAsset`)                           |
+| `CO`   | `constants/`  | Compile-time constant groups (times, report paths, order limits, etc.)       |
+| `A`    | `adapters/`   | Thin wrappers over MT5 subsystems (e.g. `ATrade` around `CTrade`)            |
 
 ## Identifier policy
 
 - **Magic numbers** — derived deterministically from `"{symbol}_{assetName}_{strategyName}"` via DJB2 hash, modulo 1 billion. Computed locally, validated for uniqueness at init.
-- **UUIDs** — deterministic UUID v5-style values derived from seed strings (account, asset, strategy, order). The EA and any external backend (Monitor, Gateway) compute matching UUIDs independently — no registration handshake is needed.
+- **Order IDs** — random UUIDs generated locally (`GenerateUuid()`) when an order is created.
 
 See [Explanation > Portfolio Approach](../explanation/portfolio-approach.md) for the rationale.

@@ -54,6 +54,10 @@ public:
 		stateCollection = database.Collection("state");
 	}
 
+	bool HasLoadError() {
+		return stateCollection != NULL && stateCollection.HasLoadError();
+	}
+
 	bool Load() {
 		if (!IsLiveTrading()) {
 			return true;

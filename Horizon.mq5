@@ -1,5 +1,5 @@
 #property copyright "Horizon5, by Pedro Carvajal"
-#property version "0.416"
+#property version "0.420"
 #property description "Advanced algorithmic trading system for MetaTrader 5 featuring multiple quantitative strategies with intelligent portfolio optimization."
 
 #include <Trade/Trade.mqh>
@@ -7,36 +7,20 @@
 #include "configs/Assets.mqh"
 
 #include "constants/COHorizon.mqh"
-#include "constants/COTime.mqh"
 
 #include "entities/EAccount.mqh"
 
 #include "enums/EDebugLevel.mqh"
-#include "enums/ESnapshotEvent.mqh"
 
-#include "structs/STradingStatus.mqh"
-
-#include "helpers/HGetPipSize.mqh"
-#include "helpers/HGetPipValue.mqh"
-#include "helpers/HIsLiveTrading.mqh"
 #include "helpers/HGetLogsPath.mqh"
-#include "helpers/HGetSystemName.mqh"
-#include "helpers/HInitializeMessageBus.mqh"
 
 #include "services/SEDateTime/SEDateTime.mqh"
 #include "services/SRReportOfLogs/SRReportOfLogs.mqh"
-#include "services/SRImplementationOfHorizonMonitor/SRImplementationOfHorizonMonitor.mqh"
-#include "services/SRImplementationOfHorizonGateway/SRImplementationOfHorizonGateway.mqh"
-#include "services/SRReportOfMonitorSeed/SRReportOfMonitorSeed.mqh"
 #include "services/SRAccountAuditor/SRAccountAuditor.mqh"
 
 EAccount account;
 SEDateTime dtime;
 SELogger logger;
-SRImplementationOfHorizonMonitor horizonMonitor;
-SRImplementationOfHorizonGateway horizonGateway;
-STradingStatus tradingStatus;
-SRReportOfMonitorSeed *monitorSeedReporter = NULL;
 SRAccountAuditor accountAuditor;
 
 input group "General Settings";
@@ -49,14 +33,6 @@ input bool EnableOrderHistoryReport = false; // [1] > Export per-strategy order 
 input bool EnableSnapshotHistoryReport = false; // [1] > Export per-strategy snapshots
 input bool EnableMarketHistoryReport = false; // [1] > Export per-asset market snapshots
 
-input group "Reporting > Monitor Seed";
-input bool EnableSeedAccounts = false; // [1] > Export accounts collection
-input bool EnableSeedAssets = false; // [1] > Export assets collection
-input bool EnableSeedStrategies = false; // [1] > Export strategies collection
-input bool EnableSeedMetadata = false; // [1] > Export metadata collection
-input bool EnableSeedOrders = false; // [1] > Export orders collection
-input bool EnableSeedSnapshots = false; // [1] > Export account/asset/strategy snapshots
-
 input group "Reporting > Logs";
 input bool EnableLogExport = false; // [1] > Export portfolio logs on shutdown
 
@@ -64,21 +40,8 @@ input group "Risk management";
 input bool EquityAtRiskCompounded = false; // [1] > Equity at risk compounded
 input double EquityAtRisk = 1; // [1] > Equity at risk value (in percentage)
 
-input group "Horizon Monitor";
-input bool EnableHorizonMonitor = false; // [1] > Enable Horizon Monitor integration
-input string HorizonMonitorUrl = ""; // [1] > HorizonMonitor base URL
-input string HorizonMonitorEmail = ""; // [1] > HorizonMonitor email (required)
-input string HorizonMonitorPassword = ""; // [1] > HorizonMonitor password (required)
-
-input group "Horizon Gateway";
-input bool EnableHorizonGateway = false; // [1] > Enable Horizon Gateway integration
-input string HorizonGatewayUrl = ""; // [1] > HorizonGateway base URL
-input string HorizonGatewayEmail = ""; // [1] > HorizonGateway email (required)
-input string HorizonGatewayPassword = ""; // [1] > HorizonGateway password (required)
-
 int lastCheckedDay = -1;
 int lastCheckedHour = -1;
-int lastCheckedMinute = -1;
 datetime lastTickTime = 0;
 
 bool ValidateMagicNumbers() {
@@ -134,79 +97,6 @@ bool ValidateMagicNumbers() {
 	return true;
 }
 
-int BuildRequiredServices(string &services[]) {
-	int count = 0;
-
-	ArrayResize(services, 1);
-	services[count++] = MB_SERVICE_PERSISTENCE;
-
-	if (horizonMonitor.IsEnabled()) {
-		ArrayResize(services, count + 1);
-		services[count++] = MB_SERVICE_MONITOR;
-	}
-
-	if (horizonGateway.IsEnabled()) {
-		ArrayResize(services, count + 1);
-		services[count++] = MB_SERVICE_GATEWAY;
-	}
-
-	return count;
-}
-
-void SendServiceHeartbeats() {
-	if (horizonGateway.IsEnabled() && SEMessageBus::IsActive() && SEMessageBus::IsServiceRunning(MB_SERVICE_GATEWAY)) {
-		horizonMonitor.StoreSystemHeartbeat(GetSystemName(SYSTEM_GATEWAY_SERVICE));
-	}
-
-	if (SEMessageBus::IsActive() && SEMessageBus::IsServiceRunning(MB_SERVICE_PERSISTENCE)) {
-		horizonMonitor.StoreSystemHeartbeat(GetSystemName(SYSTEM_PERSISTENCE_SERVICE));
-	}
-}
-
-void CheckServiceHealth() {
-	string requiredServices[];
-	int serviceCount = BuildRequiredServices(requiredServices);
-	bool servicesRunning = SEMessageBus::AreServicesReady(requiredServices, serviceCount);
-
-	if (servicesRunning && tradingStatus.reason == TRADING_PAUSE_REASON_SERVICES_DOWN) {
-		SEMessageBus::Activate();
-		logger.Info(
-			LOG_CODE_TRADING_PAUSED,
-			"trading resumed | reason='services recovered'"
-		);
-		tradingStatus.isPaused = false;
-		tradingStatus.reason = TRADING_PAUSE_REASON_NONE;
-	}
-
-	if (!servicesRunning && tradingStatus.reason != TRADING_PAUSE_REASON_SERVICES_DOWN) {
-		logger.Error(
-			LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
-			"trading paused | reason='required services down'"
-		);
-		SEMessageBus::Shutdown();
-		tradingStatus.isPaused = true;
-		tradingStatus.reason = TRADING_PAUSE_REASON_SERVICES_DOWN;
-	}
-}
-
-void CollectAccountSeedSnapshot(ENUM_SNAPSHOT_EVENT event) {
-	accountAuditor.CollectAccountSeedSnapshot(event);
-}
-
-void InitializeMonitorSeedReporter() {
-	string firstSymbol = "";
-	for (int i = 0; i < ArraySize(assets); i++) {
-		if (assets[i].IsEnabled()) {
-			firstSymbol = assets[i].GetSymbol();
-			break;
-		}
-	}
-
-	monitorSeedReporter = new SRReportOfMonitorSeed();
-	monitorSeedReporter.Initialize(firstSymbol, "MonitorSeed");
-	monitorSeedReporter.RegisterAccount();
-}
-
 int OnInit() {
 	EventSetTimer(1);
 
@@ -214,51 +104,6 @@ int OnInit() {
 	logger.SetPrefix("Horizon");
 
 	SELogger::SetGlobalDebugLevel(DebugLevel);
-	SELogger::SetLogSystem(LOG_SYSTEM_HORIZON5);
-
-	bool monitorEnabled = IsLiveTrading() && EnableHorizonMonitor;
-	bool gatewayEnabled = IsLiveTrading() && EnableHorizonGateway;
-
-	if (!horizonMonitor.Initialize(HorizonMonitorUrl, HorizonMonitorEmail, HorizonMonitorPassword, monitorEnabled)) {
-		return INIT_FAILED;
-	}
-
-	if (!horizonGateway.Initialize(HorizonGatewayUrl, HorizonGatewayEmail, HorizonGatewayPassword, gatewayEnabled)) {
-		return INIT_FAILED;
-	}
-
-	if (horizonMonitor.IsEnabled()) {
-		SELogger::SetRemoteLogger(GetPointer(horizonMonitor));
-
-		if (!horizonMonitor.UpsertAccount()) {
-			logger.Error(
-				LOG_CODE_REMOTE_AUTH_FAILED,
-				"service idle | reason='monitor account registration failed'"
-			);
-			return INIT_FAILED;
-		}
-	}
-
-	if (horizonGateway.IsEnabled()) {
-		if (!horizonGateway.UpsertAccount()) {
-			logger.Error(
-				LOG_CODE_REMOTE_AUTH_FAILED,
-				"service idle | reason='gateway account registration failed'"
-			);
-			return INIT_FAILED;
-		}
-
-		string accountStatus = horizonGateway.FetchAccountStatus();
-
-		if (accountStatus != "active") {
-			logger.Warning(
-				LOG_CODE_TRADING_PAUSED,
-				"trading paused | reason='account inactive'"
-			);
-			tradingStatus.isPaused = true;
-			tradingStatus.reason = TRADING_PAUSE_REASON_ACCOUNT_INACTIVE;
-		}
-	}
 
 	lastCheckedDay = dtime.Today().dayOfYear;
 	lastCheckedHour = dtime.Today().hour;
@@ -290,13 +135,6 @@ int OnInit() {
 
 	double weightPerAsset = 1.0 / enabledAssetCount;
 
-	bool isMonitorSeedEnabled = EnableSeedAccounts || EnableSeedAssets || EnableSeedStrategies
-				    || EnableSeedMetadata || EnableSeedOrders || EnableSeedSnapshots;
-
-	if (isMonitorSeedEnabled) {
-		InitializeMonitorSeedReporter();
-	}
-
 	for (int i = 0; i < assetCount; i++) {
 		if (assets[i].IsEnabled()) {
 			assets[i].SetWeight(weightPerAsset);
@@ -317,106 +155,9 @@ int OnInit() {
 	accountAuditor.Initialize(assets, assetCount);
 	accountAuditor.AuditOrders();
 
-	if (IsLiveTrading()) {
-		string requiredServices[];
-		int serviceCount = BuildRequiredServices(requiredServices);
-
-		if (!InitializeMessageBus(requiredServices, serviceCount)) {
-			logger.Error(
-				LOG_CODE_FRAMEWORK_SERVICE_UNAVAILABLE,
-				"service idle | reason='required services not running'"
-			);
-			return INIT_FAILED;
-		}
-	}
-
-	if (horizonMonitor.IsEnabled() || horizonGateway.IsEnabled()) {
-		logger.Separator("UUID Mapping Report");
-
-		if (horizonMonitor.IsEnabled()) {
-			logger.Info(
-				LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
-				StringFormat(
-					"uuid mapped | system=monitor target=account uuid=%s",
-					horizonMonitor.GetAccountUuid()
-			));
-
-			for (int i = 0; i < ArraySize(assets); i++) {
-				if (!assets[i].IsEnabled()) {
-					continue;
-				}
-
-				string symbolName = assets[i].GetSymbol();
-				logger.Info(
-					LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
-					StringFormat(
-						"uuid mapped | system=monitor target=asset symbol=%s uuid=%s",
-						symbolName,
-						horizonMonitor.GetAssetUuid(symbolName)
-				));
-
-				for (int j = 0; j < assets[i].GetStrategyCount(); j++) {
-					ulong magic = assets[i].GetStrategyAtIndex(j).GetMagicNumber();
-					string stratName = assets[i].GetStrategyAtIndex(j).GetName();
-					logger.Info(
-						LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
-						StringFormat(
-							"uuid mapped | system=monitor target=strategy strategy=%s magic=%llu uuid=%s",
-							stratName,
-							magic,
-							horizonMonitor.GetStrategyUuid(magic)
-					));
-				}
-			}
-		}
-
-		if (horizonGateway.IsEnabled()) {
-			logger.Info(
-				LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
-				StringFormat(
-					"uuid mapped | system=gateway target=account uuid=%s",
-					horizonGateway.GetAccountUuid()
-			));
-
-			for (int i = 0; i < ArraySize(assets); i++) {
-				if (!assets[i].IsEnabled()) {
-					continue;
-				}
-
-				string symbolName = assets[i].GetSymbol();
-				logger.Info(
-					LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
-					StringFormat(
-						"uuid mapped | system=gateway target=asset symbol=%s uuid=%s",
-						symbolName,
-						horizonGateway.GetAssetUuid(symbolName)
-				));
-
-				for (int j = 0; j < assets[i].GetStrategyCount(); j++) {
-					ulong magic = assets[i].GetStrategyAtIndex(j).GetMagicNumber();
-					string stratName = assets[i].GetStrategyAtIndex(j).GetName();
-					logger.Info(
-						LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
-						StringFormat(
-							"uuid mapped | system=gateway target=strategy strategy=%s magic=%llu uuid=%s",
-							stratName,
-							magic,
-							horizonGateway.GetStrategyUuid(magic)
-					));
-				}
-			}
-		}
-
-		logger.Separator("End UUID Mapping Report");
-	}
-
-	if (horizonMonitor.IsEnabled()) {
-		SendServiceHeartbeats();
-	}
-
 	logger.Info(
 		LOG_CODE_FRAMEWORK_INTERNAL_ERROR,
-		"service started | system=Horizon version=0.416 built='2026-04-15 14:14:55'"
+		"service started | system=Horizon version=0.420 built='2026-10-16 21:10:35'"
 	);
 
 	return INIT_SUCCEEDED;
@@ -424,8 +165,6 @@ int OnInit() {
 
 void OnDeinit(const int reason) {
 	EventKillTimer();
-	SELogger::SetRemoteLogger(NULL);
-	SEMessageBus::Shutdown();
 
 	bool isNormalShutdown = (reason != REASON_CHARTCHANGE && reason != REASON_PARAMETERS);
 
@@ -464,7 +203,6 @@ void OnTimer() {
 
 	bool isStartDay = (now.dayOfYear != lastCheckedDay);
 	bool isStartHour = (now.hour != lastCheckedHour);
-	bool isStartMinute = (now.minute != lastCheckedMinute);
 	bool isTickInterval = (now.timestamp - lastTickTime) >= TickIntervalTime;
 
 	for (int i = 0; i < ArraySize(assets); i++) {
@@ -475,37 +213,13 @@ void OnTimer() {
 	if (isStartDay) {
 		lastCheckedDay = now.dayOfYear;
 
-		if (tradingStatus.isPaused
-		    && tradingStatus.reason != TRADING_PAUSE_REASON_HORIZON_API_REQUEST
-		    && tradingStatus.reason != TRADING_PAUSE_REASON_ACCOUNT_INACTIVE
-		    && tradingStatus.reason != TRADING_PAUSE_REASON_SERVICES_DOWN) {
-			logger.Info(
-				LOG_CODE_TRADING_PAUSED,
-				"trading resumed | reason='new day started'"
-			);
-			tradingStatus.isPaused = false;
-			tradingStatus.reason = TRADING_PAUSE_REASON_NONE;
-		}
-
-		if (horizonMonitor.IsEnabled()) {
-			horizonMonitor.SyncAccount(assets, ArraySize(assets), SNAPSHOT_ON_END_DAY);
-		}
-
-		if (monitorSeedReporter != NULL) {
-			CollectAccountSeedSnapshot(SNAPSHOT_ON_END_DAY);
+		for (int i = 0; i < ArraySize(assets); i++) {
+			assets[i].ResumeTrading();
 		}
 	}
 
 	if (isStartHour) {
 		lastCheckedHour = now.hour;
-	}
-
-	if (isStartMinute) {
-		lastCheckedMinute = now.minute;
-
-		if (SEMessageBus::IsActive()) {
-			CheckServiceHealth();
-		}
 	}
 
 	if (isTickInterval) {
@@ -520,18 +234,6 @@ void OnTimer() {
 		assets[i].ProcessOrders();
 	}
 
-	if (horizonGateway.IsEnabled() && SEMessageBus::IsActive()) {
-		horizonGateway.ProcessServiceEvents(assets);
-	}
-
-	if (isStartHour && horizonMonitor.IsEnabled()) {
-		if (!isStartDay) {
-			horizonMonitor.SyncAccount(assets, ArraySize(assets), SNAPSHOT_ON_HOUR);
-		}
-
-		SendServiceHeartbeats();
-	}
-
 	if (isStartHour) {
 		accountAuditor.AuditOrders();
 	}
@@ -544,11 +246,11 @@ void OnTradeTransaction(
 ) {
 	if (transaction.type == TRADE_TRANSACTION_HISTORY_ADD) {
 		if (HistoryOrderSelect(transaction.order)) {
-			ulong orderState = HistoryOrderGetInteger(transaction.order, ORDER_STATE);
+			ENUM_ORDER_STATE orderState = (ENUM_ORDER_STATE)HistoryOrderGetInteger(transaction.order, ORDER_STATE);
 
 			if (orderState == ORDER_STATE_CANCELED || orderState == ORDER_STATE_EXPIRED) {
 				for (int i = 0; i < ArraySize(assets); i++) {
-					if (assets[i].HandleOrderCancellation(transaction.order)) {
+					if (assets[i].HandleOrderCancellation(transaction.order, orderState)) {
 						break;
 					}
 				}
@@ -600,8 +302,7 @@ void HandleDealCloseTransaction(ulong positionId, ulong dealId) {
 	bool isFound = false;
 	for (int i = 0; i < ArraySize(assets); i++) {
 		if (assets[i].HandleDealClose(
-			positionId, dealTime, dealPrice, netProfit,
-			dealProfit, dealCommission, dealSwap, dealReason
+			positionId, dealTime, dealPrice, netProfit, dealReason
 		    )) {
 			isFound = true;
 			break;
@@ -657,12 +358,6 @@ double OnTester() {
 		assets[i].ExportOrderHistory();
 		assets[i].ExportStrategySnapshots();
 		assets[i].ExportMarketSnapshots();
-	}
-
-	if (monitorSeedReporter != NULL) {
-		monitorSeedReporter.Export();
-		delete monitorSeedReporter;
-		monitorSeedReporter = NULL;
 	}
 
 	return quality;

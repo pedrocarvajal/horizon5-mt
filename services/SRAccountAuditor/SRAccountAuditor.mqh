@@ -3,20 +3,9 @@
 
 #include "../SELogger/SELogger.mqh"
 
-#include "../SEDateTime/SEDateTime.mqh"
-
-#include "../SRReportOfMonitorSeed/SRReportOfMonitorSeed.mqh"
-
-#include "../../entities/EAccount.mqh"
-
 #include "../../assets/Asset.mqh"
 
 #include "../../helpers/HIsLiveTrading.mqh"
-#include "../../helpers/HGetSnapshotEvent.mqh"
-
-extern SEDateTime dtime;
-extern EAccount account;
-extern SRReportOfMonitorSeed *monitorSeedReporter;
 
 class SRAccountAuditor {
 private:
@@ -80,29 +69,6 @@ public:
 					metatraderTotal - trackedOrderCount
 			));
 		}
-	}
-
-	void CollectAccountSeedSnapshot(ENUM_SNAPSHOT_EVENT event) {
-		if (monitorSeedReporter == NULL) {
-			return;
-		}
-
-		double floatingPnl = 0;
-		double realizedPnl = 0;
-
-		for (int i = 0; i < assetCount; i++) {
-			registeredAssets[i].AggregateSnapshotData(floatingPnl, realizedPnl);
-		}
-
-		monitorSeedReporter.AddAccountSnapshot(
-			account.GetBalance(),
-			account.GetEquity(),
-			account.GetMargin(),
-			floatingPnl,
-			realizedPnl,
-			event,
-			dtime.Timestamp()
-		);
 	}
 };
 

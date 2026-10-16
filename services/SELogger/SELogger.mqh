@@ -5,11 +5,8 @@
 #include "enums/ELogLevel.mqh"
 #include "enums/ELogCode.mqh"
 
-#include "../../interfaces/IRemoteLogger.mqh"
-
 #include "components/LogLevelFilter.mqh"
 #include "components/LogPersister.mqh"
-#include "components/LogRemoteDispatcher.mqh"
 #include "components/LogFormatter.mqh"
 
 class SELogger {
@@ -42,25 +39,12 @@ public:
 		log(LOG_LEVEL_WARNING, code, message);
 	}
 
-	void Separator(string title) {
-		const string separatorTail = " -------------------------------- ";
-		log(LOG_LEVEL_INFO, LOG_CODE_NONE, title + separatorTail);
-	}
-
 	void SetPrefix(string newPrefix) {
 		prefix = newPrefix;
 	}
 
 	static void SetGlobalDebugLevel(ENUM_DEBUG_LEVEL level) {
 		globalDebugLevel = level;
-	}
-
-	static void SetRemoteLogger(IRemoteLogger *remoteLoggerInstance) {
-		LogRemoteDispatcher::SetRemoteLogger(remoteLoggerInstance);
-	}
-
-	static void SetLogSystem(string system) {
-		LogRemoteDispatcher::SetLogSystem(system);
 	}
 
 	static void GetGlobalEntries(string &result[]) {
@@ -77,13 +61,6 @@ public:
 
 private:
 	void log(ENUM_LOG_LEVEL level, ENUM_LOG_CODE code, string message) {
-		if (!LogLevelFilter::IsEnabled(globalDebugLevel)) {
-			return;
-		}
-
-		string levelLabel = LogLevelToString(level);
-		LogRemoteDispatcher::Dispatch(levelLabel, prefix, message);
-
 		if (!LogLevelFilter::ShouldPrint(level, globalDebugLevel)) {
 			return;
 		}

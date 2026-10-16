@@ -9,10 +9,8 @@ These call MT5's `CopyXxx` family (`CopyClose`, `CopyHigh`, `CopyBuffer`, ...) t
 Representative functions:
 
 - `INRollingReturn.mqh` — rolling percentage return over N bars.
-- `INHighest.mqh` — highest value in a lookback window.
 - `INDrawdownFromPeak.mqh` — drawdown from the rolling peak.
 - `INVolatility.mqh` — rolling volatility.
-- `INDailyPerformance.mqh` — day-level performance.
 - `INFairValueGap.mqh`, `INSwingPoints.mqh` — structural indicators.
 - `INGetPriceValue.mqh` — price lookup at a given shift.
 
@@ -24,11 +22,11 @@ These operate on values or arrays already in memory. No market data dependency.
 
 Representative functions:
 
-- `HClampNumeric.mqh`, `HStringToNumber.mqh`, `HMapTimeframe.mqh` — generic utilities.
-- `HGet*Uuid.mqh` — deterministic UUID construction.
-- `HGetPipSize.mqh`, `HGetPipValue.mqh` — symbol-scale helpers.
-- `HDrawHorizontalLine.mqh`, `HDrawVerticalLine.mqh`, `HDrawRectangle.mqh` — chart annotations.
-- `HIsMarketClosed.mqh`, `HIsLiveTrading.mqh`, `HIsLiveEnvironment.mqh` — environment/status checks.
+- `HNormalizeLotSize.mqh` — round lot size to broker volume step/min/max.
+- `HCheckStopDistance.mqh` — validate SL/TP against `SYMBOL_TRADE_STOPS_LEVEL`.
+- `HGetIndicatorValue.mqh` — wrap `CopyBuffer` for custom indicator handles.
+- `HStringToNumber.mqh` — generic utility.
+- `HIsMarketClosed.mqh`, `HIsLiveTrading.mqh` — environment/status checks.
 
 ## Using built-in or custom MT5 indicators
 
@@ -46,18 +44,23 @@ if (handle != INVALID_HANDLE) {
 }
 ```
 
-Read values with `CopyBuffer`:
+Read values through the helper:
 
 ```mql5
-double values[];
-int copied = CopyBuffer(handle, bufferIndex, shift, count, values);
+double value = GetIndicatorValue(handle, bufferIndex, shift);
 ```
 
 - `bufferIndex` — the indicator output buffer (0 for most single-output indicators).
 - `shift` — number of bars back. `0` is the forming bar; use `1` for the last closed bar.
-- `count` — number of values to copy. Use `1` for a single value.
 
-`CopyBuffer` returns the number of values copied (`-1` on error); the array is series-indexed (index 0 = most recent).
+For multiple values at once:
+
+```mql5
+double values[];
+bool ok = GetIndicatorValues(handle, bufferIndex, shift, count, values);
+```
+
+Returns `true` if the requested range was copied; the array is series-indexed (index 0 = most recent).
 
 ## Shift semantics
 

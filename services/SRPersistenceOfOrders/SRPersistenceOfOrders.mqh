@@ -6,8 +6,6 @@
 
 #include "../SELogger/SELogger.mqh"
 
-#include "../SEDateTime/SEDateTime.mqh"
-
 #include "../SEDb/SEDb.mqh"
 
 #include "../../entities/EOrder.mqh"
@@ -45,7 +43,6 @@ public:
 		bool result = ordersCollection.DeleteOne("_id", orderId);
 
 		if (result) {
-			ordersCollection.Flush();
 			logger.Debug(
 				LOG_CODE_PERSISTENCE_SAVE_FAILED,
 				StringFormat(
@@ -78,15 +75,6 @@ public:
 		return loader.Load(restoredOrders);
 	}
 
-	int QueryOrders(SEDbQuery &query, JSON::Object *&results[]) {
-		if (ordersCollection == NULL) {
-			ArrayResize(results, 0);
-			return 0;
-		}
-
-		return ordersCollection.Find(query, results);
-	}
-
 	bool SaveOrder(EOrder &order) {
 		if (!IsLiveTrading()) {
 			return true;
@@ -97,20 +85,10 @@ public:
 		}
 
 		JSON::Object *json = SerializeOrder(order);
-		JSON::Object *existing = ordersCollection.FindOne("_id", order.GetId());
-		bool result;
-
-		if (existing != NULL) {
-			delete existing;
-			result = ordersCollection.UpdateOne("_id", order.GetId(), json);
-		} else {
-			result = ordersCollection.InsertOne(json);
-		}
-
+		bool result = ordersCollection.UpsertOne("_id", order.GetId(), json);
 		delete json;
 
 		if (result) {
-			ordersCollection.Flush();
 			logger.Debug(
 				LOG_CODE_PERSISTENCE_SAVE_FAILED,
 				StringFormat(

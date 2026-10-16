@@ -131,16 +131,8 @@ public:
 		return result;
 	}
 
-	STradeResult ModifyStopLoss(double stopLoss, ulong magicNumber = 0) {
-		return Modify(stopLoss, 0, magicNumber);
-	}
-
 	STradeResult ModifyStopLossAndTakeProfit(double stopLoss, double takeProfit, ulong magicNumber = 0) {
 		return Modify(stopLoss, takeProfit, magicNumber);
-	}
-
-	STradeResult ModifyTakeProfit(double takeProfit, ulong magicNumber = 0) {
-		return Modify(0, takeProfit, magicNumber);
 	}
 
 	STradeResult Open(

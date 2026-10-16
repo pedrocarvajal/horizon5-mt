@@ -50,9 +50,6 @@ private:
 	double profitInDollars;
 	double takeProfitPrice;
 	double stopLossPrice;
-	double commission;
-	double swap;
-	double grossProfit;
 
 	SDateTime signalAt;
 	SDateTime openAt;
@@ -94,9 +91,6 @@ public:
 		profitInDollars = 0;
 		takeProfitPrice = 0;
 		stopLossPrice = 0;
-		commission = 0;
-		swap = 0;
-		grossProfit = 0;
 
 		dealId = 0;
 		orderId = 0;
@@ -145,9 +139,6 @@ public:
 
 		takeProfitPrice = other.takeProfitPrice;
 		stopLossPrice = other.stopLossPrice;
-		commission = other.commission;
-		swap = other.swap;
-		grossProfit = other.grossProfit;
 
 		snapshot = other.snapshot;
 
@@ -202,9 +193,6 @@ public:
 		profitInDollars = 0;
 		takeProfitPrice = 0;
 		stopLossPrice = 0;
-		commission = 0;
-		swap = 0;
-		grossProfit = 0;
 
 		dealId = 0;
 		orderId = 0;
@@ -300,18 +288,6 @@ public:
 
 	double GetProfitInDollars() const {
 		return profitInDollars;
-	}
-
-	double GetCommission() const {
-		return commission;
-	}
-
-	double GetSwap() const {
-		return swap;
-	}
-
-	double GetGrossProfit() const {
-		return grossProfit;
 	}
 
 	double GetFloatingPnL() const {
@@ -504,18 +480,6 @@ public:
 
 	void SetModifyRetry(const SOrderRetryState &value) {
 		modifyRetry = value;
-	}
-
-	void SetCommission(double value) {
-		commission = value;
-	}
-
-	void SetSwap(double value) {
-		swap = value;
-	}
-
-	void SetGrossProfit(double value) {
-		grossProfit = value;
 	}
 
 	void SetPersistence(SRPersistenceOfOrders *value) {

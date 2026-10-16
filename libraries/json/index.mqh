@@ -111,14 +111,24 @@ public:
 
 			for (int i = 0; i < arraySize; i++) {
 				const JsonValueItem *item = this._jsonValueItemsArray[i];
-				result += "\"" + item.key + "\": " + item.toString() + (i <
-											arraySize
-											- 1 ?
-											"," :
-											"");
+				result += "\"" + JSON::_escapeString(item.key) + "\": " + item.toString() + (i <
+													     arraySize
+													     - 1 ?
+													     "," :
+													     "");
 			}
 
 			return "{" + result + "}";
+		}
+
+		bool isSerializable() const {
+			for (int i = 0; i < ArraySize(this._jsonValueItemsArray); i++) {
+				if (!this._jsonValueItemsArray[i].isSerializable()) {
+					return false;
+				}
+			}
+
+			return true;
 		}
 
 		~Object() {
@@ -271,6 +281,16 @@ public:
 			return "[" + result + "]";
 		}
 
+		bool isSerializable() const {
+			for (int i = 0; i < ArraySize(this._jsonValueItemsArray); i++) {
+				if (!this._jsonValueItemsArray[i].isSerializable()) {
+					return false;
+				}
+			}
+
+			return true;
+		}
+
 		~Array() {
 			this._clearResources();
 		}
@@ -407,6 +427,45 @@ private:
 	static bool _isDigit(ushort ch) {
 		return ch >= '0' && ch <= '9';
 	}
+	static int _hexDigitValue(ushort ch) {
+		if (ch >= '0' && ch <= '9') {
+			return ch - '0';
+		}
+		if (ch >= 'a' && ch <= 'f') {
+			return ch - 'a' + 10;
+		}
+		if (ch >= 'A' && ch <= 'F') {
+			return ch - 'A' + 10;
+		}
+		return -1;
+	}
+	static string _escapeString(string value) {
+		StringReplace(value, "\\", "\\\\");
+		StringReplace(value, "\"", "\\\"");
+		StringReplace(value, "\n", "\\n");
+		StringReplace(value, "\r", "\\r");
+		StringReplace(value, "\t", "\\t");
+
+		int length = StringLen(value);
+		bool hasControlCharacter = false;
+
+		for (int i = 0; i < length && !hasControlCharacter; i++) {
+			hasControlCharacter = value[i] < 0x20;
+		}
+
+		if (!hasControlCharacter) {
+			return value;
+		}
+
+		string escaped = "";
+
+		for (int i = 0; i < length; i++) {
+			ushort character = value[i];
+			escaped += character < 0x20 ? StringFormat("\\u%04x", character) : ShortToString(character);
+		}
+
+		return escaped;
+	}
 	static void _skipWhitespace(const string &json, int &i) {
 		while (i < StringLen(json) &&
 		       (json[i] == ' ' || json[i] == '\n' || json[i] == '\r' ||
@@ -416,17 +475,7 @@ private:
 	}
 	static string _parseKey(const string &json, int &i, bool &isSuccess) {
 		if (i < StringLen(json) && json[i] == '"') {
-			i++; // skip '"'
-			string key = "";
-
-			while (i < StringLen(json) &&
-			       json[i] != '"') {
-				key += ShortToString(json[i++]);
-			}
-			if (i < StringLen(json) && json[i] == '"') { // check end '"'
-				i++;                    // skip '"'
-				return key;
-			}
+			return JSON::_parseString(json, i, isSuccess);
 		}
 
 		isSuccess = false;
@@ -452,13 +501,38 @@ private:
 			}
 		}
 
-		if (StringLen(numberStr) > 0) {
-			double result = StringToDouble(numberStr);
-			return isNegative ? -result : result;
+		if (StringLen(numberStr) == 0) {
+			isSuccess = false;
+			return 0.0;
 		}
 
-		isSuccess = false;
-		return 0.0;
+		double result = StringToDouble(numberStr);
+
+		if (i < StringLen(json) && (json[i] == 'e' || json[i] == 'E')) {
+			i++;
+			bool isNegativeExponent = false;
+
+			if (i < StringLen(json) && (json[i] == '+' || json[i] == '-')) {
+				isNegativeExponent = json[i] == '-';
+				i++;
+			}
+
+			string exponentStr = "";
+
+			while (i < StringLen(json) && JSON::_isDigit(json[i])) {
+				exponentStr += ShortToString(json[i++]);
+			}
+
+			if (StringLen(exponentStr) == 0) {
+				isSuccess = false;
+				return 0.0;
+			}
+
+			double exponentScale = MathPow(10.0, (double)StringToInteger(exponentStr));
+			result = isNegativeExponent ? result / exponentScale : result * exponentScale;
+		}
+
+		return isNegative ? -result : result;
 	}
 	static string _parseString(const string &json, int &i, bool &isSuccess) {
 		string result = "";
@@ -477,6 +551,32 @@ private:
 					case 'r': result += "\r"; break;
 					case '"': result += "\""; break;
 					case '\\': result += "\\"; break;
+					case '/': result += "/"; break;
+					case 'b': result += ShortToString(8); break;
+					case 'f': result += ShortToString(12); break;
+					case 'u': {
+						if (i + 4 >= StringLen(json)) {
+							isSuccess = false;
+							return "";
+						}
+
+						int codeUnit = 0;
+
+						for (int digitIndex = 1; digitIndex <= 4; digitIndex++) {
+							int digitValue = JSON::_hexDigitValue(json[i + digitIndex]);
+
+							if (digitValue < 0) {
+								isSuccess = false;
+								return "";
+							}
+
+							codeUnit = codeUnit * 16 + digitValue;
+						}
+
+						result += ShortToString((ushort)codeUnit);
+						i += 4;
+						break;
+					}
 					default:
 						isSuccess = false;
 						return "";
@@ -594,15 +694,22 @@ public:
 				return this.arrayValue.toString();
 			}
 			if (this.valueType == JSONStringType) {
-				string copy = this.stringValue;
-				StringReplace(copy, "\\", "\\\\");
-				StringReplace(copy, "\"", "\\\"");
-				StringReplace(copy, "\n", "\\n");
-				StringReplace(copy, "\r", "\\r");
-				StringReplace(copy, "\t", "\\t");
-				return "\"" + copy + "\"";
+				return "\"" + JSON::_escapeString(this.stringValue) + "\"";
 			}
 			return ""; // JSONUndefinedType , never returns
+		}
+
+		bool isSerializable() const {
+			if (this.valueType == JSONNumberType) {
+				return MathIsValidNumber(this.doubleValue);
+			}
+			if (this.valueType == JSONObjetType) {
+				return this.objectValue.isSerializable();
+			}
+			if (this.valueType == JSONArrayType) {
+				return this.arrayValue.isSerializable();
+			}
+			return true;
 		}
 
 		~JsonValueItem() {

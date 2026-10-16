@@ -1,6 +1,0 @@
-#ifndef __CONSTANTS_CO_HEARTBEAT_MQH__
-#define __CONSTANTS_CO_HEARTBEAT_MQH__
-
-#define HEARTBEAT_EVENT_RUNNING "on_running"
-
-#endif

@@ -68,7 +68,7 @@ Each lifecycle operation has its own retry budget (`MAX_RETRY_COUNT_OPEN`, `MAX_
 
 ## Persistence
 
-Every state change triggers JSON serialization via `SRPersistenceOfOrders`. In live trading the write is published to the persistence channel and handled asynchronously by `HorizonPersistence`; in tester mode it writes directly. The JSON file contains the full orders array per strategy — enough to rebuild state on restart.
+In live trading, every state change triggers JSON serialization via `SRPersistenceOfOrders`, which writes the strategy's `orders.json` through `SEDb` under MT5's Common Files folder (`<login>\Live\<symbol>\<prefix>\`); in the Strategy Tester persistence is skipped. The JSON file contains the full orders array per strategy — enough to rebuild state on restart.
 
 ## Recovery on restart
 

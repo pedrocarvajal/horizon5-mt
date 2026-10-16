@@ -19,19 +19,16 @@ Every 1-second tick of the timer runs, in order:
 
 1. `asset.OnTimer()` → `strategy.OnTimer()` on every asset/strategy.
 2. `asset.ProcessBarEvents()` → may fire `OnStartMinute / OnStartHour / OnStartDay`, each of which cascades to strategies.
-3. If the calendar day-of-year changed: daily maintenance, Monitor sync on `SNAPSHOT_ON_END_DAY`, and seed snapshot collection.
-4. If the calendar hour changed: Monitor hourly sync (if different from daily) and service heartbeats.
-5. If the calendar minute changed: service health check.
-6. If the tick interval elapsed: `asset.OnTick()` → `strategy.OnTick()`.
-7. `asset.ProcessOrders()` → order-book retries, submissions, and transitions.
-8. Gateway drains inbound service events (if enabled).
-9. Hourly: account auditor runs.
+3. If the calendar day-of-year changed: daily maintenance (every asset clears its trading pause).
+4. If the tick interval elapsed: `asset.OnTick()` → `strategy.OnTick()`.
+5. `asset.ProcessOrders()` → order-book retries, submissions, and transitions.
+6. If the calendar hour changed: account auditor runs.
 
-Steps 3–5 rely on calendar-time comparisons via `SEDateTime`; steps 1 and 2 are independent of calendar comparisons.
+Steps 3 and 6 rely on calendar-time comparisons via `SEDateTime`; steps 1 and 2 are independent of calendar comparisons.
 
 ## Why two signals for hour/day?
 
-Step 2 (primed-bar) fires once per asset when that asset's symbol sees a new bar. Step 3–5 (calendar-time) fire once globally regardless of market hours. The framework uses primed-bar events for strategy logic (so you only evaluate when your market actually advances) and uses calendar-time edges for portfolio-wide maintenance (Monitor sync, service health, auditing).
+Step 2 (primed-bar) fires once per asset when that asset's symbol sees a new bar. Steps 3 and 6 (calendar-time) fire once globally regardless of market hours. The framework uses primed-bar events for strategy logic (so you only evaluate when your market actually advances) and uses calendar-time edges for portfolio-wide maintenance (daily pause reset, auditing).
 
 ## Trade transactions
 

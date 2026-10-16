@@ -15,10 +15,6 @@ public:
 		);
 	}
 
-	static string FormatRemoteLine(string prefix, string message) {
-		return prefix + ": " + message;
-	}
-
 	static string FormatLogCode(ENUM_LOG_CODE code) {
 		if (code == LOG_CODE_NONE) {
 			return "-";

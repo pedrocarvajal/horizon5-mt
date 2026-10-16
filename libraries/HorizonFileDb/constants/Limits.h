@@ -1,6 +1,0 @@
-#ifndef HORIZON_FDB_LIMITS_H
-#define HORIZON_FDB_LIMITS_H
-
-constexpr int FDB_FLUSH_BUFFER_INITIAL_SIZE = 1024 * 256;
-
-#endif

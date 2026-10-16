@@ -29,19 +29,9 @@ public:
 		persistence = persistenceRef;
 	}
 
-	int QueryOrders(SEDbQuery &query, JSON::Object *&results[]) {
-		if (CheckPointer(persistence) == POINTER_INVALID) {
-			ArrayResize(results, 0);
-			return 0;
-		}
-
-		return persistence.QueryOrders(query, results);
-	}
-
-	int LoadAndSplit(
+	int LoadActiveOrders(
 		EOrder &existingOrders[],
-		EOrder &activeOrders[],
-		EOrder &reconciledOrders[]
+		EOrder &activeOrders[]
 	) {
 		ArrayResize(activeOrders, 0);
 
@@ -62,19 +52,14 @@ public:
 			return -1;
 		}
 
-		int reconciledOffset = ArraySize(reconciledOrders);
 		ArrayResize(activeOrders, loadedCount);
-		ArrayResize(reconciledOrders, reconciledOffset + loadedCount);
 
 		int activeCount = 0;
-		int reconciledCount = 0;
 
 		for (int i = 0; i < loadedCount; i++) {
 			ENUM_ORDER_STATUSES orderStatus = loadedOrders[i].GetStatus();
 
 			if (orderStatus == ORDER_STATUS_CLOSED || orderStatus == ORDER_STATUS_CANCELLED) {
-				reconciledOrders[reconciledOffset + reconciledCount] = loadedOrders[i];
-				reconciledCount++;
 				continue;
 			}
 
@@ -88,7 +73,6 @@ public:
 		}
 
 		ArrayResize(activeOrders, activeCount);
-		ArrayResize(reconciledOrders, reconciledOffset + reconciledCount);
 
 		if (activeCount > 0) {
 			logger.Info(

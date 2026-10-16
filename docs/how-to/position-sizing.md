@@ -16,7 +16,7 @@ Return semantics:
 | `-1`            | Strategy has no allocated balance (deactivated)                |
 | `0`             | Invalid inputs (non-positive NAV, stop distance, or tick data) |
 
-After this call, pass the result through broker volume normalization before submitting the order.
+After this call, pass the result through `NormalizeLotSize(symbol)` before submitting the order.
 
 ## Balance flow
 
@@ -24,7 +24,7 @@ Capital propagates down three levels:
 
 1. **EA level** — `account.GetBalance()` at startup seeds the whole portfolio.
 2. **Asset level** — EA divides balance equally among enabled assets.
-3. **Strategy level** — each asset divides its balance equally among active (non-passive) strategies. Passive strategies receive the full asset balance.
+3. **Strategy level** — each asset divides its balance equally among its enabled strategies.
 
 See [Multi-Asset Portfolios](multi-asset.md) for the formulas.
 
@@ -49,4 +49,4 @@ riskAmount = 0.01 * 10000 = 100
 lotSize    = 100 / (50 * 10) = 0.20
 ```
 
-If `maxLotsByOrder` is `0.10`, the result caps at `0.10`. Volume normalization then rounds to the broker's volume step (and rejects if below minimum).
+If `maxLotsByOrder` is `0.10`, the result caps at `0.10`. `NormalizeLotSize` then rounds to the broker's volume step (and rejects if below minimum).

@@ -204,18 +204,12 @@ public:
 		const SDateTime &time,
 		double price,
 		double profits,
-		double grossProfit,
-		double commission,
-		double swap,
 		ENUM_DEAL_REASON reason
 	) {
 		bool isCancelled = (profits == 0.0 && price == 0.0);
 
 		order.SetCloseAt(time);
 		order.SetClosePrice(price);
-		order.SetGrossProfit(grossProfit);
-		order.SetCommission(commission);
-		order.SetSwap(swap);
 		order.SetProfitInDollars(profits);
 		order.SetStatus(isCancelled ? ORDER_STATUS_CANCELLED : ORDER_STATUS_CLOSED);
 		order.SetCloseReason(reason);
