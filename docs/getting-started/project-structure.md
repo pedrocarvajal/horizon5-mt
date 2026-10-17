@@ -71,6 +71,7 @@ Horizon5/
 |   |-- SMarketStatus.mqh, STime.mqh, STradeResult.mqh, ...
 |
 |-- storage/                     Backtest INI files and results (git-ignored)
+|   |-- sets/Horizon-Live.set    Production preset (tracked)
 |
 |-- scripts/                     Build, sync, and utility scripts
 |
